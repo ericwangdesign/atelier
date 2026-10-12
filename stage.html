@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M12 9v14l11-7z' fill='white'/%3E%3C/svg%3E">
+<!--
+  The stage: a wallpaper, screens at any size, a glass panel on the right, and a glass timeline at the bottom that
+  plays a project's scenes step by step. Notes, Explore and the agent that answers them live in agent.js.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Nothing is drawn until the page has built itself (the #ready marker at the end of the body), so it never shows
+     an empty panel while its scripts and scenes load, and the crossfade from the other page lands on the finished page. -->
+<link rel="expect" href="#ready" blocking="render">
+<link rel="stylesheet" href="wall.css">
+<link rel="stylesheet" href="ui.css">
+<style>
+  @property --fl { syntax: '<length>'; inherits: false; initial-value: 0px; }
+  @property --fr { syntax: '<length>'; inherits: false; initial-value: 0px; }
+  :root { --c-text: #fff; --c-dim: rgb(255 255 255 / .8); --c-faint: rgb(255 255 255 / .62); --c-inset: rgb(255 255 255 / .1); --c-line: rgb(255 255 255 / .1); --c-line2: rgb(255 255 255 / .22);
+    --c-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --blur: 40px; --tint: .38; --dim: 0; --panel-w: 320px; --bar-h: 104px; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { background: #05070d; color: var(--c-text); font: 400 12px/16px var(--c-font); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  button, input { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+  /* ---------- wallpaper ---------- */
+
+  /* ---------- canvas and screens ---------- */
+  /* The canvas is the full window, so a screen can be dragged or zoomed anywhere, under the glass too.
+     Fit only uses the part the panel and bar leave free. */
+  .canvas { position: fixed; inset: 0; overflow: hidden; cursor: default; touch-action: none; }
+  .canvas.panning { cursor: grabbing; }
+  .frames { position: absolute; inset: 0 calc(var(--panel-w) + 16px) var(--bar-h) 0; display: flex; align-items: center; justify-content: center; gap: 32px; padding: 32px; pointer-events: none; }
+  :root[data-panel="off"] .frames { right: 0; }
+  :root[data-bar="off"] .frames { bottom: 0; }
+  .fwrap { flex: none; position: relative; pointer-events: auto; }
+  .fwrap.drag { z-index: 10; }
+  .cap { position: absolute; left: 0; bottom: 100%; margin-bottom: 8px; color: rgb(255 255 255 / .85); text-shadow: 0 1px 2px rgb(0 0 0 / .4); font-size: 11px; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* Duplicate sits at the screen's top right, centred on the caption's line (8 + 8 above the frame); the caption stops short of it */
+  .fdup { position: absolute; right: 0; bottom: 100%; margin-bottom: 6px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: rgb(255 255 255 / .85); display: grid; place-items: center; cursor: pointer; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .4)); transition: background-color .15s ease; }
+  .fdup:hover { background: var(--surf-hover); color: #fff; }
+  .fdup svg { width: 12px; height: 12px; }
+  .fwrap.dupable .cap { max-width: calc(100% - 28px); overflow: hidden; text-overflow: ellipsis; }
+  :root[data-ui="off"] .fdup { visibility: hidden; }
+  /* exporting (capture mode): no border and square corners, so a cut-out screen is the design edge to edge */
+  :root[data-capture] .frame, :root[data-capture] .screen { border-radius: 0 !important; border: 0 !important; }
+  :root[data-wall="light"] .cap { text-shadow: 0 1px 3px rgb(0 0 0 / .7), 0 0 12px rgb(0 0 0 / .5); }
+  :root[data-ui="off"] .cap, :root[data-ui="off"] .rz { visibility: hidden; }
+  .scaler { position: relative; }
+  /* Screens move by their caption, title bar or status bar. Double-click one to put it back. */
+  .cap, .tbar, .status { cursor: grab; user-select: none; touch-action: none; }
+  .fwrap.drag .cap, .fwrap.drag .tbar, .fwrap.drag .status { cursor: grabbing; }
+  body.dragging iframe, body.sizing iframe, body.panning iframe { pointer-events: none; }
+  /* The first screen resizes from all four edges and corners, like a real window.
+     The handles straddle the edge outside the scaled frame, so they keep a full grab area at any zoom. */
+  .rz { position: absolute; z-index: 3; display: grid; place-items: center; }
+  .rz.n, .rz.s { left: 14px; right: 14px; height: 20px; cursor: ns-resize; }
+  .rz.e, .rz.w { top: 14px; bottom: 14px; width: 20px; cursor: ew-resize; }
+  .rz.n { top: -10px; } .rz.s { bottom: -10px; } .rz.e { right: -10px; } .rz.w { left: -10px; }
+  .rz.nw, .rz.ne, .rz.sw, .rz.se { width: 28px; height: 28px; z-index: 4; }
+  .rz.nw { left: -14px; top: -14px; cursor: nwse-resize; } .rz.se { right: -14px; bottom: -14px; cursor: nwse-resize; }
+  .rz.ne { right: -14px; top: -14px; cursor: nesw-resize; } .rz.sw { left: -14px; bottom: -14px; cursor: nesw-resize; }
+  .rz::after { content: ""; border-radius: 999px; background: rgb(255 255 255 / .85); box-shadow: 0 1px 4px rgb(0 0 0 / .4); opacity: 0; transition: opacity .15s ease; }
+  .rz.e::after, .rz.w::after { width: 4px; height: 44px; } .rz.n::after, .rz.s::after { width: 44px; height: 4px; }
+  .rz.nw::after, .rz.ne::after, .rz.sw::after, .rz.se::after { width: 10px; height: 10px; }
+  .rz:hover::after, body.sizing .rz::after { opacity: 1; }
+  body.sizing, body.sizing * { cursor: var(--rz-cursor) !important; }
+  .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; display: flex; flex-direction: column; background: #141414;
+    border: 1px solid rgb(255 255 255 / .14); box-shadow: 0 24px 80px rgb(0 0 20 / .45); }
+  .frame.window { border-radius: 12px; }
+  .frame.handheld { border-radius: 48px; }
+  .frame.tablet { border-radius: 28px; }
+  .frame.bare { border-radius: 0; }
+  .screen { flex: 1; min-height: 0; position: relative; }
+  .screen { isolation: isolate; }
+  .host { position: absolute; inset: 0; }
+  .host > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  .host .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #8b8984; font: 14px var(--c-font); background: #141414; }
+  /* compare views: B sits over A. Swipe clips it at the divider, Onion fades it, Difference leaves only what changed. */
+  .screen[data-cmp=swipe] .host.b { clip-path: inset(0 0 0 calc(var(--wipe, .5) * 100%)); }
+  .screen[data-cmp=onion] .host.b { opacity: var(--onion, .5); }
+  .screen[data-cmp=diff] .host.b { mix-blend-mode: difference; }
+  /* Divider, knob and labels live inside the zoomed screen, so their sizes are divided by the zoom (--k) to stay constant. */
+  .wipe { display: none; position: absolute; top: 0; bottom: 0; left: calc(var(--wipe, .5) * 100%); width: calc(32px / var(--k, 1)); margin-left: calc(-16px / var(--k, 1)); z-index: 5; cursor: ew-resize; touch-action: none; }
+  .wipe::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: calc(2px / var(--k, 1)); margin-left: calc(-1px / var(--k, 1)); background: #fff; box-shadow: 0 0 calc(8px / var(--k, 1)) rgb(0 0 0 / .5); }
+  .wipe::after { content: ""; position: absolute; left: 50%; top: 50%; width: calc(28px / var(--k, 1)); height: calc(28px / var(--k, 1)); margin: calc(-14px / var(--k, 1)) 0 0 calc(-14px / var(--k, 1)); border-radius: 50%;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M11 10l-4 4 4 4M17 10l4 4-4 4' fill='none' stroke='%23141414' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+    box-shadow: 0 calc(2px / var(--k, 1)) calc(8px / var(--k, 1)) rgb(0 0 0 / .4); }
+  .screen[data-cmp=swipe] .wipe { display: block; }
+  .ab { display: none; position: absolute; top: calc(12px / var(--k, 1)); z-index: 4; height: 24px; padding: 0 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+    background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .2); color: #fff; font: 500 12px/24px var(--c-font); }
+  .ab.a { left: calc(12px / var(--k, 1)); transform: scale(calc(1 / var(--k, 1))); transform-origin: top left; }
+  .ab.b { right: calc(12px / var(--k, 1)); transform: scale(calc(1 / var(--k, 1))); transform-origin: top right; }
+  /* in Swipe the labels sit either side of the divider and follow it */
+  .screen[data-cmp=swipe] .ab.a { left: auto; right: calc((1 - var(--wipe, .5)) * 100% + 12px / var(--k, 1)); transform-origin: top right; }
+  .screen[data-cmp=swipe] .ab.b { right: auto; left: calc(var(--wipe, .5) * 100% + 12px / var(--k, 1)); transform-origin: top left; }
+  .screen[data-cmp] .ab { display: block; }
+  .screen[data-cmp=""] .ab { display: none; }
+  :root[data-ui="off"] .ab { display: none !important; }
+  /* chrome: a window title bar for desktop sizes, above the design. Phones and tablets work like the real thing: the
+     design runs the full height, and the status bar and home indicator float over it, in black or white to suit
+     what's under them. Scenes keep clear of them with var(--safe-top) and var(--safe-bottom). */
+  .tbar { height: 36px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #141414; border-bottom: 1px solid #2c2c2c; color: #8b8984; font: 12px var(--c-font); }
+  .tbar .tl3 { display: flex; gap: 8px; flex: 1; } .tbar .tl3 i { width: 12px; height: 12px; border-radius: 50%; background: #3a3a3a; }
+  .status { height: 54px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 28px 0 44px; color: #f5f2ed; font: 600 17px -apple-system, "SF Pro Text", var(--c-font); }
+  .status, .home { position: absolute; left: 0; right: 0; z-index: 3; pointer-events: none; transition: color .2s ease; }
+  .status { top: 0; } .home { bottom: 0; }
+  .frame.ink-top .status { color: #000; } .frame.ink-bottom .home { color: #000; }
+  .status .island { width: 125px; height: 37px; border-radius: 100px; background: #000; flex: none; }
+  .status .levels { width: 78px; display: flex; justify-content: flex-end; } .status .levels i { width: 72px; height: 11px; background: currentColor; -webkit-mask: url(levels.svg) center / 100% 100% no-repeat; mask: url(levels.svg) center / 100% 100% no-repeat; }
+  .frame.tablet .status { height: 32px; padding: 0 24px; font-size: 13px; } .frame.tablet .island { visibility: hidden; }
+  .home { height: 34px; display: grid; place-items: center; color: #f5f2ed; } .home::before { content: ""; width: 136px; height: 5px; border-radius: 999px; background: currentColor; transition: background-color .2s ease; }
+  .frame.tablet .home { height: 20px; } .frame.tablet .home::before { width: 180px; }
+  .frame:not(.window) .tbar, .frame.window .status, .frame.window .home, .frame.bare .tbar, .frame.bare .status, .frame.bare .home { display: none; }
+
+  /* ---------- glass, shared by the panel and the bar ---------- */
+  .glass { color: #fff; background: rgb(40 40 46 / var(--tint)); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%); backdrop-filter: blur(var(--blur)) saturate(180%);
+    border-radius: 24px; box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .28), inset 0 1px 0 rgb(255 255 255 / .18), 0 16px 48px rgb(0 0 0 / .35); }
+  :root[data-wall="light"] .glass { background: rgb(24 24 30 / calc(var(--tint) + .24)); }
+
+  /* ---------- panel ---------- */
+  .side { position: fixed; top: 16px; right: 16px; bottom: 16px; width: var(--panel-w); display: flex; flex-direction: column; overflow: hidden; z-index: 20; transition: transform .26s cubic-bezier(.23, 1, .32, 1), opacity .2s ease; }
+  :root[data-panel="off"] .side { transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none; }
+  /* One rhythm for the whole panel. Text and controls start 16 in from both sides.
+     Sections have 20 above and below their divider, 12 between blocks, 6 from a label to its control.
+     Controls are 30 tall, toggle rows 20. Nothing bleeds: a tab, a selected row and a button all share the column's
+     edges, and a row's text sits 8 inside its fill. */
+  /* the tab bar stays put and only the sections under it scroll, so nothing ever slides beneath it */
+  /* the project, as Figma shows the file: its name at the top, a menu to switch or start a new one */
+  .projbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 14px 16px 2px; }
+  /* zoom sits at the right of the project row, like Figma; its chevron lines up with the sections' (8 in, -8 out), and it
+     overhangs the 24px row by 2 above and below so the row keeps its height */
+  .proj { max-width: 100%; height: 24px; padding: 0 18px 0 0; border: 0; color: var(--c-text); font: 600 15px/24px var(--c-font); letter-spacing: -.01em; cursor: pointer; text-overflow: ellipsis;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 2px center no-repeat; }
+  .tabs { flex: none; display: flex; align-items: center; gap: 4px; padding: 6px 0 10px; border-bottom: 1px solid var(--c-line); }
+  .panes { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .panes::-webkit-scrollbar { display: none; }
+  /* The tabs scroll sideways when they outgrow the panel, never squeeze; a fade marks the side with more. */
+  .tabbar { flex: 1; min-width: 0; display: flex; gap: 4px; padding: 2px 16px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding: 0 16px; }
+  .tabbar::-webkit-scrollbar { display: none; }
+  /* The mask stays on at all times and only its fade widths change: adding or removing a mask under the glass's
+     backdrop blur rebuilds the layer, and the panel flashed every time the row reached an end. */
+  .tabbar { --fl: 0px; --fr: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
+    transition: --fl .18s ease-out, --fr .18s ease-out; }
+  .tabbar.more-l { --fl: 36px; } .tabbar.more-r { --fr: 36px; }
+  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--c-dim); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .tab:hover { color: var(--c-text); }
+  .tab[aria-selected="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
+  .zsel { flex: none; margin: -2px -8px -2px auto; width: 68px; height: 28px; padding: 0 22px 0 8px; border: 0; border-radius: 999px; color: var(--c-dim); font-size: 13px; font-variant-numeric: tabular-nums; text-align-last: right; justify-content: flex-end; cursor: pointer;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 8px center no-repeat; }
+  .zsel:hover { color: var(--c-text); background-color: var(--surf-hover); box-shadow: var(--surf-edge); }
+  .sect { padding: 14px 16px 16px; }
+  .sect.offtab { display: none; }
+  .sect:not(.offtab) ~ .sect:not(.offtab) { border-top: 1px solid var(--c-line); }
+  .st { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; border: 0; background: none; font-size: 13px; line-height: 20px; font-weight: 500; text-align: left; cursor: pointer; }
+  .st::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid var(--c-faint); border-bottom: 1.5px solid var(--c-faint); transform: translateY(-2px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+  .sect.folded .st::after { transform: rotate(-45deg); }
+  .sect.folded > :not(.st) { display: none !important; }
+  .lbl { display: flex; justify-content: space-between; align-items: center; color: var(--c-dim); line-height: 16px; }
+  .lbl output { color: var(--c-text); font-variant-numeric: tabular-nums; }
+  .seg { display: flex; padding: 2px; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
+  /* pills share the width equally, but never get narrower than their text with 10 either side */
+  .pill { flex: 1 1 0; min-width: fit-content; height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--c-dim); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pill:hover { color: var(--c-text); }
+  .pill[aria-pressed="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
+  .range { display: block; width: 100%; height: 14px; -webkit-appearance: none; appearance: none; background: none; cursor: pointer; }
+  .range::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--surf-hover); box-shadow: var(--surf-edge); }
+  .range::-moz-range-track { height: 4px; border-radius: 999px; background: var(--surf-hover); }
+  .range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
+  .range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
+  .two { display: grid; grid-template-columns: 1fr 12px 1fr 30px; gap: 4px; align-items: center; }
+  .ibtn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-dim); display: grid; place-items: center; cursor: pointer; }
+  .ibtn:hover { background: var(--surf-hover); color: var(--c-text); }
+  .ibtn svg { width: 12px; height: 12px; }
+  .two span { color: var(--c-faint); text-align: center; }
+  .num, .txt { display: block; width: 100%; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); font-variant-numeric: tabular-nums; }
+  .num::-webkit-inner-spin-button { display: none; }
+  .num:hover, .txt:hover { background-color: var(--surf-hover); }
+  select.txt { display: flex; align-items: center; cursor: pointer; padding-right: 32px; background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 12px center no-repeat; }
+  .acts { display: flex; gap: 8px; }
+  .btn { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); cursor: pointer; display: grid; place-items: center; white-space: nowrap; }
+  .btn:hover { background: var(--surf-hover); }
+  .btn { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; } .btn:active:not(:disabled) { transform: scale(.97); }
+  .chk { display: flex; align-items: center; justify-content: space-between; min-height: 20px; color: var(--c-dim); cursor: pointer; }
+  /* Selected is always the same translucent white as a selected pill, never a solid fill or a colour. */
+  .chk input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border-radius: 999px; background: var(--surf); box-shadow: var(--surf-edge); position: relative; cursor: pointer; transition: background .2s; }
+  .chk input[type=checkbox]::before { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: rgb(255 255 255 / .55); transition: transform .25s cubic-bezier(.23, 1, .32, 1), background .2s; }
+  .chk input[type=checkbox]:checked { background: var(--surf-on); } .chk input[type=checkbox]:checked::before { transform: translateX(12px); background: #fff; }
+  .swatch { flex: none; width: 20px; height: 20px; border: 0; padding: 0; border-radius: 50%; background: none; cursor: pointer; }
+  .swatch::-webkit-color-swatch-wrapper { padding: 0; } .swatch::-webkit-color-swatch { border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+  .swatch::-moz-color-swatch { border: 0; border-radius: 50%; }
+  .note { color: var(--c-faint); line-height: 16px; text-wrap: balance; }
+  .note:empty { display: none; }
+  .steps { padding: 0; list-style: none; counter-reset: s; }
+  .steps li { counter-increment: s; display: flex; gap: 8px; align-items: center; height: 28px; padding: 0 8px; border-radius: 999px; color: var(--c-dim); cursor: pointer; }
+  .steps li::before { content: counter(s); width: 12px; color: var(--c-faint); font-variant-numeric: tabular-nums; }
+  .steps li span { margin-left: auto; color: var(--c-faint); font-variant-numeric: tabular-nums; }
+  .steps li + li { margin-top: 2px; }
+  .steps li:hover { background: var(--c-inset); }
+  .steps li.cur { background: rgb(255 255 255 / .16); color: var(--c-text); }
+  .keys { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; color: var(--c-dim); }
+  .keys dt { color: var(--c-dim); } .keys dd { margin: 0; text-align: right; }
+  kbd { font: inherit; display: inline-block; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px; background: var(--c-inset); color: var(--c-text); line-height: 20px; text-align: center; }
+  kbd + kbd { margin-left: 4px; }
+  .btn[aria-pressed="true"] { background: var(--surf-on); }
+  /* design list, like layers: a lettered mark for each design on screen, an empty ring for the rest */
+  .dlist { padding: 0; list-style: none; }
+  .dlist li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 5px; border-radius: 999px; color: var(--c-dim); cursor: pointer; user-select: none; }
+  .dlist li + li { margin-top: 2px; }
+  .dlist li:hover { background: var(--c-inset); color: var(--c-text); }
+  .dlist li.on { color: var(--c-text); }
+  .dlist li.full { opacity: .4; cursor: default; } .dlist li.full:hover { background: none; color: var(--c-dim); }
+  /* a variant sits under its scene, indented like a child layer */
+  .dlist li.var { padding-left: 28px; }
+  .dlist li > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dlist li .x { margin-left: auto; visibility: hidden; } .dlist li:hover .x { visibility: visible; }
+  .dlist li .ver + .x { margin-left: 4px; }
+  /* a page with several versions: its name, then one chip per version (and saved variant) under it */
+  /* a design with several versions: its name, then one row per version, like layers in a group */
+  .dlist li.fh { height: 28px; padding-left: 8px; color: var(--c-text); font-weight: 500; }
+  .dlist li.fh + li.sub { margin-top: 0; }
+  .dlist li.sub + li:not(.sub) { margin-top: 8px; }
+  .dlist li.sub { height: 30px; }
+  .dlist li .vn { flex: none; min-width: 22px; color: var(--c-text); font-variant-numeric: tabular-nums; }
+  .dlist li .vd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-faint); }
+  .dlist li.on .vd, .dlist li:hover .vd { color: var(--c-dim); }
+  .dlist li.lost { opacity: .5; }
+  .dlist li .star { flex: none; color: #4da6ff; }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--c-inset); color: var(--c-dim); font: inherit; font-size: 12px; cursor: pointer; }
+  .chip:hover { color: var(--c-text); background: var(--c-line2); }
+  .chip.on { background: rgb(255 255 255 / .22); color: var(--c-text); }
+  .chip b { font-weight: 500; }
+  .chip .x { margin: 0 -4px 0 0; visibility: hidden; } .chip:hover .x { visibility: visible; }
+  .lay { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  /* a note's snapshot: what was under the pin when it was made */
+  .snap { display: block; width: 100%; margin-top: 8px; border-radius: 8px; background: rgb(0 0 0 / .3); }
+  .notes .snap { max-height: 72px; object-fit: cover; object-position: center; }
+  .subrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .link { flex: none; padding: 0; border: 0; background: none; color: var(--c-dim); line-height: 16px; cursor: pointer; }
+  .link:hover { color: var(--c-text); }
+  .mk { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--c-line2); display: grid; place-items: center; font-size: 11px; font-weight: 500; }
+  /* in the list the mark is only a state: a small dot on the one on screen, or with several on screen, a letter
+     (A to E, matching the screen) on each one that's on. Nothing on the rest. Same 20px slot, so text never moves. */
+  .dlist .mk { box-shadow: none; }
+  .dlist:not(.many) li.on .mk::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(255 255 255 / .9); }
+  .dlist.many li.on .mk { background: rgb(255 255 255 / .88); color: #0b0b0f; }
+  .ver { margin-left: auto; color: var(--c-faint); font-variant-numeric: tabular-nums; }
+  .sub { color: var(--c-text); font-weight: 500; line-height: 16px; }
+  #ctls > .stack + .stack { margin-top: 16px; }
+  .hint { color: var(--c-faint); line-height: 16px; }
+  /* notes list: the number matches the pin on the screen */
+  .notes { padding: 0; list-style: none; }
+  .notes li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 12px; cursor: pointer; }
+  .notes li + li { margin-top: 2px; }
+  .notes li:hover { background: var(--c-inset); }
+  /* notes come in sittings, newest first; an older sitting with nothing open folds to its header */
+  .notes li.sit { align-items: center; gap: 6px; height: 28px; padding: 0 8px; color: var(--c-dim); font-size: 12px; }
+  .notes li.sit + li { margin-top: 0; }
+  .notes li:not(.sit) + li.sit { margin-top: 12px; }
+  .notes li.sit::before { content: ""; flex: none; width: 5px; height: 5px; margin: 0 5px 0 2px; border-right: 1.5px solid var(--c-faint); border-bottom: 1.5px solid var(--c-faint); transform: translateY(-1px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+  .notes li.sit.shut::before { transform: rotate(-45deg); }
+  .notes li.sit .ver { font-size: 12px; }
+  /* the list number matches its pin; a done note keeps only the ring, like a design that is off */
+  .nbadge { flex: none; width: 20px; height: 20px; border-radius: 50%; background: rgb(255 255 255 / .22); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 500; }
+  .notes li.done .nbadge { background: none; box-shadow: inset 0 0 0 1.5px var(--c-line2); color: var(--c-faint); }
+  .notes li.done .nt { color: var(--c-faint); text-decoration: line-through; text-decoration-color: var(--c-line2); }
+  .nb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+  .nt { color: var(--c-text); line-height: 16px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nt i { color: var(--c-faint); font-style: normal; }
+  .nm { color: var(--c-faint); line-height: 16px; }
+  .x { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-faint); font-size: 14px; line-height: 20px; cursor: pointer; }
+  .x:hover { background: var(--c-inset); color: var(--c-text); }
+  /* The rhythm comes last, and resets and rhythm both have zero specificity, so the rhythm always wins. */
+  :where(.steps, .keys, .note, .range, .notes, .hint, .dlist) { margin: 0; }
+  :where(.sect, .stack) > * + * { margin-top: 12px; }
+  :where(.sect, .stack) > .lbl + * { margin-top: 6px; }
+  :where(.sect, .stack) > .txt + .txt { margin-top: 8px; }
+  :where(.sect, .stack) > .note { margin-top: 6px; }
+  /* Spacing is set by what shows, not by boxes: rows that carry empty space inside them (list rows, toggle rows,
+     the title's line) get less margin, so every visible gap reads as 12, and 6 from a label to its control. */
+  :where(.sect, .stack) > .st + * { margin-top: 10px; }
+  :where(.sect, .stack) > .st + :is(.dlist, .notes) { margin-top: 4px; }
+  :where(.sect, .stack) > .st + .steps { margin-top: 6px; }
+  :where(.sect, .stack) > :is(.dlist, .notes) + *, :where(.sect, .stack) > :is(.dlist, .notes) + [hidden] + * { margin-top: 6px; }
+  :where(.sect, .stack) > .steps + * { margin-top: 4px; }
+  :where(.sect, .stack) > * + .chk { margin-top: 12px; }
+  :where(.sect, .stack) > .chk + .chk, :where(.sect, .stack) > .steps + .chk { margin-top: 4px; }
+  :where(.sect, .stack) > .chk + .chk { margin-top: 8px; }
+  :where(.sect, .stack) > .subrow + * { margin-top: 10px; }
+  :where(.sect, .stack) > .two + .chk { margin-top: 10px; }
+  .sect > .chk:last-child { margin-bottom: -2px; }
+  /* ---------- notes on the screens ---------- */
+  .pins { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+  /* pins keep one size at any zoom */
+  /* a pin is a small glass chip, like the A and B labels, so it reads on light and dark designs alike */
+  /* centred by flex on the number's own box, tabular figures, and a pill once it needs two digits */
+  .pin { position: absolute; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border: 0; border-radius: 999px; color: #fff; font: 500 12px/1 var(--c-font); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+    background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .4), 0 2px 8px rgb(0 0 0 / .35);
+    translate: -50% -50%; transform: scale(calc(1 / var(--k, 1))); cursor: pointer; pointer-events: auto; transition: background .15s, box-shadow .15s; }
+  .pin:hover, .pin.open { background: rgb(80 80 88 / .85); box-shadow: inset 0 0 0 1.5px #fff, 0 2px 8px rgb(0 0 0 / .35); }
+  .pin.flash { animation: pinflash .9s cubic-bezier(.23, 1, .32, 1); }
+  @keyframes pinflash { 30% { transform: scale(calc(1.5 / var(--k, 1))); } }
+  .catch { display: none; position: absolute; inset: 0; z-index: 7; cursor: crosshair; }
+  body.noting .catch, body.picking .catch, body.cutting .catch { display: block; }
+  /* Cut: the element under the pointer, outlined, with its name and size. Arrow keys walk to its parent and child. */
+  .cutbox { position: fixed; z-index: 55; display: none; pointer-events: none; border-radius: 4px; background: rgb(77 166 255 / .1); box-shadow: 0 0 0 1.5px #4da6ff; }
+  body.cutting .cutbox.on { display: block; }
+  .cutbox span { position: absolute; left: -1.5px; bottom: calc(100% + 6px); height: 20px; padding: 0 8px; border-radius: 999px; background: #4da6ff; color: #05070d; font: 500 11px/20px var(--c-font); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cutbox.below span { bottom: auto; top: calc(100% + 6px); }
+  /* Focus: a screen crops to one element. Its chrome, pins and resize handles step aside. */
+  .frame.focus { border-radius: 12px; }
+  .frame.focus .tbar, .frame.focus .status, .frame.focus .home { display: none; }
+  .frame.focus .host { right: auto; bottom: auto; }
+  .fwrap.focusing .rz, .fwrap.focusing .pins { display: none; }
+  .fwrap.fixed .rz { display: none; } /* phones and tablets keep their size; only desktop-size screens resize by dragging */
+  :root[data-ui="off"] .pins { display: none; }
+  /* The editor grows out of its pin: a short fade and a small slide from the pin's side, never a pop. */
+  .notepop { position: fixed; z-index: 60; width: 264px; padding: 12px; opacity: 0; transform: translateX(var(--from, -6px)) scale(.97); transform-origin: var(--ox, left) 22px;
+    transition: opacity .14s ease, transform .14s ease; }
+  .notepop.show { opacity: 1; transform: none; transition: opacity .2s cubic-bezier(.23, 1, .32, 1), transform .32s cubic-bezier(.23, 1, .32, 1); }
+  .pophead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pophead .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notepop .snap { margin-top: 8px; }
+  .notepop .popcut { margin-top: 6px; }
+  .notepop textarea { margin-top: 8px; }
+  @media (prefers-reduced-motion: reduce) { .notepop, .notepop.show { transform: none; } .toast { animation: none; } }
+  .notepop textarea { display: block; width: 100%; min-height: 64px; padding: 8px 12px; border: 0; border-radius: 12px; background: var(--surf); box-shadow: var(--surf-edge); color: #fff; font: inherit; line-height: 16px; resize: none; }
+  .notepop textarea:focus { outline: none; box-shadow: inset 0 0 0 1px var(--c-line2); }
+  .notepop .acts { margin-top: 8px; }
+  .acts + .acts { margin-top: 8px; }
+  .acts.tools { margin-bottom: 12px; }
+  .acts.tools .btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn .key { color: var(--c-faint); font-size: 11px; }
+  .notelinks { display: flex; justify-content: space-between; margin-top: 12px; padding: 0 4px; }
+  .notelinks[hidden] { display: none; }
+  .notelinks .link { font-size: 12px; }
+  .notelinks .link:hover { color: var(--c-text); }
+  .toast { position: fixed; top: 16px; left: 16px; right: calc(var(--panel-w) + 32px); width: max-content; margin: 0 auto; z-index: 40; padding: 0 14px; height: 32px; border-radius: 999px; line-height: 32px; animation: toastin .22s cubic-bezier(.23, 1, .32, 1); }
+  @keyframes toastin { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+  .drop { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: rgb(0 0 0 / .4); font-size: 15px; }
+  .drop.show { display: grid; }
+
+  /* ---------- timeline bar ---------- */
+  .transport { position: fixed; left: 16px; right: calc(var(--panel-w) + 32px); bottom: 16px; max-width: 960px; margin: 0 auto; z-index: 30; padding: 12px; transition: transform .26s cubic-bezier(.23, 1, .32, 1), opacity .2s ease, right .26s cubic-bezier(.23, 1, .32, 1); }
+  :root[data-panel="off"] .transport { right: 16px; }
+  :root[data-bar="off"] .transport { transform: translateY(calc(100% + 32px)); opacity: 0; pointer-events: none; }
+  /* Bar rhythm: 12 in from every edge. Transport buttons sit 4 apart, every other group 12. */
+  .trow { display: flex; align-items: center; gap: 12px; height: 32px; }
+  .tgroup { display: flex; align-items: center; gap: 4px; flex: none; }
+  .tbtn { height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: #fff; cursor: pointer; flex: none; display: grid; place-items: center; }
+  .tbtn:hover { background: var(--surf-hover); }
+  .tbtn.ic { width: 32px; padding: 0; }
+  .tbtn svg { width: 10px; height: 10px; }
+  /* play is the main action: the same glass, a step brighter, pause while playing */
+  #play { width: 32px; height: 32px; background: var(--surf-on); color: #fff; transition: transform .15s cubic-bezier(.25, .46, .45, .94), background .15s ease; }
+  #play:hover { background: color-mix(in srgb, var(--surf-on), white 8%); } #play:active { transform: scale(.97); }
+  #play svg { width: 11px; height: 11px; } #play .i-play { margin-left: 1px; }
+  #play .i-pause, #play.on .i-play { display: none; } #play.on .i-pause { display: block; }
+  /* times sit either side of the scrubber: elapsed in white, the total dimmer. Fixed width so nothing shifts as digits change. */
+  .clock { flex: none; width: 36px; font-size: 12px; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+  .clock.now { color: #fff; text-align: right; } .clock.total { color: rgb(255 255 255 / .45); }
+  .scrubwrap { flex: 1; min-width: 80px; position: relative; height: 16px; }
+  #scrub { width: 100%; display: block; position: relative; z-index: 1; -webkit-appearance: none; appearance: none; background: none; height: 16px; margin: 0; cursor: pointer; }
+  /* the slider's own track is invisible; the chapter segments below draw it */
+  #scrub::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+  #scrub::-moz-range-track { height: 4px; background: transparent; }
+  #scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 0.5px rgb(0 0 0 / .12), 0 1px 2px rgb(0 0 0 / .3), 0 3px 8px rgb(0 0 0 / .25); transition: transform .12s ease; }
+  #scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 0.5px rgb(0 0 0 / .12), 0 1px 2px rgb(0 0 0 / .3), 0 3px 8px rgb(0 0 0 / .25); }
+  #scrub:hover::-webkit-slider-thumb { transform: scale(1.1); } #scrub:active::-webkit-slider-thumb { transform: scale(1.2); }
+  #scrub:focus-visible { outline: none; } #scrub:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgb(255 255 255 / .35), 0 1px 2px rgb(0 0 0 / .3); }
+  /* Chapters: one segment per step, 2 apart, each filling white as its step plays. They span the thumb's travel
+     (7 in from each end), so a step's start sits exactly in the gap before its segment. */
+  .ticks { position: absolute; left: 7px; right: 7px; top: 6px; height: 4px; pointer-events: none; z-index: 0; }
+  .ticks i { position: absolute; top: 0; height: 4px; border-radius: 999px; background: rgb(255 255 255 / .18); overflow: hidden; transition: transform .15s ease; }
+  .ticks b { display: block; height: 100%; background: #fff; transform: scaleX(0); transform-origin: left; }
+  .scrubwrap:hover .ticks i { transform: scaleY(1.5); }
+  /* speed: a menu, 32 tall like the buttons beside it (four or more choices are always a menu, never pills) */
+  .spd { flex: none; height: 32px; padding: 0 28px 0 12px; border: 0; border-radius: 999px; color: #fff; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
+    background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 12px center no-repeat;
+    -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
+  .spd:hover { background-color: var(--surf-hover); }
+  .mrow { display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; }
+  .marks { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+  .mark { height: 24px; padding: 0 8px; border: 0; border-radius: 999px; background: none; color: rgb(255 255 255 / .55); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .mark span { font-size: 11px; font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .35); }
+  .mark.cur span { color: rgb(255 255 255 / .55); }
+  .mark.past { color: rgb(255 255 255 / .75); }
+  .mark:hover, .mark.cur { background: rgb(255 255 255 / .14); color: #fff; }
+  .stepn { flex: none; line-height: 24px; font-size: 11px; color: rgb(255 255 255 / .45); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 900px) { :root { --panel-w: 0px; } .side { display: none; } .transport { left: 16px; right: 16px; } .transport .seg, .clock, .stepn { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .side, .transport { transition: none; } }
+</style>
+<link rel="stylesheet" href="agent.css">
+</head>
+<body>
+<div class="wall" id="wall"></div>
+<main class="canvas" id="canvas"><div class="frames" id="frames"></div></main>
+
+<div class="transport glass" role="group" aria-label="Playback">
+  <div class="trow">
+    <span class="tgroup"><button class="tbtn ic" id="play" aria-label="Play"><svg class="i-play" viewBox="0 0 11 11" fill="currentColor"><path d="M2.5 1.2v8.6c0 .4.4.6.7.4l6.6-4.3c.3-.2.3-.6 0-.8L3.2.8c-.3-.2-.7 0-.7.4z"/></svg><svg class="i-pause" viewBox="0 0 11 11" fill="currentColor"><rect x="2" y="1" width="2.6" height="9" rx=".6"/><rect x="6.4" y="1" width="2.6" height="9" rx=".6"/></svg></button>
+    <button class="tbtn ic" id="prev" aria-label="Previous step"><svg viewBox="0 0 11 11" fill="currentColor"><path d="M2 1h1.5v9H2zM10 1v9L4 5.5z"/></svg></button>
+    <button class="tbtn ic" id="next" aria-label="Next step"><svg viewBox="0 0 11 11" fill="currentColor"><path d="M9 1H7.5v9H9zM1 1v9l6-4.5z"/></svg></button></span>
+    <span class="clock now" id="clock"></span>
+    <div class="scrubwrap"><input type="range" id="scrub" min="0" max="100" step="0.01" value="0" aria-label="Time"><div class="ticks" id="ticks" aria-hidden="true"></div></div>
+    <span class="clock total" id="total"></span>
+    <select class="spd" id="speed" aria-label="Speed"></select>
+  </div>
+  <div class="mrow"><div class="marks" id="marks" role="group" aria-label="Jump to a step"></div><span class="stepn" id="stepn"></span></div>
+</div>
+
+<aside class="side glass" aria-label="Controls">
+  <!-- Tabs, as in Figma. Every section names its tab with data-tab; the bar is built from TABS, and a tab with no sections is left out. -->
+  <div class="projbar"><select class="proj" id="proj" aria-label="Project"></select><select class="zsel" id="zsel" aria-label="Zoom"></select></div>
+  <div class="tabs"><div class="tabbar" id="tabbar" role="tablist"></div></div>
+  <div class="panes" id="panes">
+
+  <div class="sect" data-k="design" data-tab="design">
+    <button class="st">Designs</button>
+    <ol class="dlist" id="dlist"></ol>
+    <input class="txt" id="url" type="url" placeholder="http://localhost:5173" aria-label="Address">
+    <div class="acts"><button class="btn" id="focusbtn" aria-pressed="false">Focus</button></div>
+    <div class="stack" id="laywrap">
+      <div class="lay"><div class="stack"><div class="lbl">Rows</div><select class="txt" id="rows" aria-label="Rows"></select></div>
+        <div class="stack"><div class="lbl">Columns</div><select class="txt" id="cols" aria-label="Columns"></select></div></div>
+    </div>
+    <div class="stack" id="viewwrap">
+      <div class="lbl">View</div>
+      <select class="txt" id="view" aria-label="View"></select>
+      <div class="stack" id="onionwrap"><div class="lbl">Opacity <output id="oniono"></output></div><input class="range" type="range" id="onionr" min="0" max="1" step="0.05"></div>
+    </div>
+  </div>
+
+  <div class="sect" data-k="controls" data-tab="design" id="ctlsect">
+    <button class="st">Controls</button>
+    <div class="stack" id="ctls"></div>
+    <div class="acts"><button class="btn" id="ctlcopy">Copy values</button><button class="btn" id="ctlreset">Reset</button></div>
+  </div>
+
+  <div class="sect" data-k="screen" data-tab="design">
+    <button class="st">Screen</button>
+    <div class="seg" id="dev"></div>
+    <div class="lbl">Size</div>
+    <div class="two"><input class="num" id="w" type="number" min="200" max="4000" aria-label="Width"><span>×</span><input class="num" id="h" type="number" min="200" max="4000" aria-label="Height"><button class="ibtn" id="rotate" aria-label="Rotate" title="Rotate"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6a4 4 0 1 1-1.2-2.85"/><path d="M9.2 1.2v2.2H7"/></svg></button></div>
+    <label class="chk" id="secondrow">Second screen<input type="checkbox" id="second"></label>
+    <label class="chk">Device frame<input type="checkbox" id="chrome"></label>
+  </div>
+
+  <div class="sect" data-k="wall" data-tab="stage">
+    <button class="st">Wallpaper</button>
+    <select class="txt" id="wallseg" aria-label="Wallpaper"></select>
+    <label class="chk" id="colorrow">Colour<input class="swatch" type="color" id="color" aria-label="Wallpaper colour"></label>
+    <input type="file" id="file" accept="image/*" hidden>
+    <div class="lbl">Dim <output id="dimo"></output></div>
+    <input class="range" type="range" id="dimr" min="0" max="0.8" step="0.05">
+  </div>
+
+  <div class="sect" data-k="glass" data-tab="stage">
+    <button class="st">Glass</button>
+    <div class="lbl">Blur <output id="bluro"></output></div>
+    <input class="range" type="range" id="blurr" min="0" max="80" step="2">
+    <div class="lbl">Tint <output id="tinto"></output></div>
+    <input class="range" type="range" id="tintr" min="0" max="0.8" step="0.02">
+  </div>
+
+  <div class="sect" data-k="flow" data-tab="prototype">
+    <button class="st">Steps</button>
+    <ol class="steps" id="steps"></ol>
+    <label class="chk">Loop<input type="checkbox" id="loop"></label>
+    <label class="chk">Timeline<input type="checkbox" id="baron"></label>
+  </div>
+
+  <div class="sect" data-k="export" data-tab="prototype">
+    <button class="st">Export</button>
+    <div class="seg" id="exfmt"><button class="pill" data-v="png">PNG</button><button class="pill" data-v="gif">GIF</button><button class="pill" data-v="mp4">MP4</button></div>
+    <p class="hint" id="exhint"></p>
+    <div class="acts"><button class="btn" id="exbtn">Export</button></div>
+  </div>
+
+  <div class="sect" data-k="notes" data-tab="notes">
+    <button class="st">Notes</button>
+    <!-- the tools first, then what they made, then the one thing to do with it; the rest are links -->
+    <div class="acts tools"><button class="btn" id="noteadd" aria-pressed="false" title="Click to pin a note, drag to note an area">Note<span class="key">N</span></button><button class="btn" id="notecut" aria-pressed="false" title="Cut out elements and note them; shift-click for several">Cut<span class="key">X</span></button></div>
+    <ol class="notes" id="notelist"></ol>
+    <p class="hint" id="noteempty">No notes yet. Press N and click a screen.</p>
+    <p class="hint" id="notesync"></p>
+    <div class="acts"><button class="btn go" id="notesend" title="One new version per design, with all its open notes, beside the original">Send to Claude</button></div>
+    <div class="notelinks"><button class="link" id="notecopy">Copy brief</button><button class="link" id="noteclear">Clear all</button></div>
+  </div>
+
+  <div class="sect" data-k="explore" data-tab="agent">
+    <button class="st">Explore</button>
+    <div class="exfrom"><span class="mk" id="exmk">A</span><span class="sub" id="exfrom"></span><button class="link" id="exfocus" hidden></button></div>
+    <textarea class="ask" id="exask" rows="3" placeholder="What should Claude try?"></textarea>
+    <div class="lbl">Directions</div>
+    <div class="seg" id="excount"><button class="pill" data-v="2">2</button><button class="pill" data-v="3">3</button><button class="pill" data-v="4">4</button></div>
+    <div class="acts"><button class="btn go" id="exgo">Explore</button></div>
+    <p class="hint" id="exhint2">Each direction is a new version, made by its own agent at the same time. Pick one when they land.</p>
+  </div>
+
+  <div class="sect" data-k="runs" data-tab="agent">
+    <button class="st">Runs</button>
+    <ol class="runs" id="runlist"></ol>
+    <p class="hint" id="runempty">Nothing yet. Send notes or explore.</p>
+  </div>
+
+  <div class="sect" data-k="trail" data-tab="agent">
+    <button class="st">History</button>
+    <ol class="trail" id="traillist"></ol>
+    <p class="hint" id="trailempty">Every version Claude makes lands here, with why it exists.</p>
+  </div>
+  <!-- Taste: what Claude has learned you like. Every run reads it first. taste.js fills it from /api/taste. -->
+  <div class="sect" data-k="taste" data-tab="taste">
+    <button class="st">Taste</button>
+    <p class="hint">What Claude has learned from your picks and notes. Every run reads it first.</p>
+    <label class="chk tasteon"><span>Use in every run</span><input type="checkbox" id="tasteon" checked></label>
+    <div class="tastelearn" id="tastelearn" hidden><i class="agspin"></i><span>Learning from what you just did</span></div>
+    <ol class="tastelist" id="tastelist"></ol>
+    <p class="hint" id="tasteempty">Nothing yet. Pick a direction and say why, or send notes: Claude learns from both.</p>
+    <input class="tasteadd" id="tasteadd" maxlength="140" placeholder="Add something you always want" aria-label="Add to your taste">
+  </div>
+  <div class="sect" data-k="angles" data-tab="taste">
+    <button class="st">Directions you pick</button>
+    <div class="anglestats" id="anglestats"></div>
+    <p class="hint" id="anglesempty">Counted from every exploration you picked from.</p>
+  </div>
+
+  <div class="sect" data-k="liquid" data-tab="stage">
+    <button class="st">Liquid glass</button>
+    <div class="stack" id="tuner"></div>
+  </div>
+
+  <div class="sect" data-k="keys" data-tab="stage">
+    <button class="st">Keys</button>
+    <!-- Names on the left, keys on the right. What a drag does: a screen's top bar moves it, its edges resize it, empty canvas pans.
+         Scroll pans, a pinch does nothing, and a double-click puts back whatever was moved. Only desktop-size screens resize. -->
+    <dl class="keys">
+      <dt>Play</dt><dd><kbd>Space</kbd></dd>
+      <dt>Step</dt><dd><kbd>←</kbd><kbd>→</kbd></dd>
+      <dt>Frame</dt><dd><kbd>,</kbd><kbd>.</kbd></dd>
+      <dt>Restart</dt><dd><kbd>R</kbd></dd>
+      <dt>Fit, 100%</dt><dd><kbd>0</kbd><kbd>1</kbd></dd>
+      <dt>Compare, view</dt><dd><kbd>C</kbd><kbd>V</kbd></dd>
+      <dt>Panel</dt><dd><kbd>\</kbd></dd>
+      <dt>Screens only</dt><dd><kbd>H</kbd></dd>
+      <dt>Note, cut</dt><dd><kbd>N</kbd><kbd>X</kbd></dd>
+      <dt>Focus</dt><dd><kbd>F</kbd></dd>
+      <dt>Explore</dt><dd><kbd>E</kbd></dd>
+    </dl>
+    <div class="acts"><button class="btn" id="reset">Reset</button></div>
+  </div>
+  </div>
+</aside>
+<div class="cutbox" id="cutbox"><span id="cutlabel"></span></div>
+<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><img class="snap" id="popsnap" alt="" hidden><div class="nm popcut" id="popcut" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="3" placeholder="Note"></textarea><div class="acts"><button class="btn" id="popdel">Delete</button><button class="btn" id="popdone">Done</button><button class="btn" id="popsave">Save</button></div></div>
+<div class="toast glass" id="toast" hidden>Click a screen to pin a note</div>
+<div class="areabox" id="areabox"></div>
+<div class="pickpop glass" id="pickpop" hidden><p class="pt" id="pickt"></p><textarea id="pickwhy" rows="2" placeholder="Why this one? (optional)"></textarea><div class="acts"><button class="btn" id="pickno">Cancel</button><button class="btn go" id="pickyes">Pick</button></div></div>
+<div class="drop" id="drop">Drop an image for the wallpaper</div>
+
+<script src="engine.js"></script>
+<script src="wall.js"></script>
+<script src="liquid.js"></script>
+<script src="ui.js"></script>
+<script>
+/* Which project's scenes to load: ?project=, else the last one opened, else the first one serve.py lists.
+   A project is a folder next to the atelier folder with scenes/index.js in it; its scenes come from /p/<project>/.
+   Opened without serve.py there are no projects, and the starter scene plays. */
+(() => {
+  let list = [];
+  try { const x = new XMLHttpRequest(); x.open('GET', '/api/projects', false); x.send(); if (x.status === 200) list = JSON.parse(x.responseText); } catch {}
+  let want = new URLSearchParams(location.search).get('project');
+  if (!want) try { want = localStorage.getItem('workspace.project'); } catch {}
+  const p = list.find(x => x.id === want) || list[0] || null;
+  window.PROJECTS = list; window.PROJECT = p ? p.id : ''; window.PROJECT_NAME = p ? p.name : 'Starter';
+  window.SCENE_BASE = p ? `/p/${encodeURIComponent(p.id)}/` : 'starter/';
+  window.SCENE_PATH = p ? p.path || `${p.id}/scenes/` : 'workspace/starter/'; // where the files are, for briefs: relative to Projects/
+  try { if (p) localStorage.setItem('workspace.project', p.id); } catch {}
+  window.SCENES = [];
+  // scenes(['a-v1', 'a-v2'], ['icons']): the designs, and helper scripts in scenes/ that load before them
+  window.scenes = (names, libs = []) => [...libs, ...names].forEach(n => document.write(`<script src="${SCENE_BASE}${encodeURIComponent(n)}.js"><\/script>`));
+  document.write(`<script src="${SCENE_BASE}index.js"><\/script>`);
+  // A project can bring its own typefaces in scenes/fonts.css. @font-face is ignored inside a scene's shadow root,
+  // so it has to load in this document.
+  if (p && p.fonts !== false) document.write(`<link rel="stylesheet" href="${SCENE_BASE}fonts.css">`);
+})();
+</script>
+<script>
+const $ = id => document.getElementById(id);
+const root = document.documentElement;
+/* capture mode: capture.mjs drives this page in a hidden Chrome to export it (see window.__capture at the end).
+   It never saves anything back: the notes and picks on disk belong to the page you're using. */
+const CAPTURE = new URLSearchParams(location.search).has('capture'), CAPTURE_T = +new URLSearchParams(location.search).get('t') || 0; // read now: the address is tidied later
+/* a project whose index.js lists nothing: one placeholder design, so the stage still builds and says what to do */
+if (!SCENES.length) SCENES.push({ id: 'none', title: 'No designs yet', version: '', placeholder: true, steps: [{ label: 'Empty', dur: 1 }], css: '',
+  html: `<div style="position:absolute;inset:0;display:grid;place-items:center;color:#8b8984;font:14px system-ui">Add a scene to ${SCENE_PATH}index.js</div>` });
+const fmt = s => { s = Math.max(0, s); return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
+
+/* ---------- settings, kept per browser ---------- */
+/* Three shortcuts. Any other size is custom, and its frame follows its shape: narrow is a phone, tall a tablet, wide a window. */
+const DEVICES = {
+  desktop: { n: 'Desktop', w: 1440, h: 900 },
+  tablet: { n: 'Tablet', w: 834, h: 1194 },
+  phone: { n: 'Phone', w: 402, h: 874 },
+};
+const kindOf = (w, h) => w < 600 ? 'handheld' : h > w ? 'tablet' : 'window';
+const nameOf = (w, h) => (Object.values(DEVICES).find(d => d.w === w && d.h === h) || { n: 'Custom' }).n;
+/* zoom 0 means fit. pos holds how far each screen was dragged, pan how far the whole canvas was. preset is the last size picked, for double-click to go back to. */
+const DEFAULTS = { preset: 'desktop', w: 1440, h: 900, second: false, chrome: true, wall: 'dark', color: '#1b1b22', exfmt: 'png', dim: 0, blur: 40, tint: .38, bar: true, panel: true, loop: false, speed: 1, folded: [], tab: 'design',
+  zoom: 0, pos: {}, pan: { x: 0, y: 0 },
+  /* designs: a is always shown; b joins it when compare is on. Each is a scene id, or 'url'. */
+  /* shown: the designs on screen, up to five, lettered A to E in list order. A design is a scene id, or 'url'. */
+  shown: [], url: '', view: 'side', wipe: .5, onion: .5,
+  /* rows, cols: Lay out. 'none' and 'shown' (the designs side by side) is the plain layout. */
+  rows: 'none', cols: 'shown',
+  /* ctl: scene id → control key → value, for values moved off a scene's defaults. notes: pinned notes, kept through Reset. */
+  ctl: {}, notes: [],
+  /* variants: { id, base, name }. A variant is its base scene with its own control values, kept in ctl[id]. */
+  variants: [] };
+/* The stage (size, wallpaper, glass, tab...) is kept for every project. What's on screen and what was picked is kept
+   per project: in this browser, and the variants and control values also in <project>/scenes/workspace.json. */
+const PER = ['shown', 'url', 'view', 'wipe', 'onion', 'rows', 'cols', 'ctl', 'variants', 'notes', 'w', 'h', 'preset'];
+const PKEY = 'workspace:' + (PROJECT || 'starter');
+let S = structuredClone(DEFAULTS), kept = {}, mine = null;
+try { kept = JSON.parse(localStorage.getItem('workspace') || '{}'); mine = JSON.parse(localStorage.getItem(PKEY) || 'null'); } catch {}
+Object.assign(S, Object.fromEntries(Object.entries(kept).filter(([k]) => !PER.includes(k))));
+// a project's first visit takes over what the one workspace kept before there were projects (the filters below drop what doesn't fit)
+Object.assign(S, mine || Object.fromEntries(PER.filter(k => kept[k] !== undefined).map(k => [k, kept[k]])));
+/* The screen size is the project's own: a long page wants a tall screen, an app a desktop or a phone. Before a project
+   has one, it takes its first design's size: [w, h], if the scene gives one, else the size the stage had before. */
+if (!mine || mine.w === undefined) {
+  const sz = SCENES[0] && SCENES[0].size;
+  if (Array.isArray(sz)) { S.w = sz[0]; S.h = sz[1]; S.preset = (Object.entries(DEVICES).find(([, d]) => d.w === sz[0] && d.h === sz[1]) || [S.preset])[0]; }
+  else if (kept.w) { S.w = kept.w; S.h = kept.h; S.preset = kept.preset || S.preset; }
+}
+let stateServer = false, stateSent = '', stateTimer = 0, stateVersion = null;
+const stateJSON = () => JSON.stringify({ variants: S.variants, ctl: S.ctl });
+if (PROJECT) try {
+  const x = new XMLHttpRequest(); x.open('GET', '/api/state?project=' + encodeURIComponent(PROJECT), false); x.send();
+  if (x.status === 200) {
+    const res = JSON.parse(x.responseText), d = res.state; stateServer = true; stateVersion = res.version;
+    if (d.variants || d.ctl) { S.variants = d.variants || []; S.ctl = d.ctl || {}; stateSent = stateJSON(); } // the file wins
+  }
+} catch {}
+if ('src' in S) { if (S.src === 'url') { S.a = 'url'; S.urlA = S.url || ''; } delete S.src; delete S.url; } // settings from before compare
+/* A variant looks up as its base scene under its own id and name, so everything that shows a scene can show a variant. */
+const vcache = new Map();
+const sceneById = id => {
+  const sc = SCENES.find(x => x.id === id); if (sc) return sc;
+  const v = (S.variants || []).find(x => x.id === id), base = v && SCENES.find(x => x.id === v.base);
+  if (!base) return undefined;
+  const k = v.id + '|' + v.name;
+  if (!vcache.has(k)) vcache.set(k, { ...base, id: v.id, version: v.name, base: base.id, variant: true, note: `A variant of ${base.title} ${base.version || ''}`.trim() });
+  return vcache.get(k);
+};
+S.variants = (S.variants || []).filter(v => SCENES.some(x => x.id === v.base));
+if (typeof S.second !== 'boolean') S.second = false; // was a size; now one screen unless switched on
+delete S.dev; if (!DEVICES[S.preset]) S.preset = 'desktop';
+if ('a' in S) { S.shown = [S.a || SCENES[0].id, ...(S.compare ? [S.b] : [])]; S.url = S.urlA || S.urlB || ''; } // settings from the A/B days
+['a', 'b', 'urlA', 'urlB', 'compare'].forEach(k => delete S[k]);
+S.shown = [...new Set(S.shown)].filter(id => id === 'url' || sceneById(id)).slice(0, 5);
+S.notes = (S.notes || []).filter(n => n.design === 'url' || sceneById(n.design));
+const fromGallery = new URLSearchParams(location.search).get('design');
+if (fromGallery && sceneById(fromGallery)) S.shown = [fromGallery]; // opened from a gallery thumbnail
+if (!S.shown.length) S.shown = [SCENES[0].id];
+const MAX = 5, letter = k => 'ABCDE'[k];
+const DESIGNS = () => [...SCENES.flatMap(x => [x.id, ...S.variants.filter(v => v.base === x.id).map(v => v.id)]), 'url'];
+const shownDesigns = () => DESIGNS().filter(id => S.shown.includes(id)).map(id => ({ id, url: id === 'url' ? S.url : '' }));
+const comparing = () => S.shown.length > 1;
+const VIEWS = [['side', 'Side by side'], ['swipe', 'Swipe'], ['onion', 'Onion'], ['diff', 'Difference']];
+const designName = (id, url) => id === 'url' ? (url ? url.replace(/^https?:\/\//, '') : 'URL') : (x => x ? x.title + (x.version ? ' ' + x.version : '') : id)(sceneById(id));
+const save = () => {
+  if (CAPTURE) return; // a page being exported keeps its settings to itself
+  try {
+    const stage = { ...S }; PER.forEach(k => delete stage[k]);
+    localStorage.setItem('workspace', JSON.stringify(stage));
+    localStorage.setItem(PKEY, JSON.stringify(Object.fromEntries(PER.map(k => [k, S[k]]))));
+  } catch {}
+  if (stateServer && !CAPTURE && stateJSON() !== stateSent) { clearTimeout(stateTimer); stateTimer = setTimeout(saveState, 400); }
+};
+/* Saved with the version last seen: if workspace.json changed on disk meanwhile (Claude, or another tab), the
+   save is refused and the page takes the file's variants and values, as with notes. */
+async function saveState() {
+  const sent = stateJSON();
+  try {
+    const r = await fetch('/api/state?project=' + encodeURIComponent(PROJECT), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: JSON.parse(sent), version: stateVersion }) });
+    const d = await r.json();
+    if (r.ok) { stateSent = sent; stateVersion = d.version; }
+    else if (r.status === 409) {
+      S.variants = (d.state.variants || []).filter(v => SCENES.some(x => x.id === v.base)); S.ctl = d.state.ctl || {}; stateVersion = d.version;
+      stateSent = stateJSON(); S.shown = S.shown.filter(id => id === 'url' || sceneById(id)); if (!S.shown.length) S.shown = [SCENES[0].id];
+      ctlKey = ''; apply();
+    }
+  } catch {}
+}
+
+/* ---------- timeline ---------- */
+/* The clock follows design A's steps (or B's when A is a URL). B is driven by step position, not seconds,
+   so step 3 of A and step 3 of B always show together even when their steps take different times. */
+let TL, STEPS = [], STARTS = [], DURATION = 1;
+let t = 0, playing = true;
+const timeAt = pos => { const i = Math.floor(pos); return i >= STEPS.length ? DURATION : STARTS[i] + (pos - i) * STEPS[i].dur; };
+function buildTimeline() {
+  const next = shownDesigns().map(d => sceneById(d.id)).find(Boolean) || SCENES[0];
+  if (next === TL) return;
+  const pos = TL ? posAt(t) : 0;
+  TL = next; STEPS = TL.steps && TL.steps.length ? TL.steps : [{ label: '', dur: 1 }]; STARTS = []; DURATION = 0;
+  STEPS.forEach(s => { STARTS.push(DURATION); DURATION += s.dur; });
+  t = timeAt(Math.min(pos, STEPS.length));
+  $('ticks').innerHTML = STEPS.map((s, k) => `<i style="left:calc(${(STARTS[k] / DURATION * 100).toFixed(3)}% + ${k ? 1 : 0}px);width:calc(${(s.dur / DURATION * 100).toFixed(3)}% - ${k && k < STEPS.length - 1 ? 2 : 1}px)"><b></b></i>`).join('');
+  $('marks').innerHTML = STEPS.map((s, k) => `<button class="mark" data-k="${k}">${s.label}<span>${fmt(STARTS[k])}</span></button>`).join('');
+  $('steps').innerHTML = STEPS.map((s, k) => `<li data-k="${k}">${s.label}<span>${s.dur}s</span></li>`).join('');
+  $('scrub').max = DURATION;
+}
+/* time to step position: step index plus progress through it */
+function posAt(time) {
+  if (time >= DURATION) return STEPS.length;
+  let i = STARTS.findLastIndex(s => s <= time);
+  return i + (time - STARTS[i]) / STEPS[i].dur;
+}
+const stepIndex = () => Math.min(STEPS.length - 1, Math.floor(posAt(t)));
+
+/* ---------- screens ---------- */
+/* Each screen hosts the scene in its own shadow root, so scene styles never touch the stage. */
+const screens = [];
+function makeScreen(slot) {
+  const wrap = document.createElement('div');
+  wrap.className = 'fwrap';
+  wrap.innerHTML = `<div class="cap"></div><button class="fdup" aria-label="Duplicate" title="Duplicate: a copy of the code, side by side">${DUP}</button><div class="scaler"><div class="frame">
+    <div class="tbar"><span class="tl3"><i></i><i></i><i></i></span><span class="tt"></span></div>
+    <div class="status"><span>9:41</span><i class="island"></i><span class="levels"><i></i></span></div>
+    <div class="screen" data-cmp=""><span class="ab a"></span><span class="ab b"></span><i class="wipe" aria-label="Swipe divider"></i><div class="pins"></div><i class="catch"></i></div><div class="home"></div></div>
+    ${slot === 0 ? ['n', 'e', 's', 'w', 'nw', 'ne', 'sw', 'se'].map(d => `<i class="rz ${d}" data-dir="${d}"></i>`).join('') : ''}</div>`;
+  const sc = { slot, wrap, frame: wrap.querySelector('.frame'), screen: wrap.querySelector('.screen'), cap: wrap.querySelector('.cap'), scaler: wrap.querySelector('.scaler'), w: 0, h: 0 };
+  sc.tt = wrap.querySelector('.tt'); sc.pins = wrap.querySelector('.pins');
+  const cat = wrap.querySelector('.catch');
+  cat.addEventListener('pointerdown', e => picking ? pickFocus(sc, e) : cutting ? cutNote(sc, e) : noteDown(sc, e));
+  cat.addEventListener('pointermove', e => { if (cutting) cutHover(sc, e); });
+  cat.addEventListener('pointerleave', () => { cutAt = null; $('cutbox').classList.remove('on'); });
+  wrap.querySelectorAll('.rz').forEach(resizer);
+  const wipe = wrap.querySelector('.wipe');
+  wipe.addEventListener('pointerdown', e => {
+    const r = sc.screen.getBoundingClientRect(), x0 = e.clientX - r.left;
+    drag(wipe, e, 'sizing', dx => { S.wipe = clamp((x0 + dx) / r.width, 0, 1); sc.screen.style.setProperty('--wipe', S.wipe); });
+  });
+  wipe.addEventListener('dblclick', () => { S.wipe = .5; sc.screen.style.setProperty('--wipe', .5); save(); });
+  wrap.querySelectorAll('.cap, .tbar, .status').forEach(h => mover(h, sc));
+  const dup = wrap.querySelector('.fdup');
+  dup.addEventListener('pointerdown', e => e.stopPropagation()); // a click, not a pan
+  dup.onclick = () => duplicateDesign(sc.designs[0].id, sc);
+  return sc;
+}
+
+/* ---------- move, resize, pan, zoom ---------- */
+let K = 1, held = 0; // K is the zoom on screen now; held freezes it while a resize is under way
+const place = sc => { const p = S.pos[sc.slot] || { x: 0, y: 0 }; sc.wrap.style.translate = `${p.x}px ${p.y}px`; };
+/* one pointer drag: calls move with the distance moved, then done */
+function drag(el, e, cls, move, done) {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId);
+  const x0 = e.clientX, y0 = e.clientY; document.body.classList.add(cls);
+  const mv = ev => move(ev.clientX - x0, ev.clientY - y0, ev);
+  const up = () => { el.removeEventListener('pointermove', mv); document.body.classList.remove(cls); done && done(); save(); };
+  el.addEventListener('pointermove', mv);
+  el.addEventListener('pointerup', up, { once: true }); el.addEventListener('pointercancel', up, { once: true });
+}
+function mover(h, sc) {
+  h.addEventListener('pointerdown', e => {
+    const p0 = { ...(S.pos[sc.slot] || { x: 0, y: 0 }) };
+    sc.wrap.classList.add('drag');
+    drag(h, e, 'dragging', (dx, dy) => { S.pos[sc.slot] = { x: p0.x + dx, y: p0.y + dy }; place(sc); }, () => sc.wrap.classList.remove('drag'));
+  });
+  h.addEventListener('dblclick', () => { delete S.pos[sc.slot]; place(sc); save(); });
+}
+/* The edge opposite the one dragged stays pinned, and the second screen keeps its gap to the right edge. */
+function resizer(h) {
+  h.addEventListener('pointerdown', e => {
+    const dir = h.dataset.dir, w0 = S.w, h0 = S.h, [a, ...rest] = screens;
+    held = K;
+    document.body.style.setProperty('--rz-cursor', getComputedStyle(h).cursor);
+    drag(h, e, 'sizing', (dx, dy) => {
+      const before = screens.map(x => x.scaler.getBoundingClientRect()), r0 = before[0];
+      const mx = dx / held, my = dy / held;
+      if (dir.includes('e')) S.w = Math.round(clamp(w0 + mx, 200, 4000));
+      if (dir.includes('w')) S.w = Math.round(clamp(w0 - mx, 200, 4000));
+      if (dir.includes('s')) S.h = Math.round(clamp(h0 + my, 200, 4000));
+      if (dir.includes('n')) S.h = Math.round(clamp(h0 - my, 200, 4000));
+      a.w = S.w; a.h = S.h; a.n = nameOf(S.w, S.h);
+      if (comparing()) rest.forEach(o => { o.w = S.w; o.h = S.h; o.n = a.n; }); // compared designs always share one size
+      $('w').value = S.w; $('h').value = S.h;
+      fit();
+      const r1 = a.scaler.getBoundingClientRect();
+      const left = dir.includes('w') ? r0.right - r1.width : r0.left, top = dir.includes('n') ? r0.bottom - r1.height : r0.top;
+      const pa = S.pos[0] || { x: 0, y: 0 }; S.pos[0] = { x: pa.x + left - r1.left, y: pa.y + top - r1.top }; place(a);
+      let edge = left + r1.width;
+      rest.forEach((o, j) => {
+        const m0 = before[j + 1], m1 = o.scaler.getBoundingClientRect(), goal = edge + (m0.left - before[j].right);
+        const p = S.pos[j + 1] || { x: 0, y: 0 }; S.pos[j + 1] = { x: p.x + goal - m1.left, y: p.y + m0.top - m1.top }; place(o);
+        edge = goal + m1.width;
+      });
+    }, () => { S.zoom = held; held = 0; apply(); });
+  });
+  // double-click an edge: back to the last size picked in the panel, fitted and centred
+  h.addEventListener('dblclick', () => { const d = DEVICES[S.preset]; S.w = d.w; S.h = d.h; recentre(); });
+}
+const recentre = () => { S.zoom = 0; S.pos = {}; S.pan = { x: 0, y: 0 }; apply(); };
+const panTo = () => { $('frames').style.translate = `${S.pan.x}px ${S.pan.y}px`; };
+/* empty canvas: drag pans, double-click centres */
+$('canvas').addEventListener('pointerdown', e => {
+  if (e.target !== $('canvas') && e.target !== $('frames')) return;
+  const p0 = { ...S.pan }; $('canvas').classList.add('panning');
+  drag($('canvas'), e, 'panning', (dx, dy) => { S.pan = { x: p0.x + dx, y: p0.y + dy }; panTo(); }, () => $('canvas').classList.remove('panning'));
+});
+$('canvas').addEventListener('dblclick', e => { if (e.target === $('canvas') || e.target === $('frames')) { S.pan = { x: 0, y: 0 }; S.pos = {}; apply(); } });
+/* Scroll on empty canvas pans. A pinch does nothing at all: it neither zooms the screens nor the page.
+   (A trackpad pinch arrives as a ctrl-wheel; Safari also sends gesture events.) Zoom lives in the zoom menu and 0 / 1. */
+addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+for (const g of ['gesturestart', 'gesturechange']) addEventListener(g, e => e.preventDefault());
+$('canvas').addEventListener('wheel', e => {
+  if (e.ctrlKey || e.metaKey || (e.target.closest && e.target.closest('.screen') && !screens.some(s => s.tall))) return;
+  e.preventDefault();
+  S.pan = { x: S.pan.x - e.deltaX, y: S.pan.y - e.deltaY };
+  // A full page scrolls like a page: it stops at its top and its bottom.
+  if (screens.some(sc => sc.tall)) S.pan = { x: 0, y: clamp(S.pan.y, Math.min(0, $('frames').clientHeight - Math.max(...screens.map(sc => sc.wrap.offsetTop + sc.wrap.offsetHeight)) - 64), 0) };
+  fit(); save();
+}, { passive: false });
+/* Each design is a layer in the screen: a scene in its own shadow root (so its styles never touch the stage), or a URL in an iframe. */
+function makeLayer({ id, url }, cls) {
+  const host = document.createElement('div'); host.className = 'host ' + cls;
+  if (id === 'url') {
+    host.innerHTML = url ? '' : '<div class="empty">Paste an address in the panel</div>';
+    if (url) { const f = document.createElement('iframe'); f.src = url; f.title = 'Preview'; host.append(f); }
+    return { host };
+  }
+  return Engine.mount(host, sceneById(id));
+}
+function fillScreen(sc, designs) {
+  sc.screen.querySelectorAll('.host').forEach(h => h.remove());
+  sc.layers = designs.map((d, k) => makeLayer(d, k ? 'b' : 'a'));
+  sc.screen.prepend(...sc.layers.map(l => l.host));
+}
+/* Lay out: any two axes, rows by columns. An axis is the designs on screen one by one, their design (title), their
+   version, the screen (Desktop, Phone), or a choice control every shown scene has (a Mode: Dark, Light).
+   'none' by 'shown' is the plain layout, where two designs can also Swipe, Onion or Difference. */
+let GRID = null;
+const matrix = () => (S.rows || 'none') !== 'none' || (S.cols || 'shown') !== 'shown';
+function sharedSegs(ds) {
+  const scs = ds.map(d => sceneById(d.id)).filter(Boolean);
+  if (!scs.length || scs.length < ds.length) return [];
+  return (scs[0].controls || []).filter(c => c.type === 'seg' && scs.every(x => (x.controls || []).some(o => o.key === c.key && o.type === 'seg')));
+}
+const layoutOptions = ds => [['design', 'Design'], ['version', 'Version'], ['screen', 'Screen'], ...sharedSegs(ds).map(c => ['ctl:' + c.key, c.label])];
+function axis(a, ds) {
+  if (!a || a === 'none') return [{ label: '' }];
+  if (a === 'shown') return ds.map(d => ({ label: designName(d.id, d.url), match: x => x.id === d.id }));
+  if (a === 'design' || a === 'version') {
+    const key = d => { const sc = sceneById(d.id); return !sc ? 'URL' : a === 'design' ? sc.title : sc.version || sc.title; };
+    return [...new Set(ds.map(key))].map(v => ({ label: v, match: x => key(x) === v }));
+  }
+  if (a === 'screen') return ['desktop', 'phone'].map(k => ({ label: DEVICES[k].n, dev: k }));
+  const c = a.startsWith('ctl:') && sharedSegs(ds).find(x => x.key === a.slice(4));
+  return c ? c.options.map(([v, n]) => ({ label: n, ctl: { [c.key]: v } })) : [{ label: '' }];
+}
+function matrixSpecs(base, ds) {
+  const R = axis(S.rows, ds), C = axis(S.cols, ds), out = [];
+  R.forEach((r, ri) => C.forEach((c, ci) => {
+    const item = ds.find(d => (!r.match || r.match(d)) && (!c.match || c.match(d)));
+    if (!item) return; // e.g. a version that one of the designs doesn't have
+    const dev = c.dev || r.dev || null, d0 = dev ? DEVICES[dev] : null, w = d0 ? d0.w : base.w, h = d0 ? d0.h : base.h;
+    out.push({ w, h, kind: S.chrome ? kindOf(w, h) : 'bare', n: d0 ? d0.n : base.n, dev, designs: [item], ctl: { ...r.ctl, ...c.ctl }, row: ri, col: ci,
+      tag: [r.label, c.label].filter(Boolean).join(' · ') });
+  }));
+  GRID = { rows: R.length, cols: C.length };
+  return out;
+}
+function twoRowsBigger(n) {
+  const f = $('frames'), cs = getComputedStyle(f), aw = f.clientWidth - parseFloat(cs.paddingLeft) * 2, ah = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 24;
+  const cols = Math.ceil(n / 2), one = Math.min(aw / (n * S.w + 32 * (n - 1)), ah / S.h), two = Math.min(aw / (cols * S.w + 32 * (cols - 1)), (ah - 56) / (2 * S.h));
+  return two > one * 1.1;
+}
+function layoutScreens() {
+  /* One design: one screen, plus an optional second size of it. Several: one screen each, side by side at the same size.
+     Exactly two can also be laid over each other in one screen (Swipe, Onion, Difference). */
+  const base = { w: S.w, h: S.h, kind: S.chrome ? kindOf(S.w, S.h) : 'bare', n: nameOf(S.w, S.h) };
+  const ds = shownDesigns();
+  let list;
+  GRID = null;
+  if (matrix()) list = matrixSpecs(base, ds);
+  else if (ds.length === 2 && S.view !== 'side') list = [{ ...base, designs: ds, cmp: S.view }];
+  else if (ds.length > 3 && twoRowsBigger(ds.length)) { // two rows only when that shows each screen bigger: wide screens wrap, phones stay in a row
+    const cols = Math.ceil(ds.length / 2);
+    list = ds.map((d, k) => ({ ...base, designs: [d], tag: letter(k), row: Math.floor(k / cols), col: k % cols }));
+    GRID = { rows: 2, cols, wrap: true };
+  }
+  else if (ds.length > 1) list = ds.map((d, k) => ({ ...base, designs: [d], tag: letter(k) }));
+  else {
+    list = [{ ...base, designs: ds }];
+    // the second screen is a phone beside anything wider, and a desktop beside a phone
+    if (S.second) { const e = S.w < 600 ? DEVICES.desktop : DEVICES.phone; list.push({ w: e.w, h: e.h, kind: S.chrome ? kindOf(e.w, e.h) : 'bare', n: e.n, designs: ds }); }
+  }
+  while (screens.length > list.length) screens.pop().wrap.remove();
+  list.forEach((spec, i) => {
+    let sc = screens[i];
+    if (!sc) { sc = makeScreen(i); screens.push(sc); $('frames').append(sc.wrap); }
+    const key = JSON.stringify(spec.designs);
+    if (sc.key !== key) { sc.key = key; fillScreen(sc, spec.designs); sc.fresh = true; }
+    Object.assign(sc, { tag: '', cmp: '', row: null, col: null, ctl: null, dev: null }, spec);
+    sc.frame.className = 'frame ' + spec.kind + inkClass(sc);
+    sc.devKind = kindOf(spec.w, spec.h);
+    sc.wrap.classList.toggle('fixed', kindOf(spec.w, spec.h) !== 'window');
+    const one = spec.designs.length === 1 && spec.designs[0].id !== 'url' && !sceneById(spec.designs[0].id)?.placeholder && (i === 0 || spec.tag);
+    sc.wrap.classList.toggle('dupable', !!(one && PROJECT)); sc.wrap.querySelector('.fdup').hidden = !(one && PROJECT);
+    sc.screen.dataset.cmp = spec.cmp || '';
+    sc.screen.style.setProperty('--wipe', S.wipe); sc.screen.style.setProperty('--onion', S.onion);
+    const [la, lb] = spec.designs;
+    sc.screen.querySelector('.ab.a').textContent = 'A · ' + designName(la.id, la.url);
+    sc.screen.querySelector('.ab.b').textContent = lb ? 'B · ' + designName(lb.id, lb.url) : '';
+    sc.tt.textContent = spec.designs.map(x => designName(x.id, x.url)).join('  vs  ');
+  });
+  /* A scene with fit: 'content' (a long page) gets a screen as tall as what it draws, so all of it shows at once.
+     The screen keeps its width; scrolling over it pans the canvas. A newly shown one starts at its top. */
+  screens.forEach(sc => {
+    const L = sc.layers.length === 1 ? sc.layers[0] : null;
+    sc.tall = !!(L && L.root && L.scene && L.scene.fit === 'content');
+    if (sc.tall) {
+      // Always a real device's width and frame (the last one picked), never a custom size; only the height follows the page.
+      const dev = DEVICES[sc.dev || S.preset] || DEVICES.desktop;
+      Object.assign(sc, { w: dev.w, kind: S.chrome ? kindOf(dev.w, dev.h) : 'bare', devKind: kindOf(dev.w, dev.h), n: dev.n + ', full page' });
+      sc.frame.className = 'frame ' + sc.kind + inkClass(sc);
+      // Measure with the screen squeezed, so a scroll box reports its content and not the screen it fills.
+      sc.frame.style.width = sc.w + 'px'; sc.frame.style.height = '200px';
+      sc.h = Math.round(Math.min(8000, Math.max(200, (L.root.firstElementChild || L.root).scrollHeight + CHROME[sc.kind])));
+      if (sc.fresh) S.pan = { x: 0, y: 0 };
+    }
+    sc.fresh = false;
+  });
+  // a lay out is a grid of screens, each placed in its row and column
+  const f = $('frames');
+  Object.assign(f.style, GRID ? { display: 'grid', gridTemplateColumns: `repeat(${GRID.cols}, max-content)`, columnGap: '32px', rowGap: '56px', justifyContent: 'center' }
+    : { display: '', gridTemplateColumns: '', columnGap: '', rowGap: '', justifyContent: '', alignContent: '' });
+  screens.forEach(sc => { sc.wrap.style.gridRow = GRID ? sc.row + 1 : ''; sc.wrap.style.gridColumn = GRID ? sc.col + 1 : ''; });
+  fit();
+}
+/* One zoom for every screen, so they can be compared. Fit uses the space the panel and bar leave free. */
+/* how much of a screen's height its frame chrome takes, so a focused scene is laid out exactly as it was */
+const CHROME = { window: 36, handheld: 0, tablet: 0, bare: 0 };
+/* the room a design leaves for the status bar and home indicator, by the device it's on (frame shown or not, so
+   turning the frame off never moves the design) */
+const SAFE = { handheld: [54, 34], tablet: [32, 20] };
+function fit() {
+  const f = $('frames'), cs = getComputedStyle(f);
+  const availW = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (screens.length - 1);
+  const availH = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 24;
+  const dim = sc => sc.crop ? sc.crop : sc; // a focused screen is only as big as its element
+  const totalW = screens.reduce((a, s) => a + dim(s).w, 0), maxH = Math.max(...screens.map(s => dim(s).h));
+  // Focused elements are often wide and short, so they stack in a column when that shows them bigger.
+  const tall = screens.some(s => s.tall && !s.crop);
+  const kRow = tall ? Math.min(1, availW / totalW) : Math.min(focus ? 2 : 1, availW / totalW, availH / maxH);
+  f.style.alignItems = tall ? 'flex-start' : '';
+  let kGrid = 1;
+  if (GRID) {
+    const colW = [], rowH = [];
+    screens.forEach(s => { const d = dim(s); colW[s.col] = Math.max(colW[s.col] || 0, d.w); rowH[s.row] = Math.max(rowH[s.row] || 0, d.h); });
+    const gw = colW.reduce((a, b) => a + (b || 0), 0), gh = rowH.reduce((a, b) => a + (b || 0), 0);
+    const ow = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (colW.length - 1), oh = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 56 * rowH.length;
+    kGrid = tall ? Math.min(1, ow / gw) : Math.min(1, ow / gw, oh / gh);
+    f.style.alignContent = tall ? 'start' : 'center';
+  }
+  const n = screens.length, kCol = Math.min(2, (f.clientWidth - parseFloat(cs.paddingLeft) * 2) / Math.max(...screens.map(s => dim(s).w)),
+    (f.clientHeight - parseFloat(cs.paddingTop) * 2 - 32 * (n - 1) - 24 * n) / screens.reduce((a, s) => a + dim(s).h, 0));
+  const col = !!focus && n > 1 && kCol > kRow;
+  f.style.flexDirection = col ? 'column' : '';
+  K = held || S.zoom || (GRID ? kGrid : col ? kCol : kRow);
+  screens.forEach(sc => {
+    const d = dim(sc), c = sc.crop;
+    sc.frame.style.width = d.w + 'px'; sc.frame.style.height = d.h + 'px';
+    sc.frame.style.transform = `scale(${K})`;
+    const [st, sb] = SAFE[sc.devKind] || [0, 0]; // kept while focused, so the design is laid out exactly as it was
+    sc.screen.style.setProperty('--safe-top', st + 'px'); sc.screen.style.setProperty('--safe-bottom', sb + 'px');
+    sc.scaler.style.width = d.w * K + 'px'; sc.scaler.style.height = d.h * K + 'px';
+    sc.frame.classList.toggle('focus', !!c); sc.wrap.classList.toggle('focusing', !!c);
+    sc.layers.forEach(L => Object.assign(L.host.style, c ? { left: -c.x + 'px', top: -c.y + 'px', width: sc.w + 'px', height: sc.h - CHROME[sc.kind] + 'px' } : { left: '', top: '', width: '', height: '' }));
+    const who = sc.tag ? `${sc.tag} · ${designName(sc.designs[0].id, sc.designs[0].url)} · ` : sc.cmp ? `A vs B · ${VIEWS.find(v => v[0] === sc.cmp)[1]} · ` : '';
+    sc.cap.textContent = sc.agOn ? sc.tag || '' : GRID && !GRID.wrap && !c ? sc.tag : who + (c ? focus.name : sc.tall ? `${sc.n}, ${sc.w} wide` : `${sc.n}, ${sc.w} × ${sc.h}`) + (K !== 1 ? ` · ${Math.round(K * 100)}%` : '');
+    place(sc);
+  });
+  panTo(); root.style.setProperty('--k', K); inkSoon();
+  $('zsel').options[0].textContent = Math.round(K * 100) + '%'; $('zsel').value = 'now';
+}
+
+/* ---------- drive the scene from the clock ---------- */
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+function drive() {
+  const pos = posAt(t), i = stepIndex();
+  screens.forEach(sc => sc.layers.forEach(L => Engine.drive(L, pos)));
+  // bar
+  $('scrub').value = t; $('scrub').style.setProperty('--p', (t / DURATION * 100) + '%');
+  $('clock').textContent = fmt(t); $('total').textContent = fmt(DURATION);
+  $('play').classList.toggle('on', playing); $('play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  $('stepn').textContent = `Step ${i + 1} of ${STEPS.length}`;
+  document.querySelectorAll('.ticks b').forEach((b, k) => b.style.transform = `scaleX(${clamp((t - STARTS[k]) / STEPS[k].dur, 0, 1)})`);
+  document.querySelectorAll('.mark').forEach((b, k) => { b.classList.toggle('past', k < i); b.classList.toggle('cur', k === i); });
+  document.querySelectorAll('#steps li').forEach((b, k) => b.classList.toggle('cur', k === i));
+  if (i !== pinStep) { renderPins(); if (focus) setTimeout(measureFocus, 450); }
+  inkSoon();
+}
+/* The status bar and home indicator take black or white from the design under them, like iOS: read the colour behind
+   the time and behind the home bar, a few times a second at most, and keep the last answer when it can't tell
+   (an image, a gradient, off screen). */
+let inkAt = 0, inkT = 0;
+function inkSoon() {
+  clearTimeout(inkT); inkT = setTimeout(() => requestAnimationFrame(ink), 220);
+  const now = performance.now(); if (now - inkAt > 200) { inkAt = now; requestAnimationFrame(ink); }
+}
+const inkClass = sc => (sc.inkTop ? ' ink-top' : '') + (sc.inkBottom ? ' ink-bottom' : '');
+const inkCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+function lightAt(sc, x, y) {
+  const L = sc.layers[0], sh = L && L.host.shadowRoot; if (!sh) return null;
+  const el = sh.elementsFromPoint(x, y).find(e => e.getRootNode() === sh);
+  for (let e = el; e; e = e.parentElement) {
+    const c = getComputedStyle(e).backgroundColor;
+    if (!c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)') continue;
+    inkCtx.clearRect(0, 0, 1, 1); inkCtx.fillStyle = '#000'; inkCtx.fillStyle = c; inkCtx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = inkCtx.getImageData(0, 0, 1, 1).data;
+    if (a < 128) continue;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6;
+  }
+  return null;
+}
+function ink() {
+  inkAt = performance.now();
+  screens.forEach(sc => {
+    if (sc.crop || !SAFE[sc.kind]) return;
+    const r = sc.frame.getBoundingClientRect(), k = r.height / sc.h, [st, sb] = SAFE[sc.kind];
+    const top = lightAt(sc, r.left + r.width * .15, r.top + st / 2 * k), bottom = lightAt(sc, r.left + r.width / 2, r.bottom - sb / 2 * k);
+    if (top !== null) sc.inkTop = top;
+    if (bottom !== null) sc.inkBottom = bottom;
+    sc.frame.classList.toggle('ink-top', !!sc.inkTop); sc.frame.classList.toggle('ink-bottom', !!sc.inkBottom);
+  });
+}
+function seek(x) { t = clamp(x, 0, DURATION); drive(); }
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (playing) {
+    t += dt * S.speed;
+    if (t >= DURATION) { if (S.loop) t = 0; else { t = DURATION; playing = false; } }
+    drive();
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- bar ---------- */
+const goStep = k => { playing = false; seek(STARTS[clamp(k, 0, STEPS.length - 1)]); };
+$('marks').onclick = e => { const b = e.target.closest('.mark'); if (b) goStep(+b.dataset.k); };
+$('steps').onclick = e => { const b = e.target.closest('li'); if (b) goStep(+b.dataset.k); };
+$('play').onclick = () => { if (t >= DURATION) t = 0; playing = !playing; drive(); };
+$('prev').onclick = () => { const i = stepIndex(); goStep(posAt(t) - i > 0.15 ? i : i - 1); };
+$('next').onclick = () => goStep(stepIndex() + 1);
+$('scrub').oninput = e => { playing = false; seek(+e.target.value); };
+
+/* ---------- scene controls ----------
+   A scene lists its knobs in controls; they show under Design > Controls for every design on screen,
+   and set a CSS variable or data-attribute on that scene. Copy values hands the changed ones over to bake in. */
+const ctlScenes = () => shownDesigns().map(d => sceneById(d.id)).filter(x => x && x.controls && x.controls.length);
+const ctlVal = (sc, c) => S.ctl[sc.id] && S.ctl[sc.id][c.key] !== undefined ? S.ctl[sc.id][c.key] : c.value;
+function applyControls() {
+  screens.forEach(sc => sc.layers.forEach(L => L.scene && Engine.controls(L, sc.ctl ? { ...S.ctl[L.scene.id], ...sc.ctl } : S.ctl[L.scene.id])));
+}
+const esc = x => String(x).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+function ctlHTML(sc, c) {
+  const v = ctlVal(sc, c), at = `data-s="${sc.id}" data-k="${c.key}"`;
+  if (c.type === 'range') return `<div class="lbl">${esc(c.label)}<output>${v}${c.unit || ''}</output></div><input class="range" type="range" ${at} min="${c.min}" max="${c.max}" step="${c.step || 1}" value="${v}" aria-label="${esc(c.label)}">`;
+  if (c.type === 'seg') return `<div class="lbl">${esc(c.label)}</div><div class="seg" ${at}>${c.options.map(([o, n]) => `<button class="pill" data-v="${o}" aria-pressed="${o === v}">${esc(n)}</button>`).join('')}</div>`;
+  if (c.type === 'color') return `<label class="chk">${esc(c.label)}<input class="swatch" type="color" ${at} value="${v}"></label>`;
+  return `<label class="chk">${esc(c.label)}<input type="checkbox" ${at}${v ? ' checked' : ''}></label>`;
+}
+/* rebuilt only when the designs change, so a slider keeps hold of the pointer while it moves */
+let ctlKey = '';
+function renderControls() {
+  const list = ctlScenes(), on = shownDesigns().map(d => d.id), key = on.join() + '|' + list.map(x => x.id).join();
+  $('ctlsect').hidden = !list.length;
+  if (key === ctlKey) return; ctlKey = key;
+  $('ctls').innerHTML = list.map(sc => `<div class="stack"><div class="subrow"><span class="sub">${comparing() ? letter(on.indexOf(sc.id)) + ' · ' : ''}${esc(designName(sc.id))}</span>`
+    + `<button class="link" data-save="${sc.id}">Save variant</button></div>${sc.controls.map(c => ctlHTML(sc, c)).join('')}</div>`).join('');
+}
+const setCtl = (sid, k, v) => { (S.ctl[sid] ||= {})[k] = v; applyControls(); save(); };
+$('ctls').addEventListener('input', e => {
+  const t = e.target; if (!t.dataset.k) return;
+  const c = sceneById(t.dataset.s).controls.find(x => x.key === t.dataset.k);
+  const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value;
+  if (t.type === 'range') t.previousElementSibling.querySelector('output').textContent = v + (c.unit || '');
+  setCtl(t.dataset.s, c.key, v);
+});
+$('ctls').addEventListener('click', e => {
+  const sv = e.target.closest('[data-save]'); if (sv) return saveVariant(sceneById(sv.dataset.save));
+  const b = e.target.closest('.pill'); if (!b) return;
+  const g = b.parentElement; setCtl(g.dataset.s, g.dataset.k, b.dataset.v);
+  g.querySelectorAll('.pill').forEach(p => p.setAttribute('aria-pressed', p === b));
+});
+/* every control moved off its default, in every scene and variant, as lines Claude can act on */
+const ctlChanges = () => DESIGNS().map(sceneById).filter(Boolean).flatMap(sc => (sc.controls || []).filter(c => ctlVal(sc, c) !== c.value).map(c =>
+  `- ${sc.variant ? `variant "${sc.version}" of ` : ''}${SCENE_PATH}${sc.base || sc.id}.js: ${c.label} (${c.css || 'data-' + c.attr}) = ${ctlVal(sc, c)}${c.unit || ''}, default ${c.value}${c.unit || ''}`));
+
+/* ---------- variants ----------
+   Save variant keeps a design's current control values as a new design under its scene, named after what changed,
+   and puts it on screen next to the others. Double-click a variant to rename it; × removes it. */
+const ctlLabel = (c, v) => c.type === 'seg' ? (c.options.find(o => o[0] === v) || [, v])[1] : c.type === 'color' ? c.label : c.type === 'toggle' ? `${c.label} ${v ? 'on' : 'off'}` : `${c.label} ${v}${c.unit || ''}`;
+function saveVariant(sc) {
+  const base = SCENES.find(x => x.id === (sc.base || sc.id));
+  const vals = Object.fromEntries(base.controls.map(c => [c.key, ctlVal(sc, c)]));
+  let name = base.controls.filter(c => vals[c.key] !== c.value).map(c => ctlLabel(c, vals[c.key])).slice(0, 2).join(', ') || 'Variant';
+  const taken = new Set(S.variants.map(v => v.name));
+  for (let n = 2; taken.has(name); n++) name = name.replace(/ \d+$/, '') + ' ' + n;
+  const id = 'var-' + Date.now().toString(36);
+  S.variants.push({ id, base: base.id, name }); S.ctl[id] = vals;
+  if (S.shown.length < MAX) S.shown = [...S.shown, id];
+  S.zoom = 0; S.pos = {}; ctlKey = ''; apply();
+}
+function dropVariant(id) {
+  S.variants = S.variants.filter(v => v.id !== id); delete S.ctl[id];
+  S.shown = S.shown.filter(x => x !== id); if (!S.shown.length) S.shown = [SCENES[0].id];
+  S.notes = S.notes.filter(n => n.design !== id);
+  S.zoom = 0; S.pos = {}; ctlKey = ''; apply();
+}
+async function copy(text, btn) {
+  const was = btn.dataset.label ||= btn.textContent; // its own label, even if clicked again mid-change
+  try { await navigator.clipboard.writeText(text); UI.say(btn, 'Copied'); } catch { UI.say(btn, 'Not copied'); }
+  clearTimeout(btn._back); btn._back = setTimeout(() => UI.say(btn, was, -1), 1400);
+}
+$('ctlcopy').onclick = e => { const ch = ctlChanges(); copy(ch.length ? 'Make these the new defaults in the scene files:\n' + ch.join('\n') : 'Every control is at its default.', e.currentTarget); };
+$('ctlreset').onclick = () => { ctlScenes().filter(sc => !sc.variant).forEach(sc => delete S.ctl[sc.id]); ctlKey = ''; apply(); }; // variants keep their values
+
+/* ---------- notes ----------
+   N (or Add) turns on note mode: a click on a screen pins a numbered note there, on that step and that design,
+   and records the element under it. Copy brief turns every note into a brief Claude can act on. */
+let noting = false, editing = null, pinStep = -1;
+const stepLabel = n => (sceneById(n.design)?.steps[n.step] || {}).label || '';
+const setNoting = on => {
+  if (on && (focus || picking)) setPicking(false), clearFocus();
+  if (on && cutting) setCutting(false);
+  if (on && S.tab !== 'notes') { S.tab = 'notes'; apply(); } // the list the new pins land in
+  noting = on; document.body.classList.toggle('noting', on); $('noteadd').setAttribute('aria-pressed', on);
+  $('toast').textContent = 'Click a screen to pin a note'; $('toast').hidden = !on;
+};
+
+/* ---------- focus ----------
+   F (or Focus) and a click on an element crops every screen to that element, so one part can be compared across
+   designs. An element with data-focus is found by that name in every design; anything else by its place in the scene. */
+let focus = null, picking = false;
+const setPicking = on => {
+  if (on && noting) setNoting(false);
+  if (on && cutting) setCutting(false);
+  picking = on; document.body.classList.toggle('picking', on);
+  $('toast').textContent = 'Click an element to focus on it'; $('toast').hidden = !on;
+  focusLabel();
+};
+const focusLabel = () => { UI.say($('focusbtn'), focus ? 'Focus · ' + focus.name : 'Focus', focus ? 1 : -1); $('focusbtn').setAttribute('aria-pressed', !!focus || picking); };
+const visible = n => !n.closest('[data-in]:not(.on)') && n.getBoundingClientRect().width > 0;
+function pathTo(n, rootEl) {
+  const parts = [];
+  for (; n && n !== rootEl; n = n.parentElement) parts.unshift(`${n.tagName.toLowerCase()}:nth-child(${[...n.parentElement.children].indexOf(n) + 1})`);
+  return ':scope > ' + parts.join(' > ');
+}
+function pickFocus(sc, e) {
+  e.preventDefault(); e.stopPropagation();
+  const r = sc.screen.getBoundingClientRect(), k = sc.cmp === 'swipe' && (e.clientX - r.left) / r.width > S.wipe && sc.layers[1] ? 1 : 0, L = sc.layers[k];
+  if (!L.root) return;
+  const sr = L.root.getRootNode();
+  let el = sr.elementsFromPoint(e.clientX, e.clientY).find(n => sr.contains(n) && n !== L.root && visible(n));
+  while (el && el instanceof SVGElement) el = el.parentElement;
+  if (!el) return;
+  const named = el.closest('[data-focus]'), target = named || el.closest('[data-in]') || el;
+  const name = named ? named.dataset.focus : (target.classList[0] || target.tagName.toLowerCase());
+  focus = { sel: named ? `[data-focus="${named.dataset.focus}"]` : pathTo(target, L.root), name: name[0].toUpperCase() + name.slice(1) };
+  setPicking(false); measureFocus();
+}
+/* each screen crops to its own copy of the element, measured in scene pixels with 16 around it */
+function measureFocus() {
+  screens.forEach(sc => {
+    if (!focus) { sc.crop = null; return; }
+    const L = sc.layers[0]; if (!L.root) return;
+    const el = [...L.root.querySelectorAll(focus.sel)].find(visible); if (!el) return; // not on this step: keep the last crop
+    const a = el.getBoundingClientRect(), b = L.root.getBoundingClientRect(), pad = 16;
+    const x = Math.max(0, (a.left - b.left) / K - pad), y = Math.max(0, (a.top - b.top) / K - pad);
+    sc.crop = { x, y, w: Math.min(sc.w - x, a.width / K + pad * 2), h: Math.min(sc.h - CHROME[sc.kind] - y, a.height / K + pad * 2) };
+  });
+  focusLabel(); fit();
+}
+const clearFocus = () => { focus = null; screens.forEach(sc => sc.crop = null); focusLabel(); fit(); };
+$('focusbtn').onclick = () => { if (focus) clearFocus(); else setPicking(!picking); };
+function describe(n) {
+  while (n && n instanceof SVGElement) n = n.parentElement;
+  if (!n) return '';
+  const attrs = ['class', 'data-in', 'data-out', 'data-state', 'data-type'].filter(a => n.getAttribute(a)).map(a => `${a}="${n.getAttribute(a)}"`).join(' ');
+  const text = (n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return `<${n.tagName.toLowerCase()}${attrs ? ' ' + attrs : ''}>` + (text ? ` "${text}"` : '');
+}
+/* What a note is about: the topmost element under the point that actually paints (text, a picture, a fill, a border),
+   so an invisible layer on top (a click catcher, a transparent wrapper) never gets the blame. As in Cuttings. */
+function pickUnder(L, cx, cy) {
+  if (!L || !L.root) return null;
+  const sr = L.root.getRootNode(), ok = n => sr.contains(n) && n !== L.root && !n.closest('[data-in]:not(.on)');
+  const paints = n => {
+    if (/^(img|svg|canvas|video|input|textarea|select|button)$/i.test(n.tagName)) return true;
+    if ([...n.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) return true;
+    const cs = getComputedStyle(n);
+    return cs.backgroundImage !== 'none' || !/^(transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor) || (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none');
+  };
+  const stack = sr.elementsFromPoint(cx, cy).filter(ok);
+  return stack.find(paints) || stack[0] || null;
+}
+// Which design a point on a screen belongs to (the right one past a swipe's divider), and where it is on the screen.
+function layerAt(sc, e) {
+  const r = sc.screen.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  const k = sc.cmp === 'swipe' && x > S.wipe && sc.layers[1] ? 1 : 0;
+  return { k, x, y, L: sc.layers[k], d: sc.designs[k] };
+}
+function newNote(sc, e, at, el) {
+  const { k, x, y, d } = at;
+  return { id: Date.now(), design: d.id, url: d.url || '', side: !comparing() ? '' : sc.layers.length > 1 ? letter(k) : sc.tag, kind: kindOf(sc.w, sc.h),
+    step: Math.min(stepIndex(), (sceneById(d.id)?.steps.length || STEPS.length) - 1), pos: +posAt(t).toFixed(2), x: +x.toFixed(3), y: +y.toFixed(3), size: `${sc.n}, ${sc.w} × ${sc.h}`, on: describe(el), text: '' };
+}
+// A quick note: click, type, done. It still keeps a snapshot for the brief, but never shows it.
+function pinNote(sc, e) {
+  e.preventDefault(); e.stopPropagation();
+  if (editing) closeEditor(true);
+  const at = layerAt(sc, e), note = newNote(sc, e, at, pickUnder(at.L, e.clientX, e.clientY));
+  S.notes.push(note); touch(note); renderNotes(); openEditor(note, e.clientX, e.clientY, true);
+  snapNote(note, at.L, e.clientX, e.clientY);
+}
+
+/* A press in note mode: let go where you pressed and it pins a note there; drag first and it notes the area you drew,
+   with every element inside it and their text, as Agentation does. The pin sits on the area's top left corner. */
+function noteDown(sc, e) {
+  e.preventDefault(); e.stopPropagation();
+  const x0 = e.clientX, y0 = e.clientY, box = $('areabox'), start = { clientX: x0, clientY: y0, preventDefault() {}, stopPropagation() {} };
+  let dragged = false;
+  const move = ev => {
+    if (!dragged && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+    dragged = true;
+    const r = sc.screen.getBoundingClientRect(), x = clamp(ev.clientX, r.left, r.right), y = clamp(ev.clientY, r.top, r.bottom);
+    Object.assign(box.style, { left: Math.min(x0, x) + 'px', top: Math.min(y0, y) + 'px', width: Math.abs(x - x0) + 'px', height: Math.abs(y - y0) + 'px' });
+    box.classList.add('on');
+  };
+  const up = ev => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+    box.classList.remove('on');
+    if (!dragged) return pinNote(sc, start);
+    const r = sc.screen.getBoundingClientRect(), x1 = clamp(ev.clientX, r.left, r.right), y1 = clamp(ev.clientY, r.top, r.bottom);
+    areaNote(sc, start, { left: Math.min(x0, x1), top: Math.min(y0, y1), right: Math.max(x0, x1), bottom: Math.max(y0, y1) });
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', up);
+}
+function areaNote(sc, e, a) {
+  if (editing) closeEditor(true);
+  const r = sc.screen.getBoundingClientRect(), at = layerAt(sc, { clientX: a.left + 1, clientY: a.top + 1 });
+  // the outermost elements that sit wholly inside the area, in reading order
+  const inside = [];
+  if (at.L && at.L.root) {
+    const all = [...at.L.root.querySelectorAll('*')].filter(el => { if (el.closest('[data-in]:not(.on)')) return false; const b = el.getBoundingClientRect(); return b.width && b.height && b.left >= a.left - 1 && b.top >= a.top - 1 && b.right <= a.right + 1 && b.bottom <= a.bottom + 1; });
+    all.forEach(el => { if (!all.includes(el.parentElement)) inside.push(el); });
+  }
+  const pin = { clientX: a.left, clientY: a.top };
+  const note = newNote(sc, pin, { ...at, x: (a.left - r.left) / r.width, y: (a.top - r.top) / r.height }, inside[0] || pickUnder(at.L, (a.left + a.right) / 2, (a.top + a.bottom) / 2));
+  const text = inside.map(el => (el.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ');
+  note.area = { x: note.x, y: note.y, w: +((a.right - a.left) / r.width).toFixed(3), h: +((a.bottom - a.top) / r.height).toFixed(3),
+    els: inside.slice(0, 6).map(el => at.L ? cssPath(el, at.L.root) : elName(el)), text: text.slice(0, 200) };
+  S.notes.push(note); touch(note); renderNotes(); openEditor(note, a.right, a.top + 12, true, { left: a.left, right: a.right });
+  snapNote(note, at.L, (a.left + a.right) / 2, (a.top + a.bottom) / 2);
+}
+
+/* ---------- cut ----------
+   X (or Cut) is the power version, as in Cuttings: point at a screen and the element under the pointer is outlined,
+   with its name and size. Up and Down walk to its parent and back. A click cuts it out: the note keeps the element's
+   path, box, styles and markup, and a picture cropped to just that element, which the editor shows.
+   Shift- or ⌘-click gathers several elements first (each stays outlined); a plain click or Return makes one note of all of them. */
+let cutting = false, cutDepth = 0, cutBase = null, cutAt = null, cutPicks = [];
+const clearPicks = () => { cutPicks = []; document.querySelectorAll('.cutsel').forEach(x => x.remove()); };
+const setCutting = on => {
+  if (on && (focus || picking)) setPicking(false), clearFocus();
+  if (on && noting) setNoting(false);
+  if (on && S.tab !== 'notes') { S.tab = 'notes'; apply(); }
+  cutting = on; cutDepth = 0; cutBase = null; clearPicks(); document.body.classList.toggle('cutting', on); $('notecut').setAttribute('aria-pressed', on);
+  if (!on) $('cutbox').classList.remove('on');
+  $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several'; $('toast').hidden = !on;
+};
+function cutTarget(L, cx, cy) {
+  const base = pickUnder(L, cx, cy);
+  if (base !== cutBase) { cutBase = base; cutDepth = 0; }
+  let el = base, i = 0;
+  while (el && i < cutDepth && el.parentElement && L.root.contains(el.parentElement) && el.parentElement !== L.root) { el = el.parentElement; i++; }
+  cutDepth = i; // stops at the top, so Down always comes straight back
+  return el;
+}
+const scale = L => { const rr = L.root.getBoundingClientRect(); return { rr, k: rr.width / L.root.offsetWidth || 1 }; };
+const elName = el => el.tagName.toLowerCase() + (el.classList.length ? '.' + [...el.classList].slice(0, 2).join('.') : '');
+function cutHover(sc, e) {
+  cutAt = { sc, e: { clientX: e.clientX, clientY: e.clientY } };
+  const { L } = layerAt(sc, e), el = L && cutTarget(L, e.clientX, e.clientY), box = $('cutbox');
+  if (!el) return box.classList.remove('on');
+  const r = el.getBoundingClientRect(), { k } = scale(L);
+  Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  box.classList.toggle('below', r.top < 40);
+  $('cutlabel').textContent = `${elName(el)} · ${Math.round(r.width / k)} × ${Math.round(r.height / k)}`;
+  box.classList.add('on');
+}
+// A selector a person (or Claude) can find again: up to five steps, each a tag, its first classes, and its place when it has twins.
+function cssPath(el, root) {
+  const parts = [];
+  for (let n = el; n && n !== root && parts.length < 5; n = n.parentElement) {
+    let p = elName(n);
+    const twins = n.parentElement ? [...n.parentElement.children].filter(c => elName(c) === p) : [];
+    if (twins.length > 1) p += `:nth-of-type(${[...n.parentElement.children].filter(c => c.tagName === n.tagName).indexOf(n) + 1})`;
+    parts.unshift(p);
+  }
+  return parts.join(' > ');
+}
+function styleLine(el) {
+  const cs = getComputedStyle(el), out = [`font ${cs.fontSize}/${cs.lineHeight} ${cs.fontWeight} ${cs.fontFamily.split(',')[0].replace(/"/g, '')}`, `colour ${cs.color}`];
+  if (!/^(transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor)) out.push(`background ${cs.backgroundColor}`);
+  if (cs.padding !== '0px') out.push(`padding ${cs.padding}`);
+  if (cs.borderRadius !== '0px') out.push(`radius ${cs.borderRadius}`);
+  if (cs.gap && cs.gap !== 'normal') out.push(`gap ${cs.gap}`);
+  if (cs.boxShadow !== 'none') out.push(`shadow ${cs.boxShadow}`);
+  return out.join(', ');
+}
+const cutOf = (el, L) => { const { rr, k } = scale(L), r = el.getBoundingClientRect();
+  return { path: cssPath(el, L.root), box: [(r.left - rr.left) / k, (r.top - rr.top) / k, r.width / k, r.height / k].map(Math.round), style: styleLine(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 280) }; };
+function cutNote(sc, e) {
+  e.preventDefault(); e.stopPropagation();
+  if (editing) closeEditor(true);
+  const at = layerAt(sc, e), el = at.L && cutTarget(at.L, e.clientX, e.clientY);
+  if (!el) return;
+  if (e.shiftKey || e.metaKey || e.ctrlKey) { // gather: outline it and wait for more
+    const had = cutPicks.findIndex(p => p.el === el);
+    if (had >= 0) { cutPicks[had].mark.remove(); cutPicks.splice(had, 1); }
+    else { const r = el.getBoundingClientRect(), mark = document.createElement('div'); mark.className = 'cutsel';
+      Object.assign(mark.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+      mark.dataset.n = cutPicks.length + 1; document.body.append(mark); cutPicks.push({ el, sc, at, e: { clientX: e.clientX, clientY: e.clientY }, mark }); }
+    $('toast').textContent = cutPicks.length ? `${cutPicks.length} picked. Click one more, or press Return, to note them together` : 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
+    return;
+  }
+  cutMake([...cutPicks.filter(p => p.el !== el), { el, sc, at, e }]);
+}
+function cutMake(picks) {
+  if (!picks.length) return;
+  const { sc, at, e, el } = picks[picks.length - 1], note = newNote(sc, e, at, el);
+  note.cut = cutOf(el, at.L);
+  if (picks.length > 1) note.cuts = picks.map(p => cutOf(p.el, p.at.L));
+  clearPicks();
+  $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
+  S.notes.push(note); touch(note); renderNotes(); openEditor(note, e.clientX, e.clientY, true, el.getBoundingClientRect());
+  snapNote(note, at.L, e.clientX, e.clientY);
+}
+$('notecut').onclick = () => setCutting(!cutting);
+
+/* ---------- note snapshots ----------
+   Every note keeps a picture of what was under it, taken the moment it's pinned: the scene drawn into an image around
+   the pin, with the spot ringed. Nothing to do for whoever writes the note; the brief links the picture, so a pin that
+   landed a little off still carries what was meant. Scenes only (a URL design is another site's page). */
+const dataURLs = new Map();
+const toDataURL = url => {
+  if (!dataURLs.has(url)) dataURLs.set(url, fetch(url).then(r => r.ok ? r.blob() : null)
+    .then(b => b && new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => null));
+  return dataURLs.get(url);
+};
+async function inlineUrls(css, base) {
+  const urls = [...new Set([...css.matchAll(/url\((['"]?)([^)'"]+)\1\)/g)].map(m => m[2]).filter(u => !u.startsWith('data:')))];
+  for (const u of urls) { const d = await toDataURL(new URL(u, base).href); if (d) css = css.split(u).join(d); }
+  return css;
+}
+let snapFonts = null;
+// Cut crop: the element and 24 around it, inside the scene.
+const cutCrop = (b, w, h) => { const x0 = Math.max(0, b[0] - 24), y0 = Math.max(0, b[1] - 24); return [x0, y0, Math.min(w - x0, b[2] + 48), Math.min(h - y0, b[3] + 48)]; };
+async function snapScene(L, px, py, cutBox) {
+  const el = L.root, sr = el.getRootNode(), w = el.offsetWidth, h = el.offsetHeight;
+  let CW = Math.min(w, 720), CH = Math.min(h, 440), x0 = clamp(px - CW / 2, 0, w - CW), y0 = clamp(py - CH / 2, 0, h - CH);
+  if (cutBox) [x0, y0, CW, CH] = cutCrop(cutBox, w, h);
+  const clone = el.cloneNode(true);
+  // what a clone doesn't carry: which radio is checked, typed values, and the pictures (inlined, so the canvas stays readable)
+  const live = el.querySelectorAll('input, textarea, select'), copy = clone.querySelectorAll('input, textarea, select');
+  live.forEach((n, i) => { if (n.checked) copy[i].setAttribute('checked', ''); else copy[i].removeAttribute('checked'); if (!/^(radio|checkbox)$/.test(n.type)) copy[i].setAttribute('value', n.value); });
+  const imgs = el.querySelectorAll('img');
+  await Promise.all([...clone.querySelectorAll('img')].map(async (im, i) => { const d = await toDataURL(imgs[i].currentSrc || imgs[i].src); im.removeAttribute('srcset'); im.removeAttribute('loading'); if (d) im.setAttribute('src', d); }));
+  if (snapFonts === null) snapFonts = PROJECT && (PROJECTS.find(x => x.id === PROJECT) || {}).fonts !== false ? await fetch(SCENE_BASE + 'fonts.css').then(r => r.ok ? r.text() : '').then(t => inlineUrls(t, location.origin + SCENE_BASE)).catch(() => '') : '';
+  // a copy has no live scroll state, so it would draw scrollbars the screen hides and shift centred content by half of one
+  const css = ('.snaphost * { scrollbar-width: none; }\n' + snapFonts + '\n' + await inlineUrls([...sr.querySelectorAll('style')].map(x => x.textContent).join('\n').replace(/:host/g, '.snaphost'), location.href))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CW}" height="${CH}"><foreignObject x="0" y="0" width="${CW}" height="${CH}">`
+    + `<div xmlns="http://www.w3.org/1999/xhtml" class="snaphost" style="display:block;position:relative;width:${w}px;height:${h}px;transform:translate(${-x0}px,${-y0}px)"><style>${css}</style>`
+    + new XMLSerializer().serializeToString(clone) + `</div></foreignObject></svg>`;
+  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
+  const k = Math.min(2, 1600 / CW), cv = document.createElement('canvas'); cv.width = Math.round(CW * k); cv.height = Math.round(CH * k);
+  const g = cv.getContext('2d'); g.fillStyle = '#141414'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+  const mx = (px - x0) * k, my = (py - y0) * k; // the spot, ringed; a cut element, outlined
+  for (const [lw, col] of [[5, 'rgba(0,0,0,.45)'], [2.5, '#4da6ff']]) {
+    g.lineWidth = lw * Math.max(k, 1); g.strokeStyle = col; g.beginPath();
+    if (cutBox) g.roundRect((cutBox[0] - x0) * k, (cutBox[1] - y0) * k, cutBox[2] * k, cutBox[3] * k, 4 * k); else g.arc(mx, my, 16 * k, 0, Math.PI * 2);
+    g.stroke();
+  }
+  return cv.toDataURL('image/jpeg', .85);
+}
+const snapURL = n => `${SCENE_BASE}notes/${n.snap}?v=${n.snapAt || n.id}`;
+async function snapNote(n, L, cx, cy) {
+  if (!L || !L.root || !notesServer || CAPTURE) return;
+  try {
+    const rr = L.root.getBoundingClientRect(), k = rr.width / L.root.offsetWidth;
+    const data = await snapScene(L, (cx - rr.left) / k, (cy - rr.top) / k, n.cut && n.cut.box);
+    const r = await fetch('/api/snap?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, data }) });
+    if (!r.ok) return;
+    n.snap = (await r.json()).file; n.snapAt = Date.now();
+    if (S.notes.includes(n)) { touch(n); renderNotes(); if (editing === n) showSnap(n); }
+  } catch (err) { console.warn('[atelier] snapshot', err); }
+}
+// Only a cut shows its picture, at its final shape from the start so nothing jumps when it arrives. A quick note keeps
+// its snapshot for the brief and never shows it.
+function showSnap(n) {
+  const im = $('popsnap'), c = n.cut;
+  im.hidden = !c; $('popcut').hidden = !c;
+  if (!c) return;
+  const L = sceneLayer(n), crop = L ? cutCrop(c.box, L.root.offsetWidth, L.root.offsetHeight) : [0, 0, c.box[2] + 48, c.box[3] + 48];
+  im.style.aspectRatio = `${crop[2]} / ${crop[3]}`; im.style.maxHeight = '200px'; im.style.objectFit = 'contain';
+  if (n.snap) im.src = snapURL(n); else im.removeAttribute('src');
+  $('popcut').textContent = `${c.path.split(' > ').pop().replace(/:nth-of-type\(\d+\)/, '')} · ${c.box[2]} × ${c.box[3]}`;
+}
+const sceneLayer = n => { for (const sc of screens) { const i = sc.designs.findIndex(d => d.id === n.design); if (i >= 0) return sc.layers[i]; } return null; };
+
+/* Drag a pin to move its note. It reads what's under its new spot and takes a new snapshot. */
+let pinDragged = false;
+$('frames').addEventListener('pointerdown', e => {
+  const p = e.target.closest('.pin'); if (!p) return;
+  const n = noteById(p.dataset.id), sc = screens.find(x => x.pins.contains(p)); if (!n || !sc) return;
+  const r = sc.screen.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+  let moved = false;
+  const at = ev => [clamp((ev.clientX - r.left) / r.width, 0, 1), clamp((ev.clientY - r.top) / r.height, 0, 1)];
+  const move = ev => {
+    if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+    moved = true; const [x, y] = at(ev); p.style.left = x * 100 + '%'; p.style.top = y * 100 + '%';
+  };
+  const up = ev => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+    if (!moved) return;
+    pinDragged = true; setTimeout(() => { pinDragged = false; });
+    const [x, y] = at(ev), L = sc.layers.find(l => l.root) || sc.layers[0];
+    n.x = +x.toFixed(3); n.y = +y.toFixed(3); n.on = describe(pickUnder(L, ev.clientX, ev.clientY));
+    touch(n); renderNotes(); snapNote(n, L, ev.clientX, ev.clientY);
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', up);
+});
+/* a note shows on any screen of the same kind (window, phone, tablet) showing its design, on its step */
+function renderPins() {
+  pinStep = stepIndex();
+  screens.forEach(sc => {
+    const ids = sc.designs.map(d => d.id);
+    sc.pins.innerHTML = S.notes.map((n, k) => (editing === n || !n.done && n.step === pinStep) && (n.kind === kindOf(sc.w, sc.h) || n.kind === sc.kind) && ids.includes(n.design)
+      ? (n.area ? `<i class="area${n.sent ? ' sent' : ''}" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
+        + `<button class="pin${editing === n ? ' open' : ''}${n.sent ? ' sent' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.sent ? 'Claude is on it: ' + n.text : n.text)}">${k + 1}</button>` : '').join('');
+  });
+}
+// A gap of over half an hour starts a new sitting. Newest sitting first, so round five isn't buried under round one;
+// inside a sitting notes keep their order, and every number still matches its pin.
+const SITTING = 30 * 60e3, sitOpen = {};
+function sittings() {
+  const out = [];
+  S.notes.forEach((n, k) => {
+    const t = +n.id || 0, last = out.at(-1);
+    if (!last || t - last.end > SITTING) out.push({ start: t, end: t, items: [] });
+    const g = out.at(-1); g.end = Math.max(g.end, t); g.items.push([n, k]);
+  });
+  return out.reverse();
+}
+const sitWhen = t => {
+  const d = new Date(t), day = d.toDateString() === new Date().toDateString() ? 'Today' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${day}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+};
+// Under each note: which page and version; the step only when the design actually has steps.
+const noteWhere = n => {
+  // notes from before versions name an old scene (tasks-3); that page is now v1
+  const sc = sceneById(n.design) || sceneById(String(n.design).replace(/-\d+$/, '-v1')), page = n.design === 'url' ? 'URL' : sc ? [sc.title, sc.version].filter(Boolean).join(' ') : n.design;
+  return sc && sc.steps.length > 1 ? `${page} · Step ${n.step + 1} ${stepLabel(n)}` : page;
+};
+function renderNotes() {
+  const said = n => (n.replies || []).map(r => `<span class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}${r.made && sceneById(r.made) ? ` <button class="link vlink" data-show="${esc(n.design)}|${esc(r.made)}">${esc(sceneById(r.made).version || r.made)}</button>` : ''}</span>`).join('');
+  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}${n.sent ? ' sent' : ''}"><span class="nbadge">${k + 1}</span><span class="nb"><span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
+    <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${n.sent ? '<span class="nr working"><i class="agspin"></i>Claude is on it</span>' : ''}${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
+  $('notelist').innerHTML = groups.length < 2 ? groups.flatMap(g => g.items).map(noteRow).join('') : groups.map((g, i) => {
+    const open = g.items.filter(([n]) => !n.done).length, shown = sitOpen[g.start] ?? (i === 0 || open > 0);
+    return `<li class="sit${shown ? '' : ' shut'}" data-sit="${g.start}"><span>${sitWhen(g.start)}</span><span class="ver">${open ? `${open} open` : 'Done'}</span></li>`
+      + (shown ? g.items.map(noteRow).join('') : '');
+  }).join('');
+  $('notelist').hidden = !S.notes.length; $('noteempty').hidden = !!S.notes.length;
+  $('notesync').hidden = document.querySelector('.notelinks').hidden = !S.notes.length; // nothing to copy, clear or save yet
+  $('notesync').textContent = notesServer ? `Saved to ${SCENE_PATH}notes/brief.md` : 'Saved in this browser only';
+  renderPins(); save(); queueSync();
+  window.Agent && Agent.notesChanged();
+}
+
+/* ---------- notes on disk ----------
+   Served by serve.py, notes live in notes/notes.json and notes/brief.md, so Claude can read them and answer them.
+   The page saves every change, and every 2s picks up changes made to the file (Claude marking a note done, say).
+   If the file changed since the page last saw it, the save is refused and the page takes the file's version.
+   Opened any other way, notes stay in this browser. */
+let notesServer = false, notesVersion = null, notesSent = '', syncTimer = 0;
+const NOTES_API = '/api/notes?project=' + encodeURIComponent(PROJECT);
+const notesJSON = () => JSON.stringify(S.notes);
+/* Notes changed here and not yet saved (id → the note, or null once deleted). When the file's notes come in, these
+   go back on top, so a refused save (Claude edited the file meanwhile) keeps both: the file's changes and yours. */
+const unsaved = new Map();
+const touch = (n, gone) => unsaved.set(n.id, gone ? null : n);
+function takeNotes(d) {
+  S.notes = d.notes; notesVersion = d.version;
+  if (editing) touch(editing); // the note being written stays, pin and all, whatever the file says
+  for (const [id, n] of unsaved) {
+    const k = S.notes.findIndex(x => x.id === id);
+    if (!n) { if (k >= 0) S.notes.splice(k, 1); } else if (k >= 0) S.notes[k] = n; else S.notes.push(n);
+  }
+  notesSent = unsaved.size ? '' : notesJSON(); renderNotes();
+}
+function queueSync() {
+  if (!notesServer || notesJSON() === notesSent) return;
+  clearTimeout(syncTimer); syncTimer = setTimeout(syncNotes, 300);
+}
+async function syncNotes() {
+  const sent = notesJSON();
+  try {
+    const r = await fetch(NOTES_API, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: S.notes, brief: brief(), version: notesVersion }) });
+    const d = await r.json();
+    if (r.status === 409) return takeNotes(d);
+    if (r.ok) { notesVersion = d.version; notesSent = sent; if (notesJSON() === sent) unsaved.clear(); }
+  } catch { /* the server went away; keep the notes here and try again on the next change */ }
+}
+async function pollNotes() {
+  if (editing || document.hidden) return;
+  if (notesJSON() !== notesSent) return syncNotes(); // a save that failed (server away): try again before taking the file's
+  try {
+    const d = await (await fetch(NOTES_API)).json();
+    if (d.version !== notesVersion && notesJSON() === notesSent) takeNotes(d);
+  } catch {}
+}
+(async () => {
+  try {
+    if (!PROJECT || CAPTURE) return;
+    const r = await fetch(NOTES_API); if (!r.ok) return;
+    const d = await r.json(); notesServer = true;
+    if (d.notes.length || !S.notes.length) takeNotes(d); // the file wins; notes kept only in this browser move into it once
+    else { notesVersion = d.version; renderNotes(); }
+    setInterval(pollNotes, 2000);
+    document.addEventListener('visibilitychange', pollNotes); // and at once when you come back to the tab
+  } catch {}
+})();
+const noteById = id => S.notes.find(n => n.id === +id);
+const dropNote = n => { S.notes = S.notes.filter(x => x !== n); };
+/* The editor opens beside its pin (x, y is the pin's centre), never over it: 8 to the right of the pin, or 8 to its
+   left when there's no room before the panel, with its first line level with the pin.
+   Playback pauses while it's open, and its pin stays whatever the step.
+   Save keeps the note open, a to-do in the brief. Resolve says it's dealt with: the pin goes, the list strikes it
+   through, the brief leaves it out (Reopen brings it back). A new note has nothing to resolve yet, so no Resolve. */
+let popHide = 0;
+function openEditor(n, x, y, fresh, around) {
+  if (editing === n) return; // its own pin: keep what's typed
+  if (editing) closeEditor(true); // another note: keep the draft (an empty new one goes)
+  if (playing) { playing = false; drive(); } // the screen holds still while you write about it
+  editing = n; $('popdone').textContent = n.done ? 'Reopen' : 'Resolve'; $('popdone').hidden = !!fresh; renderPins();
+  $('popn').textContent = S.notes.indexOf(n) + 1;
+  $('popmeta').textContent = (n.side ? n.side + ' · ' : '') + noteWhere(n);
+  $('poptext').value = n.text; showSnap(n);
+  $('popthread').hidden = !(n.replies && n.replies.length) && !n.sent;
+  $('popthread').innerHTML = (n.sent ? '<p class="nr working"><i class="agspin"></i>Claude is on it</p>' : '') + (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
+  const pop = $('notepop'), was = !pop.hidden && pop.classList.contains('show');
+  clearTimeout(popHide); pop.hidden = false;
+  const w = pop.offsetWidth, R = 12, GAP = 8;
+  const side = document.querySelector('.side').getBoundingClientRect();
+  const edge = root.dataset.panel === 'off' || !side.width ? innerWidth : side.left;
+  // a cut opens beside the element it cut, not over it
+  const lo = around ? around.left - GAP : x - R - GAP, hi = around ? around.right + GAP : x + R + GAP;
+  const right = hi + w <= edge - 16 || lo - w < 16 && hi + w <= edge - 16;
+  pop.style.left = (right ? hi : Math.max(16, lo - w)) + 'px';
+  pop.style.top = clamp(y - 22, 16, innerHeight - pop.offsetHeight - 16) + 'px'; // the badge's middle (12 + 10) on the pin's
+  // it grows out of the pin's side; moving to another pin while open just moves it
+  pop.style.setProperty('--ox', right ? 'left' : 'right'); pop.style.setProperty('--from', right ? '-6px' : '6px');
+  if (!was) { pop.classList.remove('show'); void pop.offsetWidth; }
+  pop.classList.add('show');
+  $('poptext').focus({ preventScroll: true });
+}
+function closeEditor(keep, done) {
+  const n = editing; if (!n) return;
+  editing = null;
+  const pop = $('notepop'); pop.classList.remove('show'); clearTimeout(popHide);
+  popHide = setTimeout(() => { if (!editing) pop.hidden = true; }, 160);
+  if (keep) n.text = $('poptext').value.trim();
+  if (done !== undefined) n.done = done;
+  if (!n.text) dropNote(n);
+  touch(n, !n.text); renderNotes();
+}
+$('popsave').onclick = () => closeEditor(true);
+$('popdel').onclick = () => { $('poptext').value = ''; closeEditor(true); };
+$('popdone').onclick = () => closeEditor(true, !editing.done);
+$('poptext').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
+  else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); }
+  e.stopPropagation();
+});
+addEventListener('pointerdown', e => { if (editing && !$('notepop').contains(e.target) && !e.target.closest('.pin')) closeEditor(true); }, { capture: true }); // first, before a drag stops the event
+$('frames').addEventListener('click', e => { const p = e.target.closest('.pin'); if (p && !pinDragged) { const n = noteById(p.dataset.id); const r = p.getBoundingClientRect(); openEditor(n, r.left + r.width / 2, r.top + r.height / 2); } });
+$('notelist').addEventListener('click', e => {
+  const show = e.target.closest('[data-show]');
+  if (show) { const [a, b] = show.dataset.show.split('|'); S.shown = [a, b].filter(id => sceneById(id)); S.view = 'side'; S.zoom = 0; S.pos = {}; return apply(); }
+  const op = e.target.closest('[data-open]');
+  if (op) { const n = noteById(op.dataset.open), sc = sceneById(n.design), find = (n.cut ? n.cut.path.split(' > ').pop() : n.on || '').match(/\.([\w-]+)/);
+    fetch('/api/open?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ design: sc ? sc.base || sc.id : n.design, find: find ? find[1] : '' }) });
+    return UI.say(op, 'Opened'); }
+  const del = e.target.closest('[data-del]');
+  if (del) { const n = noteById(del.dataset.del); dropNote(n); touch(n, true); renderNotes(); return; }
+  const li = e.target.closest('li'); if (!li) return;
+  if (li.dataset.sit) { sitOpen[li.dataset.sit] = li.classList.contains('shut'); return renderNotes(); }
+  const n = noteById(li.dataset.id);
+  goStep(n.step); renderPins();
+  const p = document.querySelector(`.pin[data-id="${n.id}"]`);
+  if (p) { p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); }
+});
+$('noteadd').onclick = () => setNoting(!noting);
+$('noteclear').onclick = () => { if (S.notes.length && confirm(`Delete all ${S.notes.length} notes?`)) { S.notes.forEach(n => touch(n, true)); S.notes = []; renderNotes(); } };
+/* One note as the brief writes it: where it is, what it's on, what it says. Send to Claude uses the same lines. */
+function noteLines(n, k) {
+  const sc = sceneById(n.design), file = n.design === 'url' ? n.url : `${SCENE_PATH}${sc ? sc.base || sc.id : n.design}.js` + (sc && sc.variant ? `, variant "${sc.version}"` : '');
+  const lines = [`${k + 1}. ${n.side ? n.side + ', ' : ''}${designName(n.design, n.url)} (${file}), step ${n.step + 1} "${stepLabel(n)}" at position ${n.pos}, ${n.size}, ${Math.round(n.x * 100)}% across and ${Math.round(n.y * 100)}% down.`];
+  const pct = x => Math.round(x * 100);
+  if (n.area) lines.push(`   Area: ${pct(n.area.x)}% to ${pct(n.area.x + n.area.w)}% across, ${pct(n.area.y)}% to ${pct(n.area.y + n.area.h)}% down`,
+    ...(n.area.els.length ? [`   In the area: ${n.area.els.join('; ')}`] : []), ...(n.area.text ? [`   Text in the area: ${n.area.text}`] : []));
+  else if (n.cuts) n.cuts.forEach((c, i) => lines.push(`   Cut ${i + 1}: ${c.path}, ${c.box[2]} × ${c.box[3]} at ${c.box[0]}, ${c.box[1]}`, `     Styles: ${c.style}`));
+  else if (n.cut) lines.push(`   Cut: ${n.cut.path}, ${n.cut.box[2]} × ${n.cut.box[3]} at ${n.cut.box[0]}, ${n.cut.box[1]}`, `   Styles: ${n.cut.style}`, `   Markup: ${n.cut.html}`);
+  else if (n.on) lines.push(`   Under the pin: ${n.on}`);
+  if (n.snap) lines.push(`   Snapshot: ${SCENE_PATH}notes/${n.snap}`);
+  lines.push(`   Note: ${n.text}`);
+  return lines;
+}
+function brief() {
+  const ds = shownDesigns(), what = ds.map(d => designName(d.id, d.url)).join(' vs ') + (ds.length === 2 ? ', ' + VIEWS.find(v => v[0] === S.view)[1] : '');
+  const lines = [`Atelier notes: ${what}`, `Project: ${PROJECT_NAME}, files in Projects/${SCENE_PATH}`, `Page: ${location.href}`, ''];
+  const open = S.notes.map((n, k) => [n, k]).filter(([n]) => !n.done && n.text);
+  if (!open.length) lines.push('No open notes.', '');
+  open.forEach(([n, k]) => lines.push(...noteLines(n, k), ''));
+  const ch = ctlChanges();
+  if (ch.length) lines.push('Controls moved off their defaults:', ...ch);
+  return lines.join('\n').trim();
+}
+$('notecopy').onclick = e => copy(brief(), e.currentTarget);
+
+/* ---------- projects ----------
+   The menu lists every project serve.py found. New project asks for a name and makes <name>/scenes/ from the starter.
+   Switching reloads the page on that project, so its scenes load fresh. */
+$('proj').innerHTML = '<option value="+home">All projects</option>' + (PROJECTS.length ? PROJECTS.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('') : '<option value="">Starter</option>')
+  + (PROJECTS.length ? '<option value="+new">New project…</option>' : '');
+$('proj').value = PROJECT;
+const openProject = id => { location.search = '?project=' + encodeURIComponent(id); };
+$('proj').onchange = async e => {
+  const v = e.target.value; e.target.value = PROJECT;
+  if (v === '+home') return location.href = './#p-' + encodeURIComponent(PROJECT); // back to this project's row
+  if (v !== '+new') return openProject(v);
+  const name = prompt('Project name. It becomes a folder next to the atelier folder, with a starter scene in it.');
+  if (!name || !name.trim()) return;
+  try {
+    const d = await (await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })).json();
+    if (d.id) openProject(d.id); else alert(d.error);
+  } catch { alert('The Atelier server is not running.'); }
+};
+if (PROJECT && !CAPTURE && location.search !== '?project=' + encodeURIComponent(PROJECT)) history.replaceState(null, '', '?project=' + encodeURIComponent(PROJECT)); // so the address is a link to this project
+document.title = PROJECT_NAME + ' · Atelier';
+/* a menu is as wide as its longest option; size it to the project's name so the chevron sits right after it */
+const fitProj = () => { const c = document.createElement('canvas').getContext('2d'), st = getComputedStyle($('proj'));
+  c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`; c.letterSpacing = st.letterSpacing;
+  $('proj').style.width = Math.ceil(c.measureText($('proj').selectedOptions[0].textContent).width) + 18 + 'px'; };
+fitProj(); document.fonts.ready.then(fitProj);
+
+/* ---------- panel ---------- */
+const seg = (id, opts, key, after) => {
+  const el = $(id);
+  el.innerHTML = opts.map(([v, n]) => `<button class="pill" data-v="${v}">${n}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; const v = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v; S[key] = v; after && after(v); apply(); };
+};
+/* picking a size also undoes any drag, resize or zoom */
+$('dev').innerHTML = Object.entries(DEVICES).map(([k, d]) => `<button class="pill" data-v="${k}">${d.n}</button>`).join('');
+$('dev').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; const d = DEVICES[b.dataset.v]; S.w = d.w; S.h = d.h; S.preset = b.dataset.v; recentre(); };
+$('second').onchange = e => { S.second = e.target.checked; S.zoom = 0; S.pos = {}; apply(); };
+/* zoom menu, top right as in Figma: shows the zoom now, and offers the usual stops */
+$('zsel').innerHTML = '<option value="now" hidden></option>' + [[0, 'Zoom to fit'], [0.5, 'Zoom to 50%'], [1, 'Zoom to 100%'], [2, 'Zoom to 200%']].map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+$('zsel').onchange = e => { const z = +e.target.value; if (!z) return recentre(); S.zoom = z; S.pan = { x: 0, y: 0 }; apply(); }; // Zoom to fit also puts everything back in place
+/* tabs */
+const TABS = [['design', 'Design'], ['prototype', 'Prototype'], ['notes', 'Notes'], ['agent', 'Agent'], ['taste', 'Taste'], ['stage', 'Stage']];
+const sects = [...document.querySelectorAll('.sect[data-tab]')];
+$('tabbar').innerHTML = TABS.filter(([k]) => sects.some(x => x.dataset.tab === k)).map(([k, n]) => `<button class="tab" role="tab" data-t="${k}">${n}</button>`).join('');
+$('tabbar').onclick = e => { const b = e.target.closest('.tab'); if (b) { S.tab = b.dataset.t; apply(); $('panes').scrollTop = 0; } };
+function tabFade() { const t = $('tabbar'), x = t.scrollLeft, room = t.scrollWidth - t.clientWidth; t.classList.toggle('more-l', x > 1); t.classList.toggle('more-r', x < room - 1); }
+$('tabbar').addEventListener('scroll', tabFade, { passive: true }); addEventListener('resize', tabFade);
+// a vertical wheel over the tabs scrolls them sideways
+$('tabbar').addEventListener('wheel', e => { const t = $('tabbar'); if (t.scrollWidth > t.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { t.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+/* Duplicate (top right of a screen) copies the design's scene file as its next version (agent-v1 → agent-v3), with the
+   same control values, and shows the two side by side: the copy is real code, to change in ways controls can't.
+   A variant's copy is its scene with the variant's values. serve.py writes the file and lists it in index.js. */
+const DUP = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><path d="M8 4V3a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 1.5 3v3.5A1.5 1.5 0 0 0 3 8h1"/></svg>';
+let duping = false;
+async function duplicateDesign(id, from) {
+  if (duping || from?.wrap?.classList.contains('agbusy')) return; duping = true;
+  const sc = sceneById(id);
+  try {
+    const r = await fetch('/api/duplicate?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sc.base || sc.id }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.id) throw new Error(d.error || 'Not duplicated');
+    S.ctl[d.id] = { ...(S.ctl[id] || {}) };
+    S.shown = [id, d.id]; S.pos = {};
+    // Nothing moves: the screen copied stays where it is on screen, at the same zoom, and the copy lands beside it.
+    if (from) { const r = from.wrap.getBoundingClientRect(); S.place = { x: r.left, y: r.top }; S.zoom = K; } else S.zoom = 0;
+    save(); if (stateServer) await saveState();
+    const u = new URL(location.href); u.searchParams.delete('design'); location.replace(u); // the new file loads with the page
+  } catch (err) {
+    duping = false; $('toast').textContent = err.message; $('toast').hidden = false;
+    setTimeout(() => { $('toast').textContent = 'Click a screen to pin a note'; $('toast').hidden = !noting; }, 2400);
+  }
+}
+/* designs: click a row to put it on screen or take it off. At least one stays on, at most five. A scene's note is its tooltip. */
+/* Designs, one row per page. Scenes that share a title are versions of one page: a row with a chip for each version
+   and saved variant. A page with one version and no variants stays a plain row.
+   Click shows just that design; shift- or ⌘-click adds it to the screen (or takes it off), up to five, lettered A to E. */
+function families() {
+  const out = [];
+  SCENES.forEach(sc => {
+    let f = out.find(x => x.title === sc.title);
+    if (!f) out.push(f = { title: sc.title, ids: [] });
+    f.ids.push(sc.id, ...S.variants.filter(v => v.base === sc.id).map(v => v.id));
+  });
+  return out;
+}
+/* Designs, like layers. A design with one version is one row. A design with several is its name, then a row per
+   version: the version, what it is (the direction Claude named it, or the scene's note), and a star on the one
+   picked. A small dot marks the one on screen; with several on screen, each one that's on gets its letter (A to E,
+   matching the screen) instead.
+   Click shows just that one; shift- or ⌘-click adds it to the screen (or takes it off), up to five. */
+function renderDesigns() {
+  const on = shownDesigns().map(d => d.id), many = on.length > 1;
+  const info = id => (window.Agent && Agent.info && Agent.info(id)) || {};
+  const mk = id => { const k = on.indexOf(id); return `<span class="mk">${k >= 0 && many ? letter(k) : ''}</span>`; };
+  $('dlist').classList.toggle('many', many);
+  const row = id => {
+    const sc = sceneById(id);
+    return `<li class="${on.includes(id) ? 'on' : ''}" data-id="${id}" title="${esc(sc ? sc.note || '' : 'A running page, by its address')}">`
+      + mk(id) + `<span>${esc(sc ? sc.title : 'URL')}</span><span class="ver">${esc(sc ? sc.version || '' : '')}</span></li>`;
+  };
+  const vrow = id => {
+    const sc = sceneById(id), i = info(id), about = i.name || (sc.variant ? 'Variant' : sc.note || '');
+    return `<li class="sub${on.includes(id) ? ' on' : ''}${sc.variant ? ' variant' : ''}${i.lost ? ' lost' : ''}" data-id="${id}" title="${esc(sc.variant ? 'Double-click to rename' : about)}">`
+      + mk(id) + `<span class="vn">${esc(sc.version || '')}</span><span class="vd">${esc(about)}</span>`
+      + (i.picked ? '<span class="star" title="Picked">★</span>' : '')
+      + (sc.variant ? `<button class="x" data-del="${id}" aria-label="Remove variant">×</button>` : '') + '</li>';
+  };
+  $('dlist').innerHTML = families().map(f => {
+    if (f.ids.length === 1) return row(f.ids[0]);
+    const latest = f.ids.filter(id => !sceneById(id).variant).at(-1);
+    return `<li class="fh" data-id="${latest}" title="Click for the newest version"><span>${esc(f.title)}</span><span class="ver">${f.ids.length}</span></li>` + f.ids.map(vrow).join('');
+  }).join('') + row('url');
+}
+$('dlist').onclick = e => {
+  const del = e.target.closest('[data-del]'); if (del) return dropVariant(del.dataset.del);
+  const t = e.target.closest('[data-id]'); if (!t) return;
+  const id = t.dataset.id, on = S.shown.includes(id);
+  if (e.shiftKey || e.metaKey || e.ctrlKey) {
+    if (on && S.shown.length === 1) return;
+    if (!on && S.shown.length >= MAX) return;
+    S.shown = on ? S.shown.filter(x => x !== id) : [...S.shown, id];
+  } else S.shown = [id];
+  S.zoom = 0; S.pos = {}; apply();
+  if (id === 'url' && S.shown.includes('url')) $('url').focus();
+};
+$('dlist').ondblclick = e => {
+  const li = e.target.closest('li.variant'); if (!li) return;
+  const v = S.variants.find(x => x.id === li.dataset.id), name = prompt('Variant name', v.name);
+  if (name && name.trim()) { v.name = name.trim(); ctlKey = ''; apply(); }
+};
+$('url').onchange = e => { S.url = e.target.value.trim(); apply(); };
+for (const k of ['rows', 'cols']) $(k).onchange = e => { S[k] = e.target.value; S.zoom = 0; S.pos = {}; S.pan = { x: 0, y: 0 }; apply(); };
+/* a menu for four or more choices; pills stay for two or three */
+const pick = (id, opts, key, after) => {
+  const el = $(id);
+  el.innerHTML = opts.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+  el.onchange = () => { const v = isNaN(+el.value) ? el.value : +el.value; S[key] = v; after && after(v); apply(); };
+};
+pick('view', VIEWS, 'view', () => { S.zoom = 0; S.pos = {}; });
+$('onionr').oninput = e => { S.onion = +e.target.value; apply(); };
+/* Image opens the file picker every time, so it also replaces the picture */
+pick('wallseg', Wall.OPTIONS, 'wall', v => { if (v === 'image') $('file').click(); });
+pick('speed', [0.5, 1, 2, 4].map(s => [s, s + '×']), 'speed');
+const size = () => { S.w = clamp(+$('w').value || S.w, 200, 4000); S.h = clamp(+$('h').value || S.h, 200, 4000); apply(); };
+$('w').onchange = size; $('h').onchange = size;
+$('rotate').onclick = () => { [S.w, S.h] = [S.h, S.w]; apply(); };
+$('chrome').onchange = e => { S.chrome = e.target.checked; apply(); };
+$('color').oninput = e => { S.color = e.target.value; S.wall = 'color'; apply(); };
+const useImage = async f => { if (await Wall.save(f)) { S.wall = 'image'; apply(); } };
+$('file').onchange = e => useImage(e.target.files[0]);
+addEventListener('dragover', e => { e.preventDefault(); $('drop').classList.add('show'); });
+addEventListener('dragleave', e => { if (!e.relatedTarget) $('drop').classList.remove('show'); });
+addEventListener('drop', e => { e.preventDefault(); $('drop').classList.remove('show'); useImage(e.dataTransfer.files[0]); });
+$('dimr').oninput = e => { S.dim = +e.target.value; apply(); };
+$('blurr').oninput = e => { S.blur = +e.target.value; apply(); };
+$('tintr').oninput = e => { S.tint = +e.target.value; apply(); };
+$('baron').onchange = e => { S.bar = e.target.checked; apply(); };
+$('loop').onchange = e => { S.loop = e.target.checked; apply(); };
+$('reset').onclick = () => {
+  const keep = { notes: S.notes, variants: S.variants, ctl: Object.fromEntries(Object.entries(S.ctl).filter(([k]) => S.variants.some(v => v.id === k))) };
+  S = Object.assign(structuredClone(DEFAULTS), keep, { shown: [SCENES[0].id] }); ctlKey = ''; clearFocus(); apply(); // the project's first design, whatever it's called
+};
+document.querySelectorAll('.sect[data-k] > .st').forEach(b => b.onclick = () => {
+  const k = b.parentElement.dataset.k; S.folded = S.folded.includes(k) ? S.folded.filter(x => x !== k) : [...S.folded, k]; apply();
+});
+
+let uiHidden = false;
+addEventListener('keydown', e => {
+  if (e.target.matches?.('input:not([type=range]):not([type=checkbox]), textarea, select') || e.metaKey || e.ctrlKey) return;
+  if (e.key === 'Escape' && noting) { setNoting(false); return; }
+  if (e.key === 'Escape' && cutting && cutPicks.length) { clearPicks(); setCutting(true); return; }
+  if (e.key === 'Escape' && cutting) { setCutting(false); return; }
+  if (e.key === 'Enter' && cutting && cutPicks.length) { e.preventDefault(); cutMake(cutPicks); return; }
+  if ((e.key === 'e' || e.key === 'E') && window.Agent) { e.preventDefault(); Agent.explore(); return; }
+  if (cutting && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault(); cutDepth = Math.max(0, cutDepth + (e.key === 'ArrowUp' ? 1 : -1)); if (cutAt) cutHover(cutAt.sc, cutAt.e); return;
+  }
+  if (e.key === 'x' || e.key === 'X') { setCutting(!cutting); return; }
+  if (e.key === 'Escape' && (picking || focus)) { setPicking(false); clearFocus(); return; }
+  if (e.key === 'f' || e.key === 'F') { $('focusbtn').click(); return; }
+  if (e.key === 'n' || e.key === 'N') { setNoting(!noting); return; }
+  if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); $('prev').click(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); $('next').click(); }
+  else if (e.key === '\\') { S.panel = !S.panel; apply(); }
+  else if (e.key === 'h' || e.key === 'H') { uiHidden = !uiHidden; apply(); }
+  else if (e.key === 'r' || e.key === 'R') { t = 0; playing = true; drive(); }
+  else if (e.key === ',' || e.key === '.') { playing = false; seek(t + (e.key === '.' ? 1 : -1) / 30); }
+  else if (e.key === '0') recentre();
+  /* C: back to one design, or add the next one. V: next view, comparing exactly two. */
+  else if (e.key === 'c' || e.key === 'C') { if (comparing()) S.shown = [shownDesigns()[0].id]; else { const nx = SCENES.find(x => !S.shown.includes(x.id)); if (nx) S.shown = [...S.shown, nx.id]; } S.zoom = 0; S.pos = {}; apply(); }
+  else if (e.key === 'v' || e.key === 'V') {
+    S.view = VIEWS[(VIEWS.findIndex(v => v[0] === S.view) + 1) % VIEWS.length][0];
+    if (S.shown.length > 2) S.shown = shownDesigns().slice(0, 2).map(d => d.id);
+    if (S.shown.length < 2) { const nx = SCENES.find(x => !S.shown.includes(x.id)); if (nx) S.shown = [...S.shown, nx.id]; }
+    S.zoom = 0; S.pos = {}; apply();
+  }
+  else if (e.key === '1') { S.zoom = 1; apply(); }
+});
+
+/* one place that turns settings into the page */
+function apply() {
+  S.wall = Wall.apply($('wall'), S);
+  root.style.setProperty('--dim', S.dim); root.style.setProperty('--blur', S.blur + 'px'); root.style.setProperty('--tint', S.tint);
+  root.dataset.panel = S.panel && !uiHidden ? 'on' : 'off';
+  root.dataset.ui = uiHidden ? 'off' : 'on';
+  const mark = (id, v) => $(id).querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v) === String(v)));
+  $('dev').querySelectorAll('[data-v]').forEach(b => { const d = DEVICES[b.dataset.v]; b.setAttribute('aria-pressed', d.w === S.w && d.h === S.h); });
+  $('second').checked = S.second; $('wallseg').value = S.wall; $('speed').value = S.speed; $('view').value = S.view;
+  $('w').value = S.w; $('h').value = S.h; $('chrome').checked = S.chrome; $('color').value = S.color;
+  renderDesigns();
+  {
+    const opts = layoutOptions(shownDesigns());
+    if (S.rows !== 'none' && !opts.some(o => o[0] === S.rows)) S.rows = 'none';
+    if (S.cols !== 'shown' && !opts.some(o => o[0] === S.cols)) S.cols = 'shown';
+    const fill = (id, list, v) => { const el = $(id), html = list.map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join(''); if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; } el.value = v; };
+    fill('rows', [['none', 'None'], ...opts], S.rows); fill('cols', [['shown', 'On screen'], ...opts], S.cols);
+  }
+  $('url').hidden = !S.shown.includes('url'); if (document.activeElement !== $('url')) $('url').value = S.url;
+  $('colorrow').hidden = S.wall !== 'color';
+  $('viewwrap').hidden = S.shown.length !== 2 || matrix(); $('secondrow').hidden = comparing();
+  $('onionwrap').hidden = S.view !== 'onion'; $('onionr').value = S.onion; $('oniono').textContent = Math.round(S.onion * 100) + '%';
+  if (!TABS.some(([k]) => k === S.tab)) S.tab = 'design';
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.t === S.tab));
+  { const t = $('tabbar'), b = t.querySelector('[aria-selected="true"]'); if (b) { const l = b.offsetLeft - 16, r = b.offsetLeft + b.offsetWidth + 16 - t.clientWidth; if (t.scrollLeft > l) t.scrollLeft = l; else if (t.scrollLeft < r) t.scrollLeft = r; } tabFade(); }
+  sects.forEach(x => x.classList.toggle('offtab', x.dataset.tab !== S.tab));
+  $('dimr').value = S.dim; $('dimo').textContent = Math.round(S.dim * 100) + '%';
+  $('blurr').value = S.blur; $('bluro').textContent = S.blur + 'px';
+  $('tintr').value = S.tint; $('tinto').textContent = Math.round(S.tint * 100) + '%';
+  $('baron').checked = S.bar; $('loop').checked = S.loop;
+  $('exfmt').querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.exfmt));
+  if (!exporting) $('exhint').textContent = PROJECT ? EXPORTS[S.exfmt] : 'Export needs serve.py';
+  document.querySelectorAll('.sect[data-k]').forEach(s => s.classList.toggle('folded', S.folded.includes(s.dataset.k)));
+  buildTimeline();
+  // The timeline only shows when what's on screen has more than one step: a still page has nothing to play.
+  root.dataset.bar = S.bar && !uiHidden && shownDesigns().some(d => (sceneById(d.id)?.steps || []).length > 1) ? 'on' : 'off';
+  layoutScreens();
+  renderControls(); applyControls();
+  drive(); renderNotes();
+  if (focus) requestAnimationFrame(measureFocus);
+  window.Agent && Agent.paint();
+  save();
+}
+/* re-fit after the panel or bar slides away */
+addEventListener('resize', fit);
+document.querySelector('.side').addEventListener('transitionend', fit);
+document.querySelector('.transport').addEventListener('transitionend', fit);
+addEventListener('pagehide', () => {
+  if (CAPTURE) return;
+  const put = (url, body) => { try { fetch(url, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); } catch {} };
+  if (editing) closeEditor(true);
+  if (notesServer && notesJSON() !== notesSent) put(NOTES_API, { notes: S.notes, brief: brief(), version: notesVersion });
+  if (stateServer && stateJSON() !== stateSent) put('/api/state?project=' + encodeURIComponent(PROJECT), { state: JSON.parse(stateJSON()), version: stateVersion });
+});
+/* back to a stage kept in the back/forward cache: take the wallpaper picked on home meanwhile */
+addEventListener('pageshow', e => { if (!e.persisted) return; try { const k = JSON.parse(localStorage.getItem('workspace') || '{}'); ['wall', 'color', 'dim'].forEach(x => { if (k[x] !== undefined) S[x] = k[x]; }); } catch {} apply(); });
+
+/* ---------- export ----------
+   Just the design: each screen's content, without the wallpaper or device frame, one file per screen.
+   PNG is this step, at 2×; GIF and MP4 play the flow once from the start. serve.py runs capture.mjs, which opens
+   this page in a hidden Chrome with these same settings (sent along). Files are kept in <project>/exports/ and downloaded. */
+const EXPORTS = { png: 'This step, at 2×', gif: 'The animation, full size', mp4: 'The animation, full size' };
+let exporting = false;
+$('exfmt').onclick = e => { const b = e.target.closest('[data-v]'); if (b && !exporting) { S.exfmt = b.dataset.v; apply(); } };
+$('exbtn').onclick = async () => {
+  if (exporting || !PROJECT) return;
+  exporting = true; const btn = $('exbtn'), fmt = S.exfmt;
+  UI.say(btn, fmt === 'png' ? 'Exporting…' : `Recording ${Math.ceil(DURATION)}s…`);
+  const storage = {}; ['workspace', PKEY, 'workspace.glass.3', 'workspace.wallimg'].forEach(k => { try { storage[k] = localStorage.getItem(k); } catch {} });
+  // a name per screen, in screen order: the design, plus its size when one design is on two screens
+  const names = screens.map(sc => sc.designs.map(d => designName(d.id, d.url)).join(' vs ') + (screens.length > 1 && !sc.tag ? ' ' + sc.n : ''));
+  try {
+    if (stateServer) await saveState(); // the hidden page reads the variants and values from disk
+    const r = await fetch('/api/capture?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format: fmt, t, names, storage }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Not exported');
+    for (const f of d.files) { const a = document.createElement('a'); a.href = f.url; a.download = f.file; document.body.append(a); a.click(); a.remove(); }
+    $('exhint').textContent = d.files.length === 1 ? `Saved to ${PROJECT}/exports/${d.files[0].file}` : `${d.files.length} files saved to ${PROJECT}/exports/`; UI.say(btn, 'Saved');
+  } catch (err) { $('exhint').textContent = err.message; UI.say(btn, 'Not exported'); }
+  setTimeout(() => { exporting = false; UI.say(btn, 'Export', -1); }, 1600);
+};
+
+apply();
+// A full-page screen measures its scene, so measure again once the typefaces are in.
+document.fonts.ready.then(() => { if (screens.some(sc => sc.tall)) layoutScreens(); });
+if (CAPTURE) {
+  root.dataset.capture = ''; uiHidden = true; S.chrome = false; S.zoom = 1; // no device frame: the file is the design at its own size S.pan = { x: 0, y: 0 }; S.pos = {}; S.loop = false; S.speed = 1; playing = false;
+  const at = CAPTURE_T;
+  t = clamp(at, 0, DURATION); apply();
+  window.__capture = {
+    ready: true,
+    // the window it takes to show every screen at 100% with pad around them
+    size: pad => ({ w: Math.ceil(screens.reduce((a, s) => a + s.w, 0) + 32 * (screens.length - 1) + pad * 2 + 64), h: Math.ceil(Math.max(...screens.map(s => s.h)) + pad * 2 + 64) }),
+    layout: () => apply(),
+    // each screen's content, without its device frame: what gets exported
+    boxes: () => screens.map(s => { const r = s.screen.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }; }),
+    still: () => { t = clamp(at, 0, DURATION); drive(); },
+    play: () => { t = 0; drive(); playing = true; return DURATION; },
+  };
+}
+/* just duplicated: move both screens by however far the original's spot is from where it was before (see duplicateDesign) */
+if (S.place) {
+  const was = S.place, r = screens[0].wrap.getBoundingClientRect(), d = { x: Math.round(was.x - r.left), y: Math.round(was.y - r.top) };
+  delete S.place; S.pos = { 0: d, 1: { ...d } }; apply();
+}
+requestAnimationFrame(frame);
+/* liquid glass on the outermost glass: the panel and the bar bend at their rims and keep their frost.
+   Buttons inside them stay clear glass: a lens inside another lens only sees the panel, never the wallpaper. */
+Liquid.watch('.side.glass, .transport.glass', g => ({ bezel: g.reach * 2, bend: g.bend * 1.6, split: g.split, frost: 'blur(var(--blur)) saturate(180%)' }));
+Liquid.tuner($('tuner'));
+/* opened from a gallery thumbnail: the screen is the thumbnail, grown (see ui.css); the name is dropped once it lands */
+if (fromGallery && screens[0]) { screens[0].frame.style.viewTransitionName = 'screen'; addEventListener('pagereveal', e => e.viewTransition?.finished.finally(() => screens[0].frame.style.viewTransitionName = '')); setTimeout(() => screens[0].frame.style.viewTransitionName = '', 1500); }
+</script>
+<script src="agent.js"></script>
+<script src="taste.js"></script>
+<div id="ready" hidden></div>
+</body>
+</html>

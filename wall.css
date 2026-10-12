@@ -1,0 +1,17 @@
+/* The wallpaper, shared by home and the stage: a fixed layer behind everything, picked by :root[data-wall].
+   The dim (--dim) darkens it; a picked image or colour is set on the element by wall.js. */
+.wall { position: fixed; inset: 0; background: #05070d center / cover no-repeat; transition: background-color .3s; }
+.wall::after { content: ""; position: absolute; inset: 0; background: #000; opacity: var(--dim); }
+/* Dark and Light are gradients: deep navy with a blue light at its foot, and a cool paper grey. A picture in
+   wallpapers/dark.jpg or light.jpg goes on top of its gradient. wall.js asks the server which pictures are there
+   (data-photos), so a missing one is never requested. */
+:root { --wall-dark: radial-gradient(60% 55% at 22% 108%, rgb(77 166 255 / .42), transparent 70%), radial-gradient(55% 50% at 100% 0%, rgb(90 80 230 / .34), transparent 70%),
+  radial-gradient(40% 35% at 55% 45%, rgb(77 166 255 / .07), transparent 70%), linear-gradient(165deg, #0c1122, #04050a 75%);
+  --wall-light: radial-gradient(90% 70% at 85% 105%, rgb(77 166 255 / .22), transparent 60%), radial-gradient(70% 60% at 5% 0%, rgb(255 255 255 / .9), transparent 65%),
+  linear-gradient(165deg, #eef1f6, #d9dee8); }
+:root[data-wall="dark"] .wall { background-image: var(--wall-dark); }
+:root[data-wall="dark"][data-photos~="dark"] .wall { background-image: url(wallpapers/dark.jpg), var(--wall-dark); }
+:root[data-wall="light"] .wall { background-image: var(--wall-light); background-color: #e6e6e6; }
+:root[data-wall="light"][data-photos~="light"] .wall { background-image: url(wallpapers/light.jpg), var(--wall-light); }
+:root[data-wall="gradient"] .wall { background-image: radial-gradient(80% 90% at 15% 10%, #3b4bd8 0, transparent 60%), radial-gradient(70% 80% at 90% 90%, #ff6a13 0, transparent 55%), radial-gradient(60% 60% at 70% 20%, #b14fd8 0, transparent 60%); background-color: #0b0b18; }
+:root[data-wall="color"] .wall { background-image: none; }

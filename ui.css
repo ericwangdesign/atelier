@@ -1,0 +1,65 @@
+/* Buttons are glass everywhere, on home and the stage: a little white, a little frost, a hairline edge, and light
+   from straight above (a soft rim along the top, a quarter as much along the bottom). Never a solid fill.
+   The values (--g-fill, --g-blur, --g-light, --g-edge) are set by liquid.js from the glass tuner; these are the
+   fallbacks. In Chrome, liquid.js also bends the background at the rims like a lens. */
+:root {
+  --g-fill: .03; --g-blur: 1px; --g-light: .2; --g-edge: .04;
+  --glass-btn: rgb(255 255 255 / var(--g-fill));                          /* at rest */
+  --glass-btn-hover: rgb(255 255 255 / calc(var(--g-fill) + .06));
+  --glass-btn-on: rgb(255 255 255 / calc(var(--g-fill) + .12));           /* pressed, chosen, or the main action (play) */
+  --glass-edge: inset 0 0 0 0.5px rgb(255 255 255 / var(--g-edge)), inset 0 1px 0.5px rgb(255 255 255 / var(--g-light)), inset 0 -1px 0.5px rgb(255 255 255 / calc(var(--g-light) / 4));
+  --glass-blur: blur(var(--g-blur));
+  /* The surface of everything you press, type in, pick or drag (buttons, pills, fields, menus, toggles, slider tracks),
+     so every control reads as one material. Two looks, picked with the tuner's Controls pills (liquid.js sets
+     data-look on <html>): flat, the default, plain translucent white with no edge, frost or lens;
+     or glass, with the edge, top light and frost from the tuner. */
+  --surf: rgb(255 255 255 / .1); --surf-hover: rgb(255 255 255 / .14); --surf-on: rgb(255 255 255 / .22); --surf-edge: none; --surf-blur: none;
+}
+:root[data-look="glass"] { --surf: var(--glass-btn); --surf-hover: var(--glass-btn-hover); --surf-on: var(--glass-btn-on); --surf-edge: var(--glass-edge); --surf-blur: var(--glass-blur); }
+
+/* A label change (ui.js): the leaving text sits over the arriving one until it's gone. */
+:is(.btn, .tbtn, .ctl, .ibtn) { position: relative; }
+.say-new { display: inline-block; }
+.say-old { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+
+/* Press: a squeeze felt more than seen, 150ms on an ease-out; every button gets it. */
+:is(.btn, .tbtn, .ctl, .ibtn, .spd, .pill) { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; }
+:is(.btn, .tbtn, .ctl, .ibtn, .spd, .pill):active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { :is(.btn, .tbtn, .ctl, .ibtn, .spd, .pill):active { transform: none; } }
+
+/* Moving between home and the stage: the pages crossfade (the wallpaper is the same on both, so it holds steady
+   through the fade), and a clicked thumbnail grows into the stage's screen ('screen'). Chrome only. */
+@view-transition { navigation: auto; }
+::view-transition-group(*) { animation-duration: .38s; animation-timing-function: cubic-bezier(.19, 1, .22, 1); }
+::view-transition-old(root) { animation-duration: .18s; }
+::view-transition-new(root) { animation-duration: .3s; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+
+/* Dropdowns: the menu that opens is glass like the rest, not the system's grey one. Each page draws its own chevron
+   and sizes the closed control; this styles the menu. Chrome only (appearance: base-select); elsewhere the system menu
+   opens, over a control that still looks the same. Option rows are pills inside a pill-cornered menu (18 = 14 + 4). */
+select { appearance: none; -webkit-appearance: none; }
+@supports (appearance: base-select) {
+  select, ::picker(select) { appearance: base-select; }
+  select { display: inline-flex; align-items: center; min-block-size: 0; min-inline-size: 0; }
+  select::picker-icon { display: none; }
+  ::picker(select) {
+    min-width: max(anchor-size(width), 128px); margin: 6px 0; padding: 4px; border: 0; border-radius: 18px;
+    background: rgb(30 30 36 / .55); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+    box-shadow: var(--glass-edge), 0 12px 32px rgb(0 0 0 / .32);
+    color: #fff; font: 400 13px/16px "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: 0;
+    /* opens in 200ms from just under the control, closes in 120ms */
+    transform-origin: top center; opacity: 1; transform: none;
+    transition: opacity .2s cubic-bezier(.19, 1, .22, 1), transform .2s cubic-bezier(.19, 1, .22, 1), display .2s allow-discrete, overlay .2s allow-discrete;
+  }
+  ::picker(select):not(:popover-open) { opacity: 0; transform: translateY(-4px) scale(.98); transition-duration: .12s; }
+  @starting-style { ::picker(select):popover-open { opacity: 0; transform: translateY(-4px) scale(.98); } }
+  select option { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px 0 8px; border-radius: 14px;
+    background: none; color: rgb(255 255 255 / .72); font: inherit; white-space: nowrap; cursor: pointer; outline: 0; }
+  select option:is(:hover, :focus-visible) { background: rgb(255 255 255 / .1); color: #fff; }
+  select option:checked { color: #fff; }
+  select option::checkmark { content: ""; width: 12px; height: 12px; flex: none; background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5.2' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
+  select option:not(:checked)::checkmark { visibility: hidden; }
+  @media (prefers-reduced-motion: reduce) { ::picker(select), ::picker(select):not(:popover-open) { transform: none; } }
+}

@@ -1,0 +1,13 @@
+notes/
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+build/
+out/
+.next/
+.DS_Store
+exports/
+__pycache__/
+taste.json
