@@ -27,7 +27,8 @@ backgrounds run to the edges.
 1. Read the brief: `<project>/scenes/notes/brief.md`. If several projects have open notes, take the one the designer
    names, else the most recently changed. Its second line names the project and where its files are.
 2. Each note names the scene file, the step, where on the screen it was pinned, and what was under it (an element,
-   several cut elements, or an area with what's inside it). Snapshots are in `notes/snaps/`.
+   several cut elements, or an area with what's inside it). A note left on selected words also quotes them
+   (`On the words: "..."`, and `quote` in notes.json): change that text. Snapshots are in `notes/snaps/`.
 3. Prefer a new version over editing in place: copy `home-v2.js` to the next free `home-vN.js`, change its `id` and
    `version`, list it in `index.js` right after its family, and make the changes there. Then the designer can compare.
 4. In `notes/notes.json`, for each note you handled: set `"done": true` and add

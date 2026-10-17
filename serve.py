@@ -167,8 +167,13 @@ def duplicate(base, src):
         return None, 'no such design'
     with open(path, encoding='utf-8') as f:
         text = f.read()
-    if not re.search(r'\bid:\s*([\'"])' + re.escape(src) + r'\1', text):
-        return None, f'{src}.js has no id: \'{src}\''
+    # The id is either `id: '<src>'` or, for scenes built by a factory such as
+    # makeCustomScene('<src>', ...), the first quoted '<src>' in the file.
+    id_pat = r'(\bid:\s*)([\'"])' + re.escape(src) + r'\2'
+    if not re.search(id_pat, text):
+        id_pat = r'()([\'"])' + re.escape(src) + r'\2'
+        if not re.search(id_pat, text):
+            return None, f'{src}.js has no id: \'{src}\''
     stem = re.sub(r'-v\d+$', '', src)
     family = [n for n in names if n == stem or re.fullmatch(re.escape(stem) + r'-v\d+', n)]
     top = 1
@@ -185,7 +190,7 @@ def duplicate(base, src):
     while f'{stem}-v{n}' in names or os.path.exists(os.path.join(base, f'{stem}-v{n}.js')):
         n += 1
     new, ver = f'{stem}-v{n}', f'v{n}'
-    text = re.sub(r'(\bid:\s*)([\'"])' + re.escape(src) + r'\2', lambda m: f"{m.group(1)}{m.group(2)}{new}{m.group(2)}", text, count=1)
+    text = re.sub(id_pat, lambda m: f"{m.group(1)}{m.group(2)}{new}{m.group(2)}", text, count=1)
     if re.search(r'\bversion:\s*[\'"][^\'"]*[\'"]', text):
         text = re.sub(r'(\bversion:\s*)([\'"])[^\'"]*\2', lambda m: f"{m.group(1)}{m.group(2)}{ver}{m.group(2)}", text, count=1)
     else:
@@ -283,8 +288,39 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=ROOT, **kwargs)
 
     def end_headers(self):
-        self.send_header('Cache-Control', 'no-store')
+        # Local tweak: big built apps inside a project (scenes/app/) revalidate instead of re-downloading every time.
+        is_app = re.match(r'^/p/[^/]+/(?:[a-z0-9-]+-)?app/', urlparse(self.path).path or '')
+        self.send_header('Cache-Control', 'no-cache' if is_app else 'no-store')
         super().end_headers()
+
+    def send_head(self):
+        # Local tweak: serve a precompressed sibling (file.gz) for scenes/app/ files when the browser takes gzip.
+        clean = urlparse(self.path).path or ''
+        if re.match(r'^/p/[^/]+/(?:[a-z0-9-]+-)?app/', clean) and 'gzip' in self.headers.get('Accept-Encoding', ''):
+            path = self.translate_path(self.path)
+            gz = path + '.gz'
+            if os.path.isfile(path) and os.path.isfile(gz):
+                st = os.stat(gz)
+                ims = self.headers.get('If-Modified-Since')
+                if ims:
+                    try:
+                        import email.utils
+                        if int(st.st_mtime) <= email.utils.parsedate_to_datetime(ims).timestamp():
+                            self.send_response(304)
+                            self.end_headers()
+                            return None
+                    except (TypeError, ValueError, IndexError, OverflowError):
+                        pass
+                f = open(gz, 'rb')
+                self.send_response(200)
+                self.send_header('Content-Type', self.guess_type(path))
+                self.send_header('Content-Encoding', 'gzip')
+                self.send_header('Vary', 'Accept-Encoding')
+                self.send_header('Content-Length', str(st.st_size))
+                self.send_header('Last-Modified', self.date_time_string(st.st_mtime))
+                self.end_headers()
+                return f
+        return super().send_head()
 
     def translate_path(self, path):
         clean = unquote(urlparse(path).path)
@@ -334,6 +370,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         route = urlparse(self.path).path
+        if route.startswith('/svc/'):
+            return self.service()
         if route == '/api/projects':
             return self.send_json(200, [summary(p) for p in projects()])
         if route == '/api/wallpapers':  # the wallpaper pictures that are there, so the page never asks for a missing one
@@ -357,11 +395,46 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, {'state': read_json(files[2], {}), 'version': version(files[2])})
         return super().do_GET()
 
+    # Local tweak: /svc/<project>/<name>/<path> forwards to a tool on this computer that the project names in
+    # scenes/services.json ({"<name>": <port>}), so a design can read from and write to it from Atelier's own origin
+    # (no CORS, and only as reachable as Atelier is). Only GET, and POST with application/json (the same rule as
+    # body(): other websites can't send that without asking first). Only the body and its type are passed on.
+    def service(self):
+        parts = urlparse(self.path)
+        _, _, project, name, rest = (parts.path.split('/', 4) + [''] * 5)[:5]
+        base = scenes_dir(unquote(project))
+        port = read_json(os.path.join(base, 'services.json'), {}).get(unquote(name)) if base else None
+        if not isinstance(port, int) or not 1024 <= port <= 65535:
+            return self.send_json(404, {'error': 'no such service'})
+        data = None
+        if self.command == 'POST':
+            if self.headers.get('Content-Type', '').split(';')[0].strip() != 'application/json':
+                return self.send_json(415, {'error': 'application/json only'})
+            data = self.rfile.read(int(self.headers.get('Content-Length', 0) or 0))
+        import http.client
+        conn = http.client.HTTPConnection('127.0.0.1', port, timeout=30)
+        try:
+            conn.request(self.command, '/' + rest + ('?' + parts.query if parts.query else ''), body=data,
+                         headers={'Content-Type': 'application/json'} if data is not None else {})
+            r = conn.getresponse()
+            out = r.read()
+        except OSError as e:
+            return self.send_json(502, {'error': f'{name} is not running on :{port} ({e})'})
+        finally:
+            conn.close()
+        self.send_response(r.status)
+        self.send_header('Content-Type', r.getheader('Content-Type', 'application/octet-stream'))
+        self.send_header('Content-Length', str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
     def do_PUT(self):
         with WRITES:
             return self.put()
 
     def do_POST(self):
+        if urlparse(self.path).path.startswith('/svc/'):
+            return self.service()
         if urlparse(self.path).path == '/api/capture':  # takes as long as the flow plays: outside the lock
             return self.capture()
         with WRITES:

@@ -49,7 +49,7 @@
   .fwrap.dupable .cap { max-width: calc(100% - 28px); overflow: hidden; text-overflow: ellipsis; }
   :root[data-ui="off"] .fdup { visibility: hidden; }
   /* exporting (capture mode): no border and square corners, so a cut-out screen is the design edge to edge */
-  :root[data-capture] .frame, :root[data-capture] .screen { border-radius: 0 !important; border: 0 !important; }
+  :root[data-capture] .frame, :root[data-capture] .screen { border-radius: 0 !important; border: 0 !important; box-shadow: none !important; }
   :root[data-wall="light"] .cap { text-shadow: 0 1px 3px rgb(0 0 0 / .7), 0 0 12px rgb(0 0 0 / .5); }
   :root[data-ui="off"] .cap, :root[data-ui="off"] .rz { visibility: hidden; }
   .scaler { position: relative; }
@@ -77,6 +77,23 @@
   .frame.handheld { border-radius: 48px; }
   .frame.tablet { border-radius: 28px; }
   .frame.bare { border-radius: 0; }
+  /* CarPlay: the car display itself, 40 px corners as in Figma 643:41271. No device art yet: no bezel image. */
+  .frame.carplay { border-radius: 40px; background: #fff; border: 0; box-shadow: 0 0 0 1px rgb(255 255 255 / .14), 0 24px 80px rgb(0 0 20 / .45); }
+  /* device bezel: a ring drawn with box-shadow so it doesn't change the frame's size */
+  .frame.tablet:not(.focus) { border-color: rgb(255 255 255 / .1);
+    box-shadow: 0 0 0 7px #161616, 0 0 0 8px rgb(255 255 255 / .16), 0 24px 80px rgb(0 0 20 / .45); }
+  /* Local tweak: phones wear his iPhone frame image (phone-frame.png, 500×1024, screen hole 447×972 at 27,26), laid
+     over the screen so its black border and rounded inner corners mask the design. The image brings its own island. */
+  .frame.handheld:not(.focus) { border-color: transparent; box-shadow: none; }
+  .scaler { position: relative; }
+  .bezel { display: none; position: absolute; z-index: 4; pointer-events: none;
+    left: calc(-27 / 447 * 100%); top: calc(-26 / 972 * 100%); width: calc(500 / 447 * 100%); height: calc(1024 / 972 * 100%);
+    background: url(phone-frame.png) center / 100% 100% no-repeat; filter: drop-shadow(0 24px 60px rgb(0 0 20 / .45)); }
+  .scaler:has(> .frame.handheld:not(.focus)) > .bezel { display: block; }
+  .scaler:has(> .frame.handheld:not(.focus)) .status .island { visibility: hidden; }
+  .fwrap:has(.frame.handheld:not(.focus)) > :is(.cap, .fdup) { bottom: calc(100% + 26 / 972 * 100%); }
+  .fwrap:has(.frame.tablet:not(.focus)) > :is(.cap, .fdup) { bottom: calc(100% + 8px); }
+  :root[data-capture] .bezel { display: none !important; }
   .screen { flex: 1; min-height: 0; position: relative; }
   .screen { isolation: isolate; }
   .host { position: absolute; inset: 0; }
@@ -118,6 +135,7 @@
   .home { height: 34px; display: grid; place-items: center; color: #f5f2ed; } .home::before { content: ""; width: 136px; height: 5px; border-radius: 999px; background: currentColor; transition: background-color .2s ease; }
   .frame.tablet .home { height: 20px; } .frame.tablet .home::before { width: 180px; }
   .frame:not(.window) .tbar, .frame.window .status, .frame.window .home, .frame.bare .tbar, .frame.bare .status, .frame.bare .home { display: none; }
+  .frame.carplay .status, .frame.carplay .home { display: none; }
 
   /* ---------- glass, shared by the panel and the bar ---------- */
   .glass { color: #fff; background: rgb(40 40 46 / var(--tint)); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%); backdrop-filter: blur(var(--blur)) saturate(180%);
@@ -152,6 +170,9 @@
   .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--c-dim); font-size: 13px; font-weight: 500; cursor: pointer; }
   .tab:hover { color: var(--c-text); }
   .tab[aria-selected="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
+  /* Local tweak: no white outline ring on tabs (it showed after clicks and the scroll row clipped it); keyboard focus gets a quiet inset ring instead. */
+  .tab:focus, .tab:focus-visible { outline: none; }
+  .tab:focus-visible { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .45); }
   .zsel { flex: none; margin: -2px -8px -2px auto; width: 68px; height: 28px; padding: 0 22px 0 8px; border: 0; border-radius: 999px; color: var(--c-dim); font-size: 13px; font-variant-numeric: tabular-nums; text-align-last: right; justify-content: flex-end; cursor: pointer;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 8px center no-repeat; }
   .zsel:hover { color: var(--c-text); background-color: var(--surf-hover); box-shadow: var(--surf-edge); }
@@ -244,6 +265,51 @@
   .subrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .link { flex: none; padding: 0; border: 0; background: none; color: var(--c-dim); line-height: 16px; cursor: pointer; }
   .link:hover { color: var(--c-text); }
+  /* Local tweak: control groups. A scene can sort its controls into folding groups (controlGroups + c.group), with
+     an on/off switch in a group's header, colours in one swatch row, and half-width pairs (c.half). */
+  #ctls .cgrp { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--c-line); }
+  #ctls > .stack > .cgrp:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .cg-h { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+  .cg-t { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--c-text); font: inherit; font-weight: 500; line-height: 20px; text-align: left; cursor: pointer; }
+  .cg-t::before { content: ""; flex: none; width: 5px; height: 5px; margin: 0 3px 0 1px; border-right: 1.5px solid var(--c-faint); border-bottom: 1.5px solid var(--c-faint); transform: translateY(-1px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+  .cgrp.folded .cg-t::before { transform: rotate(-45deg); }
+  .cg-n { margin-left: auto; color: var(--c-faint); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .cg-h .chk { flex: none; }
+  .cgrp.off .cg-t { color: var(--c-faint); }
+  .cgrp.folded > .cg-b, .cgrp.off > .cg-b { display: none; }
+  #ctls .cg-b { margin-top: 12px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .swrow { display: flex; gap: 16px; }
+  .sw { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: var(--c-dim); line-height: 16px; cursor: pointer; }
+  .sw:hover { color: var(--c-text); }
+  /* swatches are buttons now: a disc of the colour over a checkerboard, so transparency shows */
+  .swatch { display: block; flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    background: linear-gradient(var(--c), var(--c)), repeating-conic-gradient(#bbb 0 25%, #fff 0 50%) 0 0 / 8px 8px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+  /* Local tweak: Figma's colour picker. Saturation/brightness square, hue and opacity bars with an eyedropper, and
+     Hex / RGB / HSB fields with opacity in %. Opens from any swatch. */
+  .cpop { position: fixed; z-index: 60; width: 240px; padding: 12px; border-radius: 14px; background: #2c2c2e; box-shadow: 0 0 0 0.5px rgb(255 255 255 / .14), 0 18px 48px rgb(0 0 0 / .5); color: var(--c-text); font: 12px var(--c-font); }
+  .cpop[hidden] { display: none; }
+  .cp-sv { position: relative; height: 216px; border-radius: 6px; cursor: crosshair; touch-action: none;
+    background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(var(--h) 100% 50%)); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .12); }
+  .cp-k { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; box-shadow: 0 0 0 3px #fff, 0 0 0 4px rgb(0 0 0 / .25), 0 1px 4px rgb(0 0 0 / .4); pointer-events: none; }
+  .cp-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .cp-bars { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .cp-bar { position: relative; height: 14px; border-radius: 999px; cursor: pointer; touch-action: none; box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .12); }
+  .cp-bar .cp-k { top: 50%; }
+  .cp-hue { background: linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00); }
+  .cp-alpha { background: linear-gradient(to right, transparent, var(--rgb)), repeating-conic-gradient(#666 0 25%, #999 0 50%) 0 0 / 8px 8px; }
+  .cp-eye { flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--c-dim); display: grid; place-items: center; cursor: pointer; }
+  .cp-eye:hover { background: var(--c-inset); color: var(--c-text); }
+  .cp-eye svg { width: 16px; height: 16px; }
+  .cp-f { display: flex; gap: 6px; margin-top: 12px; }
+  .cp-mode { flex: none; width: 62px; height: 28px; padding: 0 18px 0 8px; border: 0; border-radius: 6px; color: var(--c-text); font: inherit; cursor: pointer;
+    background: var(--c-inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 7px center no-repeat; -webkit-appearance: none; appearance: none; }
+  .cp-in { flex: 1; min-width: 0; display: flex; border-radius: 6px; background: var(--c-inset); overflow: hidden; }
+  .cp-in input { flex: 1 1 0; min-width: 0; width: 0; height: 28px; padding: 0 6px; border: 0; background: none; color: var(--c-text); font: inherit; font-variant-numeric: tabular-nums; }
+  .cp-in input + input { box-shadow: inset 1px 0 0 rgb(0 0 0 / .35); }
+  .cp-in input.hex { flex-grow: 2.4; }
+  .cp-in input:focus { outline: none; background: rgb(255 255 255 / .06); }
+  .cp-in span { display: flex; align-items: center; padding-right: 6px; color: var(--c-faint); }
   .mk { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--c-line2); display: grid; place-items: center; font-size: 11px; font-weight: 500; }
   /* in the list the mark is only a state: a small dot on the one on screen, or with several on screen, a letter
      (A to E, matching the screen) on each one that's on. Nothing on the rest. Same 20px slot, so text never moves. */
@@ -427,7 +493,6 @@
     <button class="st">Designs</button>
     <ol class="dlist" id="dlist"></ol>
     <input class="txt" id="url" type="url" placeholder="http://localhost:5173" aria-label="Address">
-    <div class="acts"><button class="btn" id="focusbtn" aria-pressed="false">Focus</button></div>
     <div class="stack" id="laywrap">
       <div class="lay"><div class="stack"><div class="lbl">Rows</div><select class="txt" id="rows" aria-label="Rows"></select></div>
         <div class="stack"><div class="lbl">Columns</div><select class="txt" id="cols" aria-label="Columns"></select></div></div>
@@ -442,7 +507,14 @@
   <div class="sect" data-k="controls" data-tab="design" id="ctlsect">
     <button class="st">Controls</button>
     <div class="stack" id="ctls"></div>
-    <div class="acts"><button class="btn" id="ctlcopy">Copy values</button><button class="btn" id="ctlreset">Reset</button></div>
+    <div class="acts"><button class="btn" id="ctlsave" hidden>Save variant</button><button class="btn" id="ctlcopy">Copy values</button><button class="btn" id="ctlreset">Reset</button></div>
+  </div>
+
+  <div class="cpop" id="cpop" hidden>
+    <div class="cp-sv"><i class="cp-k"></i></div>
+    <div class="cp-row"><button class="cp-eye" title="Pick a colour from the screen" aria-label="Eyedropper"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M10.2 2.6a1.9 1.9 0 0 1 2.7 2.7l-1.4 1.4.7.7-1 1-.7-.7-4.9 4.9H3.4v-2.2l4.9-4.9-.7-.7 1-1 .7.7z"/></svg></button>
+      <div class="cp-bars"><div class="cp-bar cp-hue"><i class="cp-k"></i></div><div class="cp-bar cp-alpha"><i class="cp-k"></i></div></div></div>
+    <div class="cp-f"><select class="cp-mode" aria-label="Colour format"><option>Hex</option><option>RGB</option><option>HSB</option></select><div class="cp-in"></div></div>
   </div>
 
   <div class="sect" data-k="screen" data-tab="design">
@@ -490,7 +562,7 @@
     <!-- the tools first, then what they made, then the one thing to do with it; the rest are links -->
     <div class="acts tools"><button class="btn" id="noteadd" aria-pressed="false" title="Click to pin a note, drag to note an area">Note<span class="key">N</span></button><button class="btn" id="notecut" aria-pressed="false" title="Cut out elements and note them; shift-click for several">Cut<span class="key">X</span></button></div>
     <ol class="notes" id="notelist"></ol>
-    <p class="hint" id="noteempty">No notes yet. Press N and click a screen.</p>
+    <p class="hint" id="noteempty">No notes yet. Press N and click a screen, or select words in a design and press N.</p>
     <p class="hint" id="notesync"></p>
     <div class="acts"><button class="btn go" id="notesend" title="One new version per design, with all its open notes, beside the original">Send to Claude</button></div>
     <div class="notelinks"><button class="link" id="notecopy">Copy brief</button><button class="link" id="noteclear">Clear all</button></div>
@@ -552,6 +624,7 @@
       <dt>Panel</dt><dd><kbd>\</kbd></dd>
       <dt>Screens only</dt><dd><kbd>H</kbd></dd>
       <dt>Note, cut</dt><dd><kbd>N</kbd><kbd>X</kbd></dd>
+      <dt>Note on selected words</dt><dd><kbd>N</kbd></dd>
       <dt>Focus</dt><dd><kbd>F</kbd></dd>
       <dt>Explore</dt><dd><kbd>E</kbd></dd>
     </dl>
@@ -560,7 +633,7 @@
   </div>
 </aside>
 <div class="cutbox" id="cutbox"><span id="cutlabel"></span></div>
-<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><img class="snap" id="popsnap" alt="" hidden><div class="nm popcut" id="popcut" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="3" placeholder="Note"></textarea><div class="acts"><button class="btn" id="popdel">Delete</button><button class="btn" id="popdone">Done</button><button class="btn" id="popsave">Save</button></div></div>
+<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popquote" hidden></div><img class="snap" id="popsnap" alt="" hidden><div class="nm popcut" id="popcut" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="3" placeholder="Note"></textarea><div class="acts"><button class="btn" id="popdel">Delete</button><button class="btn" id="popdone">Done</button><button class="btn" id="popsave">Save</button></div></div>
 <div class="toast glass" id="toast" hidden>Click a screen to pin a note</div>
 <div class="areabox" id="areabox"></div>
 <div class="pickpop glass" id="pickpop" hidden><p class="pt" id="pickt"></p><textarea id="pickwhy" rows="2" placeholder="Why this one? (optional)"></textarea><div class="acts"><button class="btn" id="pickno">Cancel</button><button class="btn go" id="pickyes">Pick</button></div></div>
@@ -605,13 +678,16 @@ if (!SCENES.length) SCENES.push({ id: 'none', title: 'No designs yet', version: 
 const fmt = s => { s = Math.max(0, s); return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
 
 /* ---------- settings, kept per browser ---------- */
-/* Three shortcuts. Any other size is custom, and its frame follows its shape: narrow is a phone, tall a tablet, wide a window. */
+/* Four shortcuts. Any other size is custom, and its frame follows its shape: narrow is a phone, tall a tablet, wide a window.
+   CarPlay is its exact size only (800 × 480, Figma 643:41271): a car display with its own dock, no status bar or home
+   indicator. Apps in an iframe can match it by the same size (labels_nav does). */
 const DEVICES = {
   desktop: { n: 'Desktop', w: 1440, h: 900 },
   tablet: { n: 'Tablet', w: 834, h: 1194 },
   phone: { n: 'Phone', w: 402, h: 874 },
+  carplay: { n: 'CarPlay', w: 800, h: 480 },
 };
-const kindOf = (w, h) => w < 600 ? 'handheld' : h > w ? 'tablet' : 'window';
+const kindOf = (w, h) => w === 800 && h === 480 ? 'carplay' : w < 600 ? 'handheld' : h > w ? 'tablet' : 'window';
 const nameOf = (w, h) => (Object.values(DEVICES).find(d => d.w === w && d.h === h) || { n: 'Custom' }).n;
 /* zoom 0 means fit. pos holds how far each screen was dragged, pan how far the whole canvas was. preset is the last size picked, for double-click to go back to. */
 const DEFAULTS = { preset: 'desktop', w: 1440, h: 900, second: false, chrome: true, wall: 'dark', color: '#1b1b22', exfmt: 'png', dim: 0, blur: 40, tint: .38, bar: true, panel: true, loop: false, speed: 1, folded: [], tab: 'design',
@@ -622,7 +698,7 @@ const DEFAULTS = { preset: 'desktop', w: 1440, h: 900, second: false, chrome: tr
   /* rows, cols: Lay out. 'none' and 'shown' (the designs side by side) is the plain layout. */
   rows: 'none', cols: 'shown',
   /* ctl: scene id → control key → value, for values moved off a scene's defaults. notes: pinned notes, kept through Reset. */
-  ctl: {}, notes: [],
+  ctl: {}, cgFold: {}, notes: [],
   /* variants: { id, base, name }. A variant is its base scene with its own control values, kept in ctl[id]. */
   variants: [] };
 /* The stage (size, wallpaper, glass, tab...) is kept for every project. What's on screen and what was picked is kept
@@ -705,14 +781,20 @@ async function saveState() {
 /* ---------- timeline ---------- */
 /* The clock follows design A's steps (or B's when A is a URL). B is driven by step position, not seconds,
    so step 3 of A and step 3 of B always show together even when their steps take different times. */
-let TL, STEPS = [], STARTS = [], DURATION = 1;
+let TL, TLKey = '', STEPS = [], STARTS = [], DURATION = 1;
 let t = 0, playing = true;
 const timeAt = pos => { const i = Math.floor(pos); return i >= STEPS.length ? DURATION : STARTS[i] + (pos - i) * STEPS[i].dur; };
 function buildTimeline() {
   const next = shownDesigns().map(d => sceneById(d.id)).find(Boolean) || SCENES[0];
-  if (next === TL) return;
-  const pos = TL ? posAt(t) : 0;
-  TL = next; STEPS = TL.steps && TL.steps.length ? TL.steps : [{ label: '', dur: 1 }]; STARTS = []; DURATION = 0;
+  const rCtl = next && next.controls && next.controls.find(c => c.key === 'route');
+  const rk = next ? ((S.ctl[next.id] && S.ctl[next.id].route) || (rCtl && rCtl.value) || '') : '';
+  const key = (next ? next.id : '') + '|' + rk;
+  if (next === TL && key === TLKey) return;
+  const routeChanged = next === TL && key !== TLKey;
+  const pos = TL && !routeChanged ? posAt(t) : 0;
+  TL = next; TLKey = key;
+  const rawSteps = (TL.routeSteps && rk && TL.routeSteps[rk]) || TL.steps;
+  STEPS = rawSteps && rawSteps.length ? rawSteps : [{ label: '', dur: 1 }]; STARTS = []; DURATION = 0;
   STEPS.forEach(s => { STARTS.push(DURATION); DURATION += s.dur; });
   t = timeAt(Math.min(pos, STEPS.length));
   $('ticks').innerHTML = STEPS.map((s, k) => `<i style="left:calc(${(STARTS[k] / DURATION * 100).toFixed(3)}% + ${k ? 1 : 0}px);width:calc(${(s.dur / DURATION * 100).toFixed(3)}% - ${k && k < STEPS.length - 1 ? 2 : 1}px)"><b></b></i>`).join('');
@@ -738,6 +820,7 @@ function makeScreen(slot) {
     <div class="tbar"><span class="tl3"><i></i><i></i><i></i></span><span class="tt"></span></div>
     <div class="status"><span>9:41</span><i class="island"></i><span class="levels"><i></i></span></div>
     <div class="screen" data-cmp=""><span class="ab a"></span><span class="ab b"></span><i class="wipe" aria-label="Swipe divider"></i><div class="pins"></div><i class="catch"></i></div><div class="home"></div></div>
+    <i class="bezel"></i>
     ${slot === 0 ? ['n', 'e', 's', 'w', 'nw', 'ne', 'sw', 'se'].map(d => `<i class="rz ${d}" data-dir="${d}"></i>`).join('') : ''}</div>`;
   const sc = { slot, wrap, frame: wrap.querySelector('.frame'), screen: wrap.querySelector('.screen'), cap: wrap.querySelector('.cap'), scaler: wrap.querySelector('.scaler'), w: 0, h: 0 };
   sc.tt = wrap.querySelector('.tt'); sc.pins = wrap.querySelector('.pins');
@@ -951,7 +1034,7 @@ function layoutScreens() {
 }
 /* One zoom for every screen, so they can be compared. Fit uses the space the panel and bar leave free. */
 /* how much of a screen's height its frame chrome takes, so a focused scene is laid out exactly as it was */
-const CHROME = { window: 36, handheld: 0, tablet: 0, bare: 0 };
+const CHROME = { window: 36, handheld: 0, tablet: 0, carplay: 0, bare: 0 };
 /* the room a design leaves for the status bar and home indicator, by the device it's on (frame shown or not, so
    turning the frame off never moves the design) */
 const SAFE = { handheld: [54, 34], tablet: [32, 20] };
@@ -960,7 +1043,8 @@ function fit() {
   const availW = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (screens.length - 1);
   const availH = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 24;
   const dim = sc => sc.crop ? sc.crop : sc; // a focused screen is only as big as its element
-  const totalW = screens.reduce((a, s) => a + dim(s).w, 0), maxH = Math.max(...screens.map(s => dim(s).h));
+  const outer = sc => { const d = dim(sc); return !sc.crop && sc.kind === 'handheld' ? { w: d.w * 500 / 447, h: d.h * 1024 / 972 } : d; };
+  const totalW = screens.reduce((a, s) => a + outer(s).w, 0), maxH = Math.max(...screens.map(s => outer(s).h));
   // Focused elements are often wide and short, so they stack in a column when that shows them bigger.
   const tall = screens.some(s => s.tall && !s.crop);
   const kRow = tall ? Math.min(1, availW / totalW) : Math.min(focus ? 2 : 1, availW / totalW, availH / maxH);
@@ -968,14 +1052,14 @@ function fit() {
   let kGrid = 1;
   if (GRID) {
     const colW = [], rowH = [];
-    screens.forEach(s => { const d = dim(s); colW[s.col] = Math.max(colW[s.col] || 0, d.w); rowH[s.row] = Math.max(rowH[s.row] || 0, d.h); });
+    screens.forEach(s => { const d = outer(s); colW[s.col] = Math.max(colW[s.col] || 0, d.w); rowH[s.row] = Math.max(rowH[s.row] || 0, d.h); });
     const gw = colW.reduce((a, b) => a + (b || 0), 0), gh = rowH.reduce((a, b) => a + (b || 0), 0);
     const ow = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (colW.length - 1), oh = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 56 * rowH.length;
     kGrid = tall ? Math.min(1, ow / gw) : Math.min(1, ow / gw, oh / gh);
     f.style.alignContent = tall ? 'start' : 'center';
   }
-  const n = screens.length, kCol = Math.min(2, (f.clientWidth - parseFloat(cs.paddingLeft) * 2) / Math.max(...screens.map(s => dim(s).w)),
-    (f.clientHeight - parseFloat(cs.paddingTop) * 2 - 32 * (n - 1) - 24 * n) / screens.reduce((a, s) => a + dim(s).h, 0));
+  const n = screens.length, kCol = Math.min(2, (f.clientWidth - parseFloat(cs.paddingLeft) * 2) / Math.max(...screens.map(s => outer(s).w)),
+    (f.clientHeight - parseFloat(cs.paddingTop) * 2 - 32 * (n - 1) - 24 * n) / screens.reduce((a, s) => a + outer(s).h, 0));
   const col = !!focus && n > 1 && kCol > kRow;
   f.style.flexDirection = col ? 'column' : '';
   K = held || S.zoom || (GRID ? kGrid : col ? kCol : kRow);
@@ -985,7 +1069,7 @@ function fit() {
     sc.frame.style.transform = `scale(${K})`;
     const [st, sb] = SAFE[sc.devKind] || [0, 0]; // kept while focused, so the design is laid out exactly as it was
     sc.screen.style.setProperty('--safe-top', st + 'px'); sc.screen.style.setProperty('--safe-bottom', sb + 'px');
-    sc.scaler.style.width = d.w * K + 'px'; sc.scaler.style.height = d.h * K + 'px';
+    sc.scaler.style.width = d.w * K + 'px'; sc.scaler.style.height = d.h * K + 'px'; sc.scaler.style.setProperty('--k', K);
     sc.frame.classList.toggle('focus', !!c); sc.wrap.classList.toggle('focusing', !!c);
     sc.layers.forEach(L => Object.assign(L.host.style, c ? { left: -c.x + 'px', top: -c.y + 'px', width: sc.w + 'px', height: sc.h - CHROME[sc.kind] + 'px' } : { left: '', top: '', width: '', height: '' }));
     const who = sc.tag ? `${sc.tag} · ${designName(sc.designs[0].id, sc.designs[0].url)} · ` : sc.cmp ? `A vs B · ${VIEWS.find(v => v[0] === sc.cmp)[1]} · ` : '';
@@ -1080,7 +1164,8 @@ function ctlHTML(sc, c) {
   const v = ctlVal(sc, c), at = `data-s="${sc.id}" data-k="${c.key}"`;
   if (c.type === 'range') return `<div class="lbl">${esc(c.label)}<output>${v}${c.unit || ''}</output></div><input class="range" type="range" ${at} min="${c.min}" max="${c.max}" step="${c.step || 1}" value="${v}" aria-label="${esc(c.label)}">`;
   if (c.type === 'seg') return `<div class="lbl">${esc(c.label)}</div><div class="seg" ${at}>${c.options.map(([o, n]) => `<button class="pill" data-v="${o}" aria-pressed="${o === v}">${esc(n)}</button>`).join('')}</div>`;
-  if (c.type === 'color') return `<label class="chk">${esc(c.label)}<input class="swatch" type="color" ${at} value="${v}"></label>`;
+  if (c.type === 'select') return `<div class="lbl">${esc(c.label)}</div><select class="txt" ${at} aria-label="${esc(c.label)}">${c.options.map(([o, n]) => `<option value="${o}"${o === v ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+  if (c.type === 'color') return `<div class="chk">${esc(c.label)}<button class="swatch" ${at} style="--c:${v}" aria-label="${esc(c.name || c.label)}"></button></div>`;
   return `<label class="chk">${esc(c.label)}<input type="checkbox" ${at}${v ? ' checked' : ''}></label>`;
 }
 /* rebuilt only when the designs change, so a slider keeps hold of the pointer while it moves */
@@ -1089,31 +1174,166 @@ function renderControls() {
   const list = ctlScenes(), on = shownDesigns().map(d => d.id), key = on.join() + '|' + list.map(x => x.id).join();
   $('ctlsect').hidden = !list.length;
   if (key === ctlKey) return; ctlKey = key;
-  $('ctls').innerHTML = list.map(sc => `<div class="stack"><div class="subrow"><span class="sub">${comparing() ? letter(on.indexOf(sc.id)) + ' · ' : ''}${esc(designName(sc.id))}</span>`
-    + `<button class="link" data-save="${sc.id}">Save variant</button></div>${sc.controls.map(c => ctlHTML(sc, c)).join('')}</div>`).join('');
+  // Local tweak: the design's name only heads its controls when several designs are on screen; with one, it just
+  // repeated the Designs list, so Save variant moves down next to Copy values and Reset.
+  const many = comparing() || list.length > 1;
+  $('ctls').innerHTML = list.map(sc => `<div class="stack">${many ? `<div class="subrow"><span class="sub">${comparing() ? letter(on.indexOf(sc.id)) + ' · ' : ''}${esc(designName(sc.id))}</span>`
+    + `<button class="link" data-save="${sc.id}">Save variant</button></div>` : ''}${ctlTree(sc)}${ctlActs(sc)}</div>`).join('');
+  $('ctlsave').hidden = many; if (!many && list[0]) $('ctlsave').dataset.save = list[0].id;
+  refreshGroups();
 }
-const setCtl = (sid, k, v) => { (S.ctl[sid] ||= {})[k] = v; applyControls(); save(); };
+/* Local tweak: a scene can list its own buttons in actions: [{ label, run(vals, api) }], shown under its controls in
+   the panel's button style. run gets every control's value and api.setDefaults({key: value}), which makes those the
+   controls' new defaults (so "changed" counts and Reset go back to them). It may return a word or two for the button
+   to say for a moment, or { say, note } to also leave a line under the buttons. */
+const ctlActs = sc => {
+  const as = sc.actions || []; if (!as.length) return '';
+  const btn = i => `<button class="btn" data-act="${sc.id}" data-i="${i}">${esc(as[i].label)}</button>`;
+  let rows = ''; for (let i = 0; i < as.length; i += 2) rows += `<div class="acts">${btn(i)}${i + 1 < as.length ? btn(i + 1) : ''}</div>`; // two to a row
+  return `<div>${rows}</div><div class="lbl" data-actnote="${sc.id}" hidden></div>`;
+};
+async function runAct(btn) {
+  const sc = sceneById(btn.dataset.act), a = sc && (sc.actions || [])[+btn.dataset.i]; if (!a) return;
+  const base = SCENES.find(x => x.id === (sc.base || sc.id)) || sc;
+  const vals = Object.fromEntries((sc.controls || []).map(c => [c.key, ctlVal(sc, c)]));
+  const api = { setDefaults(obj) {
+    for (const [k, v] of Object.entries(obj)) { const c = (base.controls || []).find(x => x.key === k); if (c) c.value = v; if (S.ctl[sc.id]) delete S.ctl[sc.id][k]; }
+    ctlKey = ''; apply();
+  } };
+  const was = btn.dataset.label ||= btn.textContent;
+  let out;
+  try { out = await a.run(vals, api, btn); } catch (e) { out = { say: 'Failed', note: String((e && e.message) || e) }; }
+  const say = typeof out === 'string' ? out : out && out.say;
+  const note = out && typeof out === 'object' ? out.note : '';
+  const sel = `[data-act="${CSS.escape(btn.dataset.act)}"][data-i="${btn.dataset.i}"]`;
+  const live = document.querySelector('#ctls ' + sel) || btn; // the panel may have rebuilt meanwhile
+  const nb = document.querySelector(`#ctls [data-actnote="${CSS.escape(btn.dataset.act)}"]`);
+  if (nb) { nb.textContent = note || ''; nb.hidden = !note; }
+  if (say) { live.dataset.label = was; UI.say(live, say); clearTimeout(live._back); live._back = setTimeout(() => UI.say(live, was, -1), 1600); }
+}
+/* a run of controls: colours side by side in one row, c.half controls two to a row */
+function ctlRun(sc, cs) {
+  let out = '';
+  for (let i = 0; i < cs.length;) {
+    const c = cs[i];
+    if (c.type === 'color' && cs[i + 1] && cs[i + 1].type === 'color') {
+      const run = []; while (i < cs.length && cs[i].type === 'color') run.push(cs[i++]);
+      out += `<div class="lbl">Colours</div><div class="swrow">${run.map(x => `<button class="sw" data-s="${sc.id}" data-k="${x.key}" title="${esc(x.name || x.label)}"><i class="swatch" style="--c:${ctlVal(sc, x)}"></i>${esc(x.label)}</button>`).join('')}</div>`;
+      continue;
+    }
+    if (c.half && cs[i + 1] && cs[i + 1].half) { out += `<div class="pair"><div class="stack">${ctlHTML(sc, c)}</div><div class="stack">${ctlHTML(sc, cs[i + 1])}</div></div>`; i += 2; continue; }
+    out += ctlHTML(sc, c); i++;
+  }
+  return out;
+}
+function ctlTree(sc) {
+  const gs = sc.controlGroups || [], ids = new Set(gs.map(g => g.id));
+  const loose = sc.controls.filter(c => !ids.has(c.group));
+  return ctlRun(sc, loose) + gs.map(g => {
+    const tg = g.toggle && sc.controls.find(c => c.key === g.toggle);
+    const cs = sc.controls.filter(c => c.group === g.id && c !== tg);
+    const fk = sc.id + '/' + g.id, folded = S.cgFold[fk] !== undefined ? S.cgFold[fk] : !g.open;
+    const sw = tg ? `<label class="chk" title="${esc(tg.name || tg.label)}"><input type="checkbox" data-s="${sc.id}" data-k="${tg.key}"${ctlVal(sc, tg) ? ' checked' : ''} aria-label="${esc(tg.name || tg.label)}"></label>` : '';
+    return `<div class="cgrp${folded ? ' folded' : ''}" data-s="${sc.id}" data-g="${g.id}"${g.when || g.toggle ? ` data-when="${g.when || g.toggle}"` : ''}>`
+      + `<div class="cg-h"><button class="cg-t">${esc(g.label)}<span class="cg-n"></span></button>${sw}</div><div class="cg-b stack">${ctlRun(sc, cs)}</div></div>`;
+  }).join('');
+}
+/* a group whose switch is off hides its body; its header counts the controls moved off their defaults */
+function refreshGroups() {
+  document.querySelectorAll('#ctls .cgrp').forEach(el => {
+    const sc = sceneById(el.dataset.s); if (!sc) return;
+    const w = el.dataset.when && sc.controls.find(c => c.key === el.dataset.when);
+    el.classList.toggle('off', !!w && !ctlVal(sc, w));
+    const n = sc.controls.filter(c => c.group === el.dataset.g && ctlVal(sc, c) !== c.value).length;
+    el.querySelector('.cg-n').textContent = n ? n + ' changed' : '';
+  });
+}
+const setCtl = (sid, k, v) => { (S.ctl[sid] ||= {})[k] = v; if (k === 'route') { buildTimeline(); drive(); } applyControls(); refreshGroups(); save(); };
 $('ctls').addEventListener('input', e => {
   const t = e.target; if (!t.dataset.k) return;
   const c = sceneById(t.dataset.s).controls.find(x => x.key === t.dataset.k);
   const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value;
-  if (t.type === 'range') t.previousElementSibling.querySelector('output').textContent = v + (c.unit || '');
+  if (t.type === 'range') { const o = t.previousElementSibling && t.previousElementSibling.querySelector('output'); if (o) o.textContent = v + (c.unit || ''); }
   setCtl(t.dataset.s, c.key, v);
 });
+$('ctlsave').onclick = e => { const sc = sceneById(e.currentTarget.dataset.save); if (sc) saveVariant(sc); };
 $('ctls').addEventListener('click', e => {
   const sv = e.target.closest('[data-save]'); if (sv) return saveVariant(sceneById(sv.dataset.save));
+  const ab = e.target.closest('button[data-act]'); if (ab) return runAct(ab);
+  const swb = e.target.closest('[data-k].sw, button.swatch[data-k]'); if (swb) { openPicker(swb); return; }
+  const gt = e.target.closest('.cg-t'); if (gt) { const g = gt.closest('.cgrp'), f = !g.classList.contains('folded'); g.classList.toggle('folded', f); S.cgFold[g.dataset.s + '/' + g.dataset.g] = f; save(); return; }
   const b = e.target.closest('.pill'); if (!b) return;
   const g = b.parentElement; setCtl(g.dataset.s, g.dataset.k, b.dataset.v);
   g.querySelectorAll('.pill').forEach(p => p.setAttribute('aria-pressed', p === b));
 });
+/* ---------- colour picker (Figma's) ---------- */
+const CP = { el: $('cpop'), h: 0, s: 0, v: 0, a: 1, mode: 'Hex', target: null };
+document.body.append(CP.el); // out of the glass panel, whose backdrop filter would trap a fixed popover
+const hex2rgb = x => { x = String(x).replace('#', ''); if (x.length === 3) x = x.replace(/./g, m => m + m); const n = parseInt(x.slice(0, 6), 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255, x.length >= 8 ? parseInt(x.slice(6, 8), 16) / 255 : 1]; };
+const rgb2hsv = (r, g, b) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+  if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [(h * 60 + 360) % 360, mx ? d / mx : 0, mx]; };
+const hsv2rgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+const h2 = n => n.toString(16).padStart(2, '0');
+const cpHex = () => { const [r, g, b] = hsv2rgb(CP.h, CP.s, CP.v); return '#' + h2(r) + h2(g) + h2(b) + (CP.a < 1 ? h2(Math.round(CP.a * 255)) : ''); };
+function cpPaint(fields = true) {
+  const el = CP.el, [r, g, b] = hsv2rgb(CP.h, CP.s, CP.v);
+  el.style.setProperty('--h', CP.h); el.style.setProperty('--rgb', `rgb(${r} ${g} ${b})`);
+  const k = el.querySelector('.cp-sv .cp-k'); k.style.left = CP.s * 100 + '%'; k.style.top = (1 - CP.v) * 100 + '%'; k.style.background = `rgb(${r} ${g} ${b})`;
+  const hk = el.querySelector('.cp-hue .cp-k'); hk.style.left = `calc(7px + ${CP.h / 360} * (100% - 14px))`; hk.style.background = `hsl(${CP.h} 100% 50%)`;
+  const ak = el.querySelector('.cp-alpha .cp-k'); ak.style.left = `calc(7px + ${CP.a} * (100% - 14px))`; ak.style.background = `rgb(${r} ${g} ${b} / ${CP.a})`;
+  if (!fields) return;
+  const pct = Math.round(CP.a * 100), box = el.querySelector('.cp-in');
+  const vals = CP.mode === 'Hex' ? [['hex', (h2(r) + h2(g) + h2(b)).toUpperCase()]] : CP.mode === 'RGB' ? [['r', r], ['g', g], ['b', b]] : [['h', Math.round(CP.h)], ['s', Math.round(CP.s * 100)], ['v', Math.round(CP.v * 100)]];
+  box.innerHTML = vals.map(([n, x]) => `<input class="${n}" data-f="${n}" value="${x}" aria-label="${n}">`).join('') + `<input data-f="a" value="${pct}" aria-label="Opacity"><span>%</span>`;
+}
+function cpCommit(fields) {
+  cpPaint(fields);
+  const t = CP.target; if (!t) return; const v = cpHex();
+  (t.classList.contains('swatch') ? t : t.querySelector('.swatch')).style.setProperty('--c', v);
+  setCtl(t.dataset.s, t.dataset.k, v);
+}
+function openPicker(t) {
+  const sc = sceneById(t.dataset.s), c = sc.controls.find(x => x.key === t.dataset.k), [r, g, b, a] = hex2rgb(ctlVal(sc, c));
+  [CP.h, CP.s, CP.v] = rgb2hsv(r, g, b); CP.a = a; CP.target = t;
+  const el = CP.el; el.hidden = false; cpPaint();
+  const rc = t.getBoundingClientRect(), pw = el.offsetWidth, ph = el.offsetHeight;
+  el.style.left = Math.max(8, Math.min(innerWidth - pw - 8, rc.left - pw - 12)) + 'px';
+  el.style.top = Math.max(8, Math.min(innerHeight - ph - 8, rc.top - 40)) + 'px';
+}
+function cpDrag(sel, fn) {
+  const area = CP.el.querySelector(sel);
+  area.addEventListener('pointerdown', e => {
+    area.setPointerCapture(e.pointerId);
+    const move = ev => { const r = area.getBoundingClientRect(); fn(Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (ev.clientY - r.top) / r.height))); cpCommit(true); };
+    move(e); area.onpointermove = move; area.onpointerup = () => { area.onpointermove = null; };
+  });
+}
+cpDrag('.cp-sv', (x, y) => { CP.s = x; CP.v = 1 - y; });
+cpDrag('.cp-hue', x => { CP.h = x * 360; });
+cpDrag('.cp-alpha', x => { CP.a = Math.round(x * 100) / 100; });
+CP.el.querySelector('.cp-mode').onchange = e => { CP.mode = e.target.value; cpPaint(); };
+CP.el.querySelector('.cp-in').addEventListener('change', e => {
+  const f = e.target.dataset.f, n = parseFloat(e.target.value), box = CP.el.querySelector('.cp-in'), get = k => parseFloat(box.querySelector(`[data-f=${k}]`).value) || 0;
+  if (f === 'a') CP.a = Math.max(0, Math.min(100, isNaN(n) ? 100 : n)) / 100;
+  else if (f === 'hex') { const [r, g, b] = hex2rgb(e.target.value); [CP.h, CP.s, CP.v] = rgb2hsv(r, g, b); }
+  else if (CP.mode === 'RGB') [CP.h, CP.s, CP.v] = rgb2hsv(...['r', 'g', 'b'].map(k => Math.max(0, Math.min(255, get(k)))));
+  else { CP.h = Math.max(0, Math.min(360, get('h'))); CP.s = Math.max(0, Math.min(100, get('s'))) / 100; CP.v = Math.max(0, Math.min(100, get('v'))) / 100; }
+  cpCommit(true);
+});
+const eye = CP.el.querySelector('.cp-eye');
+if (!window.EyeDropper) eye.hidden = true;
+eye.onclick = async () => { try { const r = await new EyeDropper().open(); const [R, G, B] = hex2rgb(r.sRGBHex); [CP.h, CP.s, CP.v] = rgb2hsv(R, G, B); cpCommit(true); } catch (_) {} };
+document.addEventListener('pointerdown', e => { if (!CP.el.hidden && !CP.el.contains(e.target) && !e.target.closest('.sw, button.swatch')) CP.el.hidden = true; }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !CP.el.hidden) CP.el.hidden = true; });
+
 /* every control moved off its default, in every scene and variant, as lines Claude can act on */
 const ctlChanges = () => DESIGNS().map(sceneById).filter(Boolean).flatMap(sc => (sc.controls || []).filter(c => ctlVal(sc, c) !== c.value).map(c =>
-  `- ${sc.variant ? `variant "${sc.version}" of ` : ''}${SCENE_PATH}${sc.base || sc.id}.js: ${c.label} (${c.css || 'data-' + c.attr}) = ${ctlVal(sc, c)}${c.unit || ''}, default ${c.value}${c.unit || ''}`));
+  `- ${sc.variant ? `variant "${sc.version}" of ` : ''}${SCENE_PATH}${sc.base || sc.id}.js: ${c.name || c.label} (${c.css || 'data-' + c.attr}) = ${ctlVal(sc, c)}${c.unit || ''}, default ${c.value}${c.unit || ''}`));
 
 /* ---------- variants ----------
    Save variant keeps a design's current control values as a new design under its scene, named after what changed,
    and puts it on screen next to the others. Double-click a variant to rename it; × removes it. */
-const ctlLabel = (c, v) => c.type === 'seg' ? (c.options.find(o => o[0] === v) || [, v])[1] : c.type === 'color' ? c.label : c.type === 'toggle' ? `${c.label} ${v ? 'on' : 'off'}` : `${c.label} ${v}${c.unit || ''}`;
+const ctlLabel = (c, v, L = c.name || c.label) => (c.type === 'seg' || c.type === 'select') ? (c.options.find(o => o[0] === v) || [, v])[1] : c.type === 'color' ? L : c.type === 'toggle' ? `${L} ${v ? 'on' : 'off'}` : `${L} ${v}${c.unit || ''}`;
 function saveVariant(sc) {
   const base = SCENES.find(x => x.id === (sc.base || sc.id));
   const vals = Object.fromEntries(base.controls.map(c => [c.key, ctlVal(sc, c)]));
@@ -1163,7 +1383,7 @@ const setPicking = on => {
   $('toast').textContent = 'Click an element to focus on it'; $('toast').hidden = !on;
   focusLabel();
 };
-const focusLabel = () => { UI.say($('focusbtn'), focus ? 'Focus · ' + focus.name : 'Focus', focus ? 1 : -1); $('focusbtn').setAttribute('aria-pressed', !!focus || picking); };
+const focusLabel = () => { if (!$('focusbtn')) return; UI.say($('focusbtn'), focus ? 'Focus · ' + focus.name : 'Focus', focus ? 1 : -1); $('focusbtn').setAttribute('aria-pressed', !!focus || picking); };
 const visible = n => !n.closest('[data-in]:not(.on)') && n.getBoundingClientRect().width > 0;
 function pathTo(n, rootEl) {
   const parts = [];
@@ -1196,7 +1416,7 @@ function measureFocus() {
   focusLabel(); fit();
 }
 const clearFocus = () => { focus = null; screens.forEach(sc => sc.crop = null); focusLabel(); fit(); };
-$('focusbtn').onclick = () => { if (focus) clearFocus(); else setPicking(!picking); };
+if ($('focusbtn')) $('focusbtn').onclick = () => { if (focus) clearFocus(); else setPicking(!picking); };
 function describe(n) {
   while (n && n instanceof SVGElement) n = n.parentElement;
   if (!n) return '';
@@ -1490,7 +1710,7 @@ const noteWhere = n => {
 };
 function renderNotes() {
   const said = n => (n.replies || []).map(r => `<span class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}${r.made && sceneById(r.made) ? ` <button class="link vlink" data-show="${esc(n.design)}|${esc(r.made)}">${esc(sceneById(r.made).version || r.made)}</button>` : ''}</span>`).join('');
-  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}${n.sent ? ' sent' : ''}"><span class="nbadge">${k + 1}</span><span class="nb"><span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
+  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}${n.sent ? ' sent' : ''}"><span class="nbadge">${k + 1}</span><span class="nb">${n.quote ? `<span class="nq">${esc(n.quote.text)}</span>` : ''}<span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
     <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${n.sent ? '<span class="nr working"><i class="agspin"></i>Claude is on it</span>' : ''}${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
   $('notelist').innerHTML = groups.length < 2 ? groups.flatMap(g => g.items).map(noteRow).join('') : groups.map((g, i) => {
     const open = g.items.filter(([n]) => !n.done).length, shown = sitOpen[g.start] ?? (i === 0 || open > 0);
@@ -1573,6 +1793,7 @@ function openEditor(n, x, y, fresh, around) {
   $('popn').textContent = S.notes.indexOf(n) + 1;
   $('popmeta').textContent = (n.side ? n.side + ' · ' : '') + noteWhere(n);
   $('poptext').value = n.text; showSnap(n);
+  $('popquote').hidden = !n.quote; $('popquote').textContent = n.quote ? n.quote.text : '';
   $('popthread').hidden = !(n.replies && n.replies.length) && !n.sent;
   $('popthread').innerHTML = (n.sent ? '<p class="nr working"><i class="agspin"></i>Claude is on it</p>' : '') + (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
   const pop = $('notepop'), was = !pop.hidden && pop.classList.contains('show');
@@ -1633,6 +1854,7 @@ $('noteclear').onclick = () => { if (S.notes.length && confirm(`Delete all ${S.n
 function noteLines(n, k) {
   const sc = sceneById(n.design), file = n.design === 'url' ? n.url : `${SCENE_PATH}${sc ? sc.base || sc.id : n.design}.js` + (sc && sc.variant ? `, variant "${sc.version}"` : '');
   const lines = [`${k + 1}. ${n.side ? n.side + ', ' : ''}${designName(n.design, n.url)} (${file}), step ${n.step + 1} "${stepLabel(n)}" at position ${n.pos}, ${n.size}, ${Math.round(n.x * 100)}% across and ${Math.round(n.y * 100)}% down.`];
+  if (n.quote) lines.push(`   On the words: "${n.quote.text.replace(/\s+/g, ' ').trim()}"`);
   const pct = x => Math.round(x * 100);
   if (n.area) lines.push(`   Area: ${pct(n.area.x)}% to ${pct(n.area.x + n.area.w)}% across, ${pct(n.area.y)}% to ${pct(n.area.y + n.area.h)}% down`,
     ...(n.area.els.length ? [`   In the area: ${n.area.els.join('; ')}`] : []), ...(n.area.text ? [`   Text in the area: ${n.area.text}`] : []));
@@ -1765,7 +1987,7 @@ function renderDesigns() {
     if (f.ids.length === 1) return row(f.ids[0]);
     const latest = f.ids.filter(id => !sceneById(id).variant).at(-1);
     return `<li class="fh" data-id="${latest}" title="Click for the newest version"><span>${esc(f.title)}</span><span class="ver">${f.ids.length}</span></li>` + f.ids.map(vrow).join('');
-  }).join('') + row('url');
+  }).join(''); // no URL row: pages are designs only
 }
 $('dlist').onclick = e => {
   const del = e.target.closest('[data-del]'); if (del) return dropVariant(del.dataset.del);
@@ -1833,7 +2055,7 @@ addEventListener('keydown', e => {
   }
   if (e.key === 'x' || e.key === 'X') { setCutting(!cutting); return; }
   if (e.key === 'Escape' && (picking || focus)) { setPicking(false); clearFocus(); return; }
-  if (e.key === 'f' || e.key === 'F') { $('focusbtn').click(); return; }
+  if (e.key === 'f' || e.key === 'F') { if (focus) clearFocus(); else setPicking(!picking); return; }
   if (e.key === 'n' || e.key === 'N') { setNoting(!noting); return; }
   if (e.key === ' ') { e.preventDefault(); $('play').click(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); $('prev').click(); }
@@ -1866,12 +2088,14 @@ function apply() {
   $('w').value = S.w; $('h').value = S.h; $('chrome').checked = S.chrome; $('color').value = S.color;
   renderDesigns();
   {
+    if (SCENES.length < 2 && !S.variants.length && S.shown.length < 2) { S.rows = 'none'; S.cols = 'shown'; }
     const opts = layoutOptions(shownDesigns());
     if (S.rows !== 'none' && !opts.some(o => o[0] === S.rows)) S.rows = 'none';
     if (S.cols !== 'shown' && !opts.some(o => o[0] === S.cols)) S.cols = 'shown';
     const fill = (id, list, v) => { const el = $(id), html = list.map(([k, n]) => `<option value="${esc(k)}">${esc(n)}</option>`).join(''); if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; } el.value = v; };
     fill('rows', [['none', 'None'], ...opts], S.rows); fill('cols', [['shown', 'On screen'], ...opts], S.cols);
   }
+  $('laywrap').hidden = S.shown.length < 2 && !matrix();
   $('url').hidden = !S.shown.includes('url'); if (document.activeElement !== $('url')) $('url').value = S.url;
   $('colorrow').hidden = S.wall !== 'color';
   $('viewwrap').hidden = S.shown.length !== 2 || matrix(); $('secondrow').hidden = comparing();
@@ -1969,6 +2193,7 @@ if (fromGallery && screens[0]) { screens[0].frame.style.viewTransitionName = 'sc
 </script>
 <script src="agent.js"></script>
 <script src="taste.js"></script>
+<script src="textnotes.js"></script>
 <div id="ready" hidden></div>
 </body>
 </html>
