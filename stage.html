@@ -7,25 +7,25 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M12 9v14l11-7z' fill='white'/%3E%3C/svg%3E">
 <!--
   The stage: a wallpaper, screens at any size, a glass panel on the right, and a glass timeline at the bottom that
-  plays a project's scenes step by step. Notes, Explore and the agent that answers them live in agent.js.
+  plays a project's scenes step by step. Notes and the agent that answers them live in agent.js.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Geist for the tool itself; Inter Tight for the starter design (starter/first.js). -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- Nothing is drawn until the page has built itself (the #ready marker at the end of the body), so it never shows
      an empty panel while its scripts and scenes load, and the crossfade from the other page lands on the finished page. -->
 <link rel="expect" href="#ready" blocking="render">
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="wall.css">
 <link rel="stylesheet" href="ui.css">
 <style>
   @property --fl { syntax: '<length>'; inherits: false; initial-value: 0px; }
   @property --fr { syntax: '<length>'; inherits: false; initial-value: 0px; }
-  :root { --c-text: #fff; --c-dim: rgb(255 255 255 / .8); --c-faint: rgb(255 255 255 / .62); --c-inset: rgb(255 255 255 / .1); --c-line: rgb(255 255 255 / .1); --c-line2: rgb(255 255 255 / .22);
-    --c-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-    --blur: 40px; --tint: .38; --dim: 0; --panel-w: 320px; --bar-h: 104px; color-scheme: dark; }
+  :root { --blur: 40px; --tint: .38; --dim: 0; --panel-w: 320px; --bar-h: 104px; }   /* the rest is tokens.css */
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; }
-  body { background: #05070d; color: var(--c-text); font: 400 12px/16px var(--c-font); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  body { background: var(--c-ground); color: var(--c-text); font: var(--c-w-body) var(--c-t-ui)/var(--c-lh-ui) var(--c-font); -webkit-font-smoothing: antialiased; overflow: hidden; }
   button, input { font: inherit; color: inherit; }
   button:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 
@@ -41,15 +41,15 @@
   :root[data-bar="off"] .frames { bottom: 0; }
   .fwrap { flex: none; position: relative; pointer-events: auto; }
   .fwrap.drag { z-index: 10; }
-  .cap { position: absolute; left: 0; bottom: 100%; margin-bottom: 8px; color: rgb(255 255 255 / .85); text-shadow: 0 1px 2px rgb(0 0 0 / .4); font-size: 11px; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cap { position: absolute; left: 0; bottom: 100%; margin-bottom: 8px; color: rgb(255 255 255 / .85); text-shadow: 0 1px 2px rgb(0 0 0 / .4); font-size: var(--c-t-xs); line-height: var(--c-lh-ui); white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* Duplicate sits at the screen's top right, centred on the caption's line (8 + 8 above the frame); the caption stops short of it */
   .fdup { position: absolute; right: 0; bottom: 100%; margin-bottom: 6px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: rgb(255 255 255 / .85); display: grid; place-items: center; cursor: pointer; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .4)); transition: background-color .15s ease; }
-  .fdup:hover { background: var(--surf-hover); color: #fff; }
+  .fdup:hover { background: var(--surf-hover); color: var(--c-text); }
   .fdup svg { width: 12px; height: 12px; }
   .fwrap.dupable .cap { max-width: calc(100% - 28px); overflow: hidden; text-overflow: ellipsis; }
   :root[data-ui="off"] .fdup { visibility: hidden; }
   /* exporting (capture mode): no border and square corners, so a cut-out screen is the design edge to edge */
-  :root[data-capture] .frame, :root[data-capture] .screen { border-radius: 0 !important; border: 0 !important; }
+  :root[data-capture] .frame, :root[data-capture] .screen { border-radius: 0 !important; border: 0 !important; box-shadow: none !important; }
   :root[data-wall="light"] .cap { text-shadow: 0 1px 3px rgb(0 0 0 / .7), 0 0 12px rgb(0 0 0 / .5); }
   :root[data-ui="off"] .cap, :root[data-ui="off"] .rz { visibility: hidden; }
   .scaler { position: relative; }
@@ -66,22 +66,23 @@
   .rz.nw, .rz.ne, .rz.sw, .rz.se { width: 28px; height: 28px; z-index: 4; }
   .rz.nw { left: -14px; top: -14px; cursor: nwse-resize; } .rz.se { right: -14px; bottom: -14px; cursor: nwse-resize; }
   .rz.ne { right: -14px; top: -14px; cursor: nesw-resize; } .rz.sw { left: -14px; bottom: -14px; cursor: nesw-resize; }
-  .rz::after { content: ""; border-radius: 999px; background: rgb(255 255 255 / .85); box-shadow: 0 1px 4px rgb(0 0 0 / .4); opacity: 0; transition: opacity .15s ease; }
+  .rz::after { content: ""; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .85); box-shadow: 0 1px 4px rgb(0 0 0 / .4); opacity: 0; transition: opacity .15s ease; }
   .rz.e::after, .rz.w::after { width: 4px; height: 44px; } .rz.n::after, .rz.s::after { width: 44px; height: 4px; }
   .rz.nw::after, .rz.ne::after, .rz.sw::after, .rz.se::after { width: 10px; height: 10px; }
   .rz:hover::after, body.sizing .rz::after { opacity: 1; }
   body.sizing, body.sizing * { cursor: var(--rz-cursor) !important; }
   .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; display: flex; flex-direction: column; background: #141414;
     border: 1px solid rgb(255 255 255 / .14); box-shadow: 0 24px 80px rgb(0 0 20 / .45); }
-  .frame.window { border-radius: 12px; }
+  .frame.window { border-radius: var(--c-r-md); }
   .frame.handheld { border-radius: 48px; }
   .frame.tablet { border-radius: 28px; }
   .frame.bare { border-radius: 0; }
   .screen { flex: 1; min-height: 0; position: relative; }
   .screen { isolation: isolate; }
   .host { position: absolute; inset: 0; }
+  .host { isolation: isolate; } /* a design's own z-indexes stay inside it, under pins and the note catcher */
   .host > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
-  .host .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #8b8984; font: 14px var(--c-font); background: #141414; }
+  .host .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #8b8984; font: var(--c-t-md) var(--c-font); background: #141414; }
   /* compare views: B sits over A. Swipe clips it at the divider, Onion fades it, Difference leaves only what changed. */
   .screen[data-cmp=swipe] .host.b { clip-path: inset(0 0 0 calc(var(--wipe, .5) * 100%)); }
   .screen[data-cmp=onion] .host.b { opacity: var(--onion, .5); }
@@ -93,8 +94,8 @@
     background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M11 10l-4 4 4 4M17 10l4 4-4 4' fill='none' stroke='%23141414' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
     box-shadow: 0 calc(2px / var(--k, 1)) calc(8px / var(--k, 1)) rgb(0 0 0 / .4); }
   .screen[data-cmp=swipe] .wipe { display: block; }
-  .ab { display: none; position: absolute; top: calc(12px / var(--k, 1)); z-index: 4; height: 24px; padding: 0 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
-    background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .2); color: #fff; font: 500 12px/24px var(--c-font); }
+  .ab { display: none; position: absolute; top: calc(12px / var(--k, 1)); z-index: 4; height: 24px; padding: 0 10px; border-radius: var(--c-r-pill); white-space: nowrap; pointer-events: none;
+    background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .2); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/24px var(--c-font); }
   .ab.a { left: calc(12px / var(--k, 1)); transform: scale(calc(1 / var(--k, 1))); transform-origin: top left; }
   .ab.b { right: calc(12px / var(--k, 1)); transform: scale(calc(1 / var(--k, 1))); transform-origin: top right; }
   /* in Swipe the labels sit either side of the divider and follow it */
@@ -114,14 +115,14 @@
   .frame.ink-top .status { color: #000; } .frame.ink-bottom .home { color: #000; }
   .status .island { width: 125px; height: 37px; border-radius: 100px; background: #000; flex: none; }
   .status .levels { width: 78px; display: flex; justify-content: flex-end; } .status .levels i { width: 72px; height: 11px; background: currentColor; -webkit-mask: url(levels.svg) center / 100% 100% no-repeat; mask: url(levels.svg) center / 100% 100% no-repeat; }
-  .frame.tablet .status { height: 32px; padding: 0 24px; font-size: 13px; } .frame.tablet .island { visibility: hidden; }
-  .home { height: 34px; display: grid; place-items: center; color: #f5f2ed; } .home::before { content: ""; width: 136px; height: 5px; border-radius: 999px; background: currentColor; transition: background-color .2s ease; }
+  .frame.tablet .status { height: 32px; padding: 0 24px; font-size: var(--c-t-sm); } .frame.tablet .island { visibility: hidden; }
+  .home { height: 34px; display: grid; place-items: center; color: #f5f2ed; } .home::before { content: ""; width: 136px; height: 5px; border-radius: var(--c-r-pill); background: currentColor; transition: background-color .2s ease; }
   .frame.tablet .home { height: 20px; } .frame.tablet .home::before { width: 180px; }
   .frame:not(.window) .tbar, .frame.window .status, .frame.window .home, .frame.bare .tbar, .frame.bare .status, .frame.bare .home { display: none; }
 
   /* ---------- glass, shared by the panel and the bar ---------- */
-  .glass { color: #fff; background: rgb(40 40 46 / var(--tint)); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%); backdrop-filter: blur(var(--blur)) saturate(180%);
-    border-radius: 24px; box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .28), inset 0 1px 0 rgb(255 255 255 / .18), 0 16px 48px rgb(0 0 0 / .35); }
+  .glass { color: var(--c-text); background: rgb(40 40 46 / var(--tint)); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%); backdrop-filter: blur(var(--blur)) saturate(180%);
+    border-radius: var(--c-r-lg); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .28), inset 0 1px 0 rgb(255 255 255 / .18), 0 16px 48px rgb(0 0 0 / .35); }
   :root[data-wall="light"] .glass { background: rgb(24 24 30 / calc(var(--tint) + .24)); }
 
   /* ---------- panel ---------- */
@@ -133,10 +134,10 @@
      edges, and a row's text sits 8 inside its fill. */
   /* the tab bar stays put and only the sections under it scroll, so nothing ever slides beneath it */
   /* the project, as Figma shows the file: its name at the top, a menu to switch or start a new one */
-  .projbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 14px 16px 2px; }
+  .projbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 20px 16px 4px; }
   /* zoom sits at the right of the project row, like Figma; its chevron lines up with the sections' (8 in, -8 out), and it
      overhangs the 24px row by 2 above and below so the row keeps its height */
-  .proj { max-width: 100%; height: 24px; padding: 0 18px 0 0; border: 0; color: var(--c-text); font: 600 15px/24px var(--c-font); letter-spacing: -.01em; cursor: pointer; text-overflow: ellipsis;
+  .proj { max-width: 100%; height: 24px; padding: 0 18px 0 0; border: 0; color: var(--c-text); font: var(--c-w-medium) var(--c-t-md)/24px var(--c-font); letter-spacing: var(--c-tr-snug); cursor: pointer; text-overflow: ellipsis;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 2px center no-repeat; }
   .tabs { flex: none; display: flex; align-items: center; gap: 4px; padding: 6px 0 10px; border-bottom: 1px solid var(--c-line); }
   .panes { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
@@ -149,73 +150,87 @@
   .tabbar { --fl: 0px; --fr: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
     transition: --fl .18s ease-out, --fr .18s ease-out; }
   .tabbar.more-l { --fl: 36px; } .tabbar.more-r { --fr: 36px; }
-  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--c-dim); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); font-size: var(--c-t-sm); font-weight: var(--c-w-medium); cursor: pointer; }
   .tab:hover { color: var(--c-text); }
+  .tab:focus-visible { outline: none; color: var(--c-text); } /* no white ring after a click: the pill already shows where you are */
   .tab[aria-selected="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
-  .zsel { flex: none; margin: -2px -8px -2px auto; width: 68px; height: 28px; padding: 0 22px 0 8px; border: 0; border-radius: 999px; color: var(--c-dim); font-size: 13px; font-variant-numeric: tabular-nums; text-align-last: right; justify-content: flex-end; cursor: pointer;
+  .zsel { flex: none; margin: -2px -8px -2px auto; width: 68px; height: 28px; padding: 0 22px 0 8px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text-2); font-size: var(--c-t-sm); font-variant-numeric: tabular-nums; text-align-last: right; justify-content: flex-end; cursor: pointer;
     background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 8px center no-repeat; }
   .zsel:hover { color: var(--c-text); background-color: var(--surf-hover); box-shadow: var(--surf-edge); }
   .sect { padding: 14px 16px 16px; }
   .sect.offtab { display: none; }
   .sect:not(.offtab) ~ .sect:not(.offtab) { border-top: 1px solid var(--c-line); }
-  .st { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; border: 0; background: none; font-size: 13px; line-height: 20px; font-weight: 500; text-align: left; cursor: pointer; }
-  .st::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid var(--c-faint); border-bottom: 1.5px solid var(--c-faint); transform: translateY(-2px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+  .st { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; border: 0; background: none; font-size: var(--c-t-sm); line-height: 20px; font-weight: var(--c-w-medium); text-align: left; cursor: pointer; }
+  .st::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid var(--c-text-3); border-bottom: 1.5px solid var(--c-text-3); transform: translateY(-2px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
   .sect.folded .st::after { transform: rotate(-45deg); }
   .sect.folded > :not(.st) { display: none !important; }
-  .lbl { display: flex; justify-content: space-between; align-items: center; color: var(--c-dim); line-height: 16px; }
+  .lbl { display: flex; justify-content: space-between; align-items: center; color: var(--c-text-2); line-height: var(--c-lh-ui); }
   .lbl output { color: var(--c-text); font-variant-numeric: tabular-nums; }
-  .seg { display: flex; padding: 2px; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
+  .seg { display: flex; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
   /* pills share the width equally, but never get narrower than their text with 10 either side */
-  .pill { flex: 1 1 0; min-width: fit-content; height: 26px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--c-dim); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pill { flex: 1 1 0; min-width: fit-content; height: 26px; padding: 0 10px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .pill:hover { color: var(--c-text); }
   .pill[aria-pressed="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
   .range { display: block; width: 100%; height: 14px; -webkit-appearance: none; appearance: none; background: none; cursor: pointer; }
-  .range::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--surf-hover); box-shadow: var(--surf-edge); }
-  .range::-moz-range-track { height: 4px; border-radius: 999px; background: var(--surf-hover); }
+  .range::-webkit-slider-runnable-track { height: 4px; border-radius: var(--c-r-pill); background: var(--surf-hover); box-shadow: var(--surf-edge); }
+  .range::-moz-range-track { height: 4px; border-radius: var(--c-r-pill); background: var(--surf-hover); }
   .range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
   .range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
   .two { display: grid; grid-template-columns: 1fr 12px 1fr 30px; gap: 4px; align-items: center; }
-  .ibtn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-dim); display: grid; place-items: center; cursor: pointer; }
+  .ibtn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text-2); display: grid; place-items: center; cursor: pointer; }
   .ibtn:hover { background: var(--surf-hover); color: var(--c-text); }
   .ibtn svg { width: 12px; height: 12px; }
-  .two span { color: var(--c-faint); text-align: center; }
-  .num, .txt { display: block; width: 100%; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); font-variant-numeric: tabular-nums; }
+  .two span { color: var(--c-text-3); text-align: center; }
+  .num, .txt { display: block; width: 100%; height: 30px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); font-variant-numeric: tabular-nums; }
   .num::-webkit-inner-spin-button { display: none; }
   .num:hover, .txt:hover { background-color: var(--surf-hover); }
   select.txt { display: flex; align-items: center; cursor: pointer; padding-right: 32px; background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 12px center no-repeat; }
   .acts { display: flex; gap: 8px; }
-  .btn { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); cursor: pointer; display: grid; place-items: center; white-space: nowrap; }
+  .btn { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); cursor: pointer; display: grid; place-items: center; white-space: nowrap; }
   .btn:hover { background: var(--surf-hover); }
   .btn { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; } .btn:active:not(:disabled) { transform: scale(.97); }
-  .chk { display: flex; align-items: center; justify-content: space-between; min-height: 20px; color: var(--c-dim); cursor: pointer; }
+  .chk { display: flex; align-items: center; justify-content: space-between; min-height: 20px; color: var(--c-text-2); cursor: pointer; }
   /* Selected is always the same translucent white as a selected pill, never a solid fill or a colour. */
-  .chk input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border-radius: 999px; background: var(--surf); box-shadow: var(--surf-edge); position: relative; cursor: pointer; transition: background .2s; }
-  .chk input[type=checkbox]::before { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: rgb(255 255 255 / .55); transition: transform .25s cubic-bezier(.23, 1, .32, 1), background .2s; }
-  .chk input[type=checkbox]:checked { background: var(--surf-on); } .chk input[type=checkbox]:checked::before { transform: translateX(12px); background: #fff; }
+  .chk input[type=checkbox], .cghead input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); position: relative; cursor: pointer; transition: background .2s; }
+  .chk input[type=checkbox]::before, .cghead input[type=checkbox]::before { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: rgb(255 255 255 / .55); transition: transform .25s cubic-bezier(.23, 1, .32, 1), background .2s; }
+  .chk input[type=checkbox]:checked, .cghead input[type=checkbox]:checked { background: var(--surf-on); } .chk input[type=checkbox]:checked::before, .cghead input[type=checkbox]:checked::before { transform: translateX(12px); background: #fff; }
   .swatch { flex: none; width: 20px; height: 20px; border: 0; padding: 0; border-radius: 50%; background: none; cursor: pointer; }
+  button.swatch { background: linear-gradient(var(--sw), var(--sw)), repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 0 / 8px 8px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+  .swrow { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swrow .swatch { width: 24px; height: 24px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cgroup { display: grid; gap: 10px; }
+  .cghead { display: flex; align-items: center; gap: 8px; }
+  .cgname { flex: 1; display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--c-text); font: inherit; font-weight: var(--c-w-medium); text-align: left; cursor: pointer; }
+  .cgname::after { content: ''; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.3px 1.3px 0; transform: translateY(-2px) rotate(45deg); opacity: .5; transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+  .cgroup.shut .cgname::after { transform: rotate(-45deg); }
+  .cgroup.shut .cgbody { display: none; }
+  .cgroup.off .cgbody { opacity: .4; }
+  .cgn { color: var(--c-text-3); font-size: var(--c-t-xs); }
+  :where(.sect, .stack) > .cgroup + *, :where(.sect, .stack) > * + .cgroup { margin-top: 16px; }
   .swatch::-webkit-color-swatch-wrapper { padding: 0; } .swatch::-webkit-color-swatch { border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
   .swatch::-moz-color-swatch { border: 0; border-radius: 50%; }
-  .note { color: var(--c-faint); line-height: 16px; text-wrap: balance; }
+  .note { color: var(--c-text-3); line-height: var(--c-lh-ui); text-wrap: balance; }
   .note:empty { display: none; }
   .steps { padding: 0; list-style: none; counter-reset: s; }
-  .steps li { counter-increment: s; display: flex; gap: 8px; align-items: center; height: 28px; padding: 0 8px; border-radius: 999px; color: var(--c-dim); cursor: pointer; }
-  .steps li::before { content: counter(s); width: 12px; color: var(--c-faint); font-variant-numeric: tabular-nums; }
-  .steps li span { margin-left: auto; color: var(--c-faint); font-variant-numeric: tabular-nums; }
+  .steps li { counter-increment: s; display: flex; gap: 8px; align-items: center; height: 28px; padding: 0 8px; border-radius: var(--c-r-pill); color: var(--c-text-2); cursor: pointer; }
+  .steps li::before { content: counter(s); width: 12px; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+  .steps li span { margin-left: auto; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
   .steps li + li { margin-top: 2px; }
-  .steps li:hover { background: var(--c-inset); }
+  .steps li:hover { background: var(--c-fill); }
   .steps li.cur { background: rgb(255 255 255 / .16); color: var(--c-text); }
-  .keys { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; color: var(--c-dim); }
-  .keys dt { color: var(--c-dim); } .keys dd { margin: 0; text-align: right; }
-  kbd { font: inherit; display: inline-block; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px; background: var(--c-inset); color: var(--c-text); line-height: 20px; text-align: center; }
+  .keys { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; color: var(--c-text-2); }
+  .keys dt { color: var(--c-text-2); } .keys dd { margin: 0; text-align: right; }
+  kbd { font: inherit; display: inline-block; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--c-r-xs); background: var(--c-fill); color: var(--c-text); line-height: 20px; text-align: center; }
   kbd + kbd { margin-left: 4px; }
   .btn[aria-pressed="true"] { background: var(--surf-on); }
   /* design list, like layers: a lettered mark for each design on screen, an empty ring for the rest */
   .dlist { padding: 0; list-style: none; }
-  .dlist li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 5px; border-radius: 999px; color: var(--c-dim); cursor: pointer; user-select: none; }
+  .dlist li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 5px; border-radius: var(--c-r-pill); color: var(--c-text-2); cursor: pointer; user-select: none; }
   .dlist li + li { margin-top: 2px; }
-  .dlist li:hover { background: var(--c-inset); color: var(--c-text); }
+  .dlist li:hover { background: var(--c-fill); color: var(--c-text); }
   .dlist li.on { color: var(--c-text); }
-  .dlist li.full { opacity: .4; cursor: default; } .dlist li.full:hover { background: none; color: var(--c-dim); }
+  .dlist li.full { opacity: .4; cursor: default; } .dlist li.full:hover { background: none; color: var(--c-text-2); }
   /* a variant sits under its scene, indented like a child layer */
   .dlist li.var { padding-left: 28px; }
   .dlist li > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -223,59 +238,59 @@
   .dlist li .ver + .x { margin-left: 4px; }
   /* a page with several versions: its name, then one chip per version (and saved variant) under it */
   /* a design with several versions: its name, then one row per version, like layers in a group */
-  .dlist li.fh { height: 28px; padding-left: 8px; color: var(--c-text); font-weight: 500; }
+  .dlist li.fh { height: 28px; padding-left: 8px; color: var(--c-text); font-weight: var(--c-w-medium); }
   .dlist li.fh + li.sub { margin-top: 0; }
   .dlist li.sub + li:not(.sub) { margin-top: 8px; }
   .dlist li.sub { height: 30px; }
   .dlist li .vn { flex: none; min-width: 22px; color: var(--c-text); font-variant-numeric: tabular-nums; }
-  .dlist li .vd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-faint); }
-  .dlist li.on .vd, .dlist li:hover .vd { color: var(--c-dim); }
+  .dlist li .vd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-3); }
+  .dlist li.on .vd, .dlist li:hover .vd { color: var(--c-text-2); }
   .dlist li.lost { opacity: .5; }
   .dlist li .star { flex: none; color: #4da6ff; }
-  .chip { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--c-inset); color: var(--c-dim); font: inherit; font-size: 12px; cursor: pointer; }
-  .chip:hover { color: var(--c-text); background: var(--c-line2); }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 0; border-radius: var(--c-r-pill); background: var(--c-fill); color: var(--c-text-2); font: inherit; font-size: var(--c-t-ui); cursor: pointer; }
+  .chip:hover { color: var(--c-text); background: var(--c-line-2); }
   .chip.on { background: rgb(255 255 255 / .22); color: var(--c-text); }
-  .chip b { font-weight: 500; }
+  .chip b { font-weight: var(--c-w-medium); }
   .chip .x { margin: 0 -4px 0 0; visibility: hidden; } .chip:hover .x { visibility: visible; }
   .lay { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   /* a note's snapshot: what was under the pin when it was made */
-  .snap { display: block; width: 100%; margin-top: 8px; border-radius: 8px; background: rgb(0 0 0 / .3); }
+  .snap { display: block; width: 100%; margin-top: 8px; border-radius: var(--c-r-xs); background: rgb(0 0 0 / .3); }
   .notes .snap { max-height: 72px; object-fit: cover; object-position: center; }
   .subrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .link { flex: none; padding: 0; border: 0; background: none; color: var(--c-dim); line-height: 16px; cursor: pointer; }
+  .link { flex: none; padding: 0; border: 0; background: none; color: var(--c-text-2); line-height: var(--c-lh-ui); cursor: pointer; }
   .link:hover { color: var(--c-text); }
-  .mk { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--c-line2); display: grid; place-items: center; font-size: 11px; font-weight: 500; }
+  .mk { flex: none; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--c-line-2); display: grid; place-items: center; font-size: var(--c-t-xs); font-weight: var(--c-w-medium); }
   /* in the list the mark is only a state: a small dot on the one on screen, or with several on screen, a letter
      (A to E, matching the screen) on each one that's on. Nothing on the rest. Same 20px slot, so text never moves. */
   .dlist .mk { box-shadow: none; }
   .dlist:not(.many) li.on .mk::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(255 255 255 / .9); }
   .dlist.many li.on .mk { background: rgb(255 255 255 / .88); color: #0b0b0f; }
-  .ver { margin-left: auto; color: var(--c-faint); font-variant-numeric: tabular-nums; }
-  .sub { color: var(--c-text); font-weight: 500; line-height: 16px; }
+  .ver { margin-left: auto; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+  .sub { color: var(--c-text); font-weight: var(--c-w-medium); line-height: var(--c-lh-ui); }
   #ctls > .stack + .stack { margin-top: 16px; }
-  .hint { color: var(--c-faint); line-height: 16px; }
+  .hint { color: var(--c-text-3); line-height: var(--c-lh-ui); }
   /* notes list: the number matches the pin on the screen */
   .notes { padding: 0; list-style: none; }
-  .notes li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 12px; cursor: pointer; }
+  .notes li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--c-r-md); cursor: pointer; }
   .notes li + li { margin-top: 2px; }
-  .notes li:hover { background: var(--c-inset); }
+  .notes li:hover { background: var(--c-fill); }
   /* notes come in sittings, newest first; an older sitting with nothing open folds to its header */
-  .notes li.sit { align-items: center; gap: 6px; height: 28px; padding: 0 8px; color: var(--c-dim); font-size: 12px; }
+  .notes li.sit { align-items: center; gap: 6px; height: 28px; padding: 0 8px; color: var(--c-text-2); font-size: var(--c-t-ui); }
   .notes li.sit + li { margin-top: 0; }
   .notes li:not(.sit) + li.sit { margin-top: 12px; }
-  .notes li.sit::before { content: ""; flex: none; width: 5px; height: 5px; margin: 0 5px 0 2px; border-right: 1.5px solid var(--c-faint); border-bottom: 1.5px solid var(--c-faint); transform: translateY(-1px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
+  .notes li.sit::before { content: ""; flex: none; width: 5px; height: 5px; margin: 0 5px 0 2px; border-right: 1.5px solid var(--c-text-3); border-bottom: 1.5px solid var(--c-text-3); transform: translateY(-1px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
   .notes li.sit.shut::before { transform: rotate(-45deg); }
-  .notes li.sit .ver { font-size: 12px; }
+  .notes li.sit .ver { font-size: var(--c-t-ui); }
   /* the list number matches its pin; a done note keeps only the ring, like a design that is off */
-  .nbadge { flex: none; width: 20px; height: 20px; border-radius: 50%; background: rgb(255 255 255 / .22); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 500; }
-  .notes li.done .nbadge { background: none; box-shadow: inset 0 0 0 1.5px var(--c-line2); color: var(--c-faint); }
-  .notes li.done .nt { color: var(--c-faint); text-decoration: line-through; text-decoration-color: var(--c-line2); }
+  .nbadge { flex: none; box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 5px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .22); color: var(--c-text); display: grid; place-items: center; font-size: var(--c-t-xs); font-weight: var(--c-w-medium); font-variant-numeric: tabular-nums; } /* a circle for one digit, a pill with room on both sides for two */
+  .notes li.done .nbadge { background: none; box-shadow: inset 0 0 0 1.5px var(--c-line-2); color: var(--c-text-3); }
+  .notes li.done .nt { color: var(--c-text-3); text-decoration: line-through; text-decoration-color: var(--c-line-2); }
   .nb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
-  .nt { color: var(--c-text); line-height: 16px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .nt i { color: var(--c-faint); font-style: normal; }
-  .nm { color: var(--c-faint); line-height: 16px; }
-  .x { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-faint); font-size: 14px; line-height: 20px; cursor: pointer; }
-  .x:hover { background: var(--c-inset); color: var(--c-text); }
+  .nt { color: var(--c-text); line-height: var(--c-lh-ui); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nt i { color: var(--c-text-3); font-style: normal; }
+  .nm { color: var(--c-text-3); line-height: var(--c-lh-ui); }
+  .x { flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-text-3); font-size: var(--c-t-md); line-height: 20px; cursor: pointer; }
+  .x:hover { background: var(--c-fill); color: var(--c-text); }
   /* The rhythm comes last, and resets and rhythm both have zero specificity, so the rhythm always wins. */
   :where(.steps, .keys, .note, .range, .notes, .hint, .dlist) { margin: 0; }
   :where(.sect, .stack) > * + * { margin-top: 12px; }
@@ -296,26 +311,50 @@
   :where(.sect, .stack) > .two + .chk { margin-top: 10px; }
   .sect > .chk:last-child { margin-bottom: -2px; }
   /* ---------- notes on the screens ---------- */
-  .pins { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+  .pins { position: absolute; inset: 0; z-index: 8; pointer-events: none; } /* over the note catcher: a pin opens in note mode too */
   /* pins keep one size at any zoom */
   /* a pin is a small glass chip, like the A and B labels, so it reads on light and dark designs alike */
   /* centred by flex on the number's own box, tabular figures, and a pill once it needs two digits */
-  .pin { position: absolute; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border: 0; border-radius: 999px; color: #fff; font: 500 12px/1 var(--c-font); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  .pin { position: absolute; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
     background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / .4), 0 2px 8px rgb(0 0 0 / .35);
     translate: -50% -50%; transform: scale(calc(1 / var(--k, 1))); cursor: pointer; pointer-events: auto; transition: background .15s, box-shadow .15s; }
   .pin:hover, .pin.open { background: rgb(80 80 88 / .85); box-shadow: inset 0 0 0 1.5px #fff, 0 2px 8px rgb(0 0 0 / .35); }
   .pin.flash { animation: pinflash .9s cubic-bezier(.23, 1, .32, 1); }
   @keyframes pinflash { 30% { transform: scale(calc(1.5 / var(--k, 1))); } }
+  /* a note on words: a soft wash under them, a little stronger while its note is open */
+  .whl { position: absolute; border-radius: 2px; background: rgb(77 166 255 / .14); box-shadow: 0 1.5px 0 rgb(77 166 255 / .55); pointer-events: none; }
+  .whl.on { background: rgb(77 166 255 / .24); box-shadow: 0 1.5px 0 #4da6ff; }
+  .whl.sent { background: rgb(255 255 255 / .12); box-shadow: 0 1.5px 0 rgb(255 255 255 / .45); }
+  /* the chip that comes up over selected words */
+  .wordchip { position: fixed; z-index: 58; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px 0 10px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); cursor: pointer;
+    animation: chipin .16s cubic-bezier(.23, 1, .32, 1); }
+  .wordchip[hidden] { display: none; }
+  .wordchip.glass { background: rgb(40 40 46 / .94); box-shadow: 0 4px 16px rgb(0 0 0 / .45); } /* solid enough to read over the words it sits on */
+  .wordchip .key { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .12); color: var(--c-text-3); font-size: var(--c-t-xs); }
+  @keyframes chipin { from { opacity: 0; transform: translateY(4px); } }
+  @media (prefers-reduced-motion: reduce) { .wordchip { animation: none; } }
+  /* the words a note is on, quoted in the list and the editor */
+  .trytag { display: inline-block; padding: 0 6px; margin: 0 2px; border-radius: var(--c-r-pill); background: var(--c-accent-soft); color: var(--c-accent); font-size: var(--c-t-xs); line-height: var(--c-lh-xs); vertical-align: 1px; }
+  .slash { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 6px; padding: 6px 8px; border: 0; border-radius: var(--c-r-sm); background: var(--surf-on); color: var(--c-text-2); font: inherit; font-size: var(--c-t-sm); text-align: left; cursor: pointer; }
+  .slash b { color: var(--c-text); font-weight: var(--c-w-medium); }
+  .slash span { flex: 1; }
+  .slash kbd { font: inherit; font-size: var(--c-t-xs); color: var(--c-text-3); }
+  .nq { color: var(--c-text-2); line-height: var(--c-lh-ui); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nq::before { content: "“"; } .nq::after { content: "”"; }
+  .notepop .nq { margin-top: 8px; }
   .catch { display: none; position: absolute; inset: 0; z-index: 7; cursor: crosshair; }
   body.noting .catch, body.picking .catch, body.cutting .catch { display: block; }
+  /* holding ⌥ in those modes moves the catcher aside, so the design takes the click (see through() in the script) */
+  body.through .catch { display: none; }
+  body.through .cutbox { display: none !important; }
   /* Cut: the element under the pointer, outlined, with its name and size. Arrow keys walk to its parent and child. */
-  .cutbox { position: fixed; z-index: 55; display: none; pointer-events: none; border-radius: 4px; background: rgb(77 166 255 / .1); box-shadow: 0 0 0 1.5px #4da6ff; }
+  .cutbox { position: fixed; z-index: 55; display: none; pointer-events: none; border-radius: var(--c-r-xs); background: rgb(77 166 255 / .1); box-shadow: 0 0 0 1.5px #4da6ff; }
   body.cutting .cutbox.on { display: block; }
-  .cutbox span { position: absolute; left: -1.5px; bottom: calc(100% + 6px); height: 20px; padding: 0 8px; border-radius: 999px; background: #4da6ff; color: #05070d; font: 500 11px/20px var(--c-font); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cutbox span { position: absolute; left: -1.5px; bottom: calc(100% + 6px); height: 20px; padding: 0 8px; border-radius: var(--c-r-pill); background: #4da6ff; color: #05070d; font: var(--c-w-medium) var(--c-t-xs)/20px var(--c-font); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .cutbox.below span { bottom: auto; top: calc(100% + 6px); }
   /* Focus: a screen crops to one element. Its chrome, pins and resize handles step aside. */
-  .frame.focus { border-radius: 12px; }
+  .frame.focus { border-radius: var(--c-r-md); }
   .frame.focus .tbar, .frame.focus .status, .frame.focus .home { display: none; }
   .frame.focus .host { right: auto; bottom: auto; }
   .fwrap.focusing .rz, .fwrap.focusing .pins { display: none; }
@@ -331,41 +370,48 @@
   .notepop .popcut { margin-top: 6px; }
   .notepop textarea { margin-top: 8px; }
   @media (prefers-reduced-motion: reduce) { .notepop, .notepop.show { transform: none; } .toast { animation: none; } }
-  .notepop textarea { display: block; width: 100%; min-height: 64px; padding: 8px 12px; border: 0; border-radius: 12px; background: var(--surf); box-shadow: var(--surf-edge); color: #fff; font: inherit; line-height: 16px; resize: none; }
-  .notepop textarea:focus { outline: none; box-shadow: inset 0 0 0 1px var(--c-line2); }
+  .notepop textarea { display: block; width: 100%; min-height: 64px; padding: 8px 12px; border: 0; border-radius: var(--c-r-md); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text); font: inherit; line-height: var(--c-lh-ui); resize: none; }
+  .notepop textarea:focus { outline: none; box-shadow: inset 0 0 0 1px var(--c-line-2); }
   .notepop .acts { margin-top: 8px; }
   .acts + .acts { margin-top: 8px; }
   .acts.tools { margin-bottom: 12px; }
   .acts.tools .btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn .key { color: var(--c-faint); font-size: 11px; }
+  .btn .key { color: var(--c-text-3); font-size: var(--c-t-xs); }
   .notelinks { display: flex; justify-content: space-between; margin-top: 12px; padding: 0 4px; }
   .notelinks[hidden] { display: none; }
-  .notelinks .link { font-size: 12px; }
+  .notelinks .link { font-size: var(--c-t-ui); }
   .notelinks .link:hover { color: var(--c-text); }
-  .toast { position: fixed; top: 16px; left: 16px; right: calc(var(--panel-w) + 32px); width: max-content; margin: 0 auto; z-index: 40; padding: 0 14px; height: 32px; border-radius: 999px; line-height: 32px; animation: toastin .22s cubic-bezier(.23, 1, .32, 1); }
+  .toast { position: fixed; top: 16px; left: 16px; right: calc(var(--panel-w) + 32px); width: max-content; margin: 0 auto; z-index: 40; padding: 0 14px; height: 32px; border-radius: var(--c-r-pill); line-height: 32px; animation: toastin .22s cubic-bezier(.23, 1, .32, 1); }
   @keyframes toastin { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
-  .drop { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: rgb(0 0 0 / .4); font-size: 15px; }
+  .drop { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: rgb(0 0 0 / .4); font-size: var(--c-t-lg); }
   .drop.show { display: grid; }
 
   /* ---------- timeline bar ---------- */
   .transport { position: fixed; left: 16px; right: calc(var(--panel-w) + 32px); bottom: 16px; max-width: 960px; margin: 0 auto; z-index: 30; padding: 12px; transition: transform .26s cubic-bezier(.23, 1, .32, 1), opacity .2s ease, right .26s cubic-bezier(.23, 1, .32, 1); }
   :root[data-panel="off"] .transport { right: 16px; }
   :root[data-bar="off"] .transport { transform: translateY(calc(100% + 32px)); opacity: 0; pointer-events: none; }
+  /* A prototype's bar: Restart and its name, nothing to scrub. */
+  .transport > .live-row { display: none; } /* beats .trow's flex, which comes later */
+  :root[data-live="on"] .transport { width: max-content; }
+  :root[data-live="on"] .transport > .trow:not(.live-row), :root[data-live="on"] .transport > .mrow { display: none; }
+  :root[data-live="on"] .transport > .live-row { display: flex; }
+  #restart { display: inline-flex; align-items: center; gap: 6px; } #restart svg { width: 12px; height: 12px; }
+  .live-hint { padding: 0 8px 0 2px; font: var(--c-t-ui)/1 var(--c-font); color: var(--c-text-3, #8b8984); }
   /* Bar rhythm: 12 in from every edge. Transport buttons sit 4 apart, every other group 12. */
   .trow { display: flex; align-items: center; gap: 12px; height: 32px; }
   .tgroup { display: flex; align-items: center; gap: 4px; flex: none; }
-  .tbtn { height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: #fff; cursor: pointer; flex: none; display: grid; place-items: center; }
+  .tbtn { height: 32px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text); cursor: pointer; flex: none; display: grid; place-items: center; }
   .tbtn:hover { background: var(--surf-hover); }
   .tbtn.ic { width: 32px; padding: 0; }
   .tbtn svg { width: 10px; height: 10px; }
   /* play is the main action: the same glass, a step brighter, pause while playing */
-  #play { width: 32px; height: 32px; background: var(--surf-on); color: #fff; transition: transform .15s cubic-bezier(.25, .46, .45, .94), background .15s ease; }
+  #play { width: 32px; height: 32px; background: var(--surf-on); color: var(--c-text); transition: transform .15s cubic-bezier(.25, .46, .45, .94), background .15s ease; }
   #play:hover { background: color-mix(in srgb, var(--surf-on), white 8%); } #play:active { transform: scale(.97); }
   #play svg { width: 11px; height: 11px; } #play .i-play { margin-left: 1px; }
   #play .i-pause, #play.on .i-play { display: none; } #play.on .i-pause { display: block; }
   /* times sit either side of the scrubber: elapsed in white, the total dimmer. Fixed width so nothing shifts as digits change. */
-  .clock { flex: none; width: 36px; font-size: 12px; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
-  .clock.now { color: #fff; text-align: right; } .clock.total { color: rgb(255 255 255 / .45); }
+  .clock { flex: none; width: 36px; font-size: var(--c-t-ui); letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+  .clock.now { color: var(--c-text); text-align: right; } .clock.total { color: rgb(255 255 255 / .45); }
   .scrubwrap { flex: 1; min-width: 80px; position: relative; height: 16px; }
   #scrub { width: 100%; display: block; position: relative; z-index: 1; -webkit-appearance: none; appearance: none; background: none; height: 16px; margin: 0; cursor: pointer; }
   /* the slider's own track is invisible; the chapter segments below draw it */
@@ -378,22 +424,22 @@
   /* Chapters: one segment per step, 2 apart, each filling white as its step plays. They span the thumb's travel
      (7 in from each end), so a step's start sits exactly in the gap before its segment. */
   .ticks { position: absolute; left: 7px; right: 7px; top: 6px; height: 4px; pointer-events: none; z-index: 0; }
-  .ticks i { position: absolute; top: 0; height: 4px; border-radius: 999px; background: rgb(255 255 255 / .18); overflow: hidden; transition: transform .15s ease; }
+  .ticks i { position: absolute; top: 0; height: 4px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .18); overflow: hidden; transition: transform .15s ease; }
   .ticks b { display: block; height: 100%; background: #fff; transform: scaleX(0); transform-origin: left; }
   .scrubwrap:hover .ticks i { transform: scaleY(1.5); }
   /* speed: a menu, 32 tall like the buttons beside it (four or more choices are always a menu, never pills) */
-  .spd { flex: none; height: 32px; padding: 0 28px 0 12px; border: 0; border-radius: 999px; color: #fff; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
+  .spd { flex: none; height: 32px; padding: 0 28px 0 12px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font-size: var(--c-t-ui); font-variant-numeric: tabular-nums; cursor: pointer;
     background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 12px center no-repeat;
     -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
   .spd:hover { background-color: var(--surf-hover); }
   .mrow { display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; }
   .marks { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
-  .mark { height: 24px; padding: 0 8px; border: 0; border-radius: 999px; background: none; color: rgb(255 255 255 / .55); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .mark span { font-size: 11px; font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .35); }
+  .mark { height: 24px; padding: 0 8px; border: 0; border-radius: var(--c-r-pill); background: none; color: rgb(255 255 255 / .55); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .mark span { font-size: var(--c-t-xs); font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .35); }
   .mark.cur span { color: rgb(255 255 255 / .55); }
   .mark.past { color: rgb(255 255 255 / .75); }
-  .mark:hover, .mark.cur { background: rgb(255 255 255 / .14); color: #fff; }
-  .stepn { flex: none; line-height: 24px; font-size: 11px; color: rgb(255 255 255 / .45); font-variant-numeric: tabular-nums; }
+  .mark:hover, .mark.cur { background: rgb(255 255 255 / .14); color: var(--c-text); }
+  .stepn { flex: none; line-height: 24px; font-size: var(--c-t-xs); color: rgb(255 255 255 / .45); font-variant-numeric: tabular-nums; }
 
   @media (max-width: 900px) { :root { --panel-w: 0px; } .side { display: none; } .transport { left: 16px; right: 16px; } .transport .seg, .clock, .stepn { display: none; } }
   @media (prefers-reduced-motion: reduce) { .side, .transport { transition: none; } }
@@ -415,6 +461,8 @@
     <select class="spd" id="speed" aria-label="Speed"></select>
   </div>
   <div class="mrow"><div class="marks" id="marks" role="group" aria-label="Jump to a step"></div><span class="stepn" id="stepn"></span></div>
+  <!-- A prototype has no timeline: the bar holds the one move that means something for it. -->
+  <div class="trow live-row"><button class="tbtn" id="restart" title="Restart  R"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6a3.5 3.5 0 1 0 1.2-2.6M2.5 1.8v2h2"/></svg>Restart</button><span class="live-hint">Prototype</span></div>
 </div>
 
 <aside class="side glass" aria-label="Controls">
@@ -427,7 +475,6 @@
     <button class="st">Designs</button>
     <ol class="dlist" id="dlist"></ol>
     <input class="txt" id="url" type="url" placeholder="http://localhost:5173" aria-label="Address">
-    <div class="acts"><button class="btn" id="focusbtn" aria-pressed="false">Focus</button></div>
     <div class="stack" id="laywrap">
       <div class="lay"><div class="stack"><div class="lbl">Rows</div><select class="txt" id="rows" aria-label="Rows"></select></div>
         <div class="stack"><div class="lbl">Columns</div><select class="txt" id="cols" aria-label="Columns"></select></div></div>
@@ -442,7 +489,7 @@
   <div class="sect" data-k="controls" data-tab="design" id="ctlsect">
     <button class="st">Controls</button>
     <div class="stack" id="ctls"></div>
-    <div class="acts"><button class="btn" id="ctlcopy">Copy values</button><button class="btn" id="ctlreset">Reset</button></div>
+    <div class="acts"><button class="btn" id="ctlsave" hidden>Save variant</button><button class="btn" id="ctlcopy">Copy values</button><button class="btn" id="ctlreset">Reset</button></div>
   </div>
 
   <div class="sect" data-k="screen" data-tab="design">
@@ -490,47 +537,26 @@
     <!-- the tools first, then what they made, then the one thing to do with it; the rest are links -->
     <div class="acts tools"><button class="btn" id="noteadd" aria-pressed="false" title="Click to pin a note, drag to note an area">Note<span class="key">N</span></button><button class="btn" id="notecut" aria-pressed="false" title="Cut out elements and note them; shift-click for several">Cut<span class="key">X</span></button></div>
     <ol class="notes" id="notelist"></ol>
-    <p class="hint" id="noteempty">No notes yet. Press N and click a screen.</p>
+    <p class="hint" id="noteempty">Press N, then click a screen. Or select words and press N.</p>
     <p class="hint" id="notesync"></p>
-    <div class="acts"><button class="btn go" id="notesend" title="One new version per design, with all its open notes, beside the original">Send to Claude</button></div>
+    <div class="acts"><button class="btn go" id="notesend" title="One new version per design, with all its open notes, beside the original">Send to agent</button></div>
     <div class="notelinks"><button class="link" id="notecopy">Copy brief</button><button class="link" id="noteclear">Clear all</button></div>
   </div>
 
-  <div class="sect" data-k="explore" data-tab="agent">
-    <button class="st">Explore</button>
-    <div class="exfrom"><span class="mk" id="exmk">A</span><span class="sub" id="exfrom"></span><button class="link" id="exfocus" hidden></button></div>
-    <textarea class="ask" id="exask" rows="3" placeholder="What should Claude try?"></textarea>
-    <div class="lbl">Directions</div>
-    <div class="seg" id="excount"><button class="pill" data-v="2">2</button><button class="pill" data-v="3">3</button><button class="pill" data-v="4">4</button></div>
-    <div class="acts"><button class="btn go" id="exgo">Explore</button></div>
-    <p class="hint" id="exhint2">Each direction is a new version, made by its own agent at the same time. Pick one when they land.</p>
-  </div>
-
-  <div class="sect" data-k="runs" data-tab="agent">
-    <button class="st">Runs</button>
-    <ol class="runs" id="runlist"></ol>
-    <p class="hint" id="runempty">Nothing yet. Send notes or explore.</p>
-  </div>
-
-  <div class="sect" data-k="trail" data-tab="agent">
+  <div class="sect" data-k="trail" data-tab="notes">
     <button class="st">History</button>
     <ol class="trail" id="traillist"></ol>
-    <p class="hint" id="trailempty">Every version Claude makes lands here, with why it exists.</p>
+    <p class="hint" id="trailempty">Nothing yet</p>
   </div>
-  <!-- Taste: what Claude has learned you like. Every run reads it first. taste.js fills it from /api/taste. -->
+  <!-- Taste: what the agents have learned you like, from how each design changed. Every run reads it first. taste.js fills it from /api/taste. -->
   <div class="sect" data-k="taste" data-tab="taste">
     <button class="st">Taste</button>
-    <p class="hint">What Claude has learned from your picks and notes. Every run reads it first.</p>
     <label class="chk tasteon"><span>Use in every run</span><input type="checkbox" id="tasteon" checked></label>
     <div class="tastelearn" id="tastelearn" hidden><i class="agspin"></i><span>Learning from what you just did</span></div>
     <ol class="tastelist" id="tastelist"></ol>
-    <p class="hint" id="tasteempty">Nothing yet. Pick a direction and say why, or send notes: Claude learns from both.</p>
+    <p class="hint" id="tasteempty">Nothing yet</p>
     <input class="tasteadd" id="tasteadd" maxlength="140" placeholder="Add something you always want" aria-label="Add to your taste">
-  </div>
-  <div class="sect" data-k="angles" data-tab="taste">
-    <button class="st">Directions you pick</button>
-    <div class="anglestats" id="anglestats"></div>
-    <p class="hint" id="anglesempty">Counted from every exploration you picked from.</p>
+    <div class="notelinks"><button class="link" id="tastereread" title="Relearn from every design's history; your own lines stay">Re-read all</button></div>
   </div>
 
   <div class="sect" data-k="liquid" data-tab="stage">
@@ -552,17 +578,19 @@
       <dt>Panel</dt><dd><kbd>\</kbd></dd>
       <dt>Screens only</dt><dd><kbd>H</kbd></dd>
       <dt>Note, cut</dt><dd><kbd>N</kbd><kbd>X</kbd></dd>
+      <dt>Note on selected words</dt><dd><kbd>N</kbd></dd>
       <dt>Focus</dt><dd><kbd>F</kbd></dd>
-      <dt>Explore</dt><dd><kbd>E</kbd></dd>
     </dl>
     <div class="acts"><button class="btn" id="reset">Reset</button></div>
   </div>
   </div>
 </aside>
 <div class="cutbox" id="cutbox"><span id="cutlabel"></span></div>
-<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><img class="snap" id="popsnap" alt="" hidden><div class="nm popcut" id="popcut" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="3" placeholder="Note"></textarea><div class="acts"><button class="btn" id="popdel">Delete</button><button class="btn" id="popdone">Done</button><button class="btn" id="popsave">Save</button></div></div>
-<div class="toast glass" id="toast" hidden>Click a screen to pin a note</div>
+<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><img class="snap" id="popsnap" alt="" hidden><div class="nm popcut" id="popcut" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="3" placeholder="Note · / for commands"></textarea><button class="slash" id="popslash" type="button" hidden><b>/try 3</b><span>Three takes on just this</span><kbd>Tab</kbd></button><div class="acts"><button class="btn" id="popdel">Delete</button><button class="btn" id="popdone">Done</button><button class="btn" id="popsave">Save</button></div></div>
+<button class="wordchip glass" id="wordchip" type="button" hidden>Note<span class="key">N</span></button>
+<div class="toast glass" id="toast" hidden></div>
 <div class="areabox" id="areabox"></div>
+<div class="pickpop glass" id="redirpop" hidden><p class="pt" id="redirt"></p><textarea id="redirwhy" rows="2" placeholder="Instead…"></textarea><div class="acts"><button class="btn" id="redirno">Cancel</button><button class="btn go" id="rediryes">Redirect</button></div></div>
 <div class="pickpop glass" id="pickpop" hidden><p class="pt" id="pickt"></p><textarea id="pickwhy" rows="2" placeholder="Why this one? (optional)"></textarea><div class="acts"><button class="btn" id="pickno">Cancel</button><button class="btn go" id="pickyes">Pick</button></div></div>
 <div class="drop" id="drop">Drop an image for the wallpaper</div>
 
@@ -570,6 +598,7 @@
 <script src="wall.js"></script>
 <script src="liquid.js"></script>
 <script src="ui.js"></script>
+<script src="colorpick.js"></script>
 <script>
 /* Which project's scenes to load: ?project=, else the last one opened, else the first one serve.py lists.
    A project is a folder next to the atelier folder with scenes/index.js in it; its scenes come from /p/<project>/.
@@ -582,11 +611,13 @@
   const p = list.find(x => x.id === want) || list[0] || null;
   window.PROJECTS = list; window.PROJECT = p ? p.id : ''; window.PROJECT_NAME = p ? p.name : 'Starter';
   window.SCENE_BASE = p ? `/p/${encodeURIComponent(p.id)}/` : 'starter/';
-  window.SCENE_PATH = p ? p.path || `${p.id}/scenes/` : 'workspace/starter/'; // where the files are, for briefs: relative to Projects/
+  window.SCENE_PATH = p ? p.path || `${p.id}/scenes/` : 'atelier/starter/'; // where the files are, for briefs: relative to Projects/
   try { if (p) localStorage.setItem('workspace.project', p.id); } catch {}
   window.SCENES = [];
   // scenes(['a-v1', 'a-v2'], ['icons']): the designs, and helper scripts in scenes/ that load before them
-  window.scenes = (names, libs = []) => [...libs, ...names].forEach(n => document.write(`<script src="${SCENE_BASE}${encodeURIComponent(n)}.js"><\/script>`));
+  // each scene remembers the file that made it, so Duplicate copies the right file even when the id is computed
+  window.__made = n => SCENES.forEach(s => { if (!s.file) s.file = n; });
+  window.scenes = (names, libs = []) => [...libs, ...names].forEach(n => document.write(`<script src="${SCENE_BASE}${encodeURIComponent(n)}.js"><\/script><script>__made(${JSON.stringify(n)})<\/script>`));
   document.write(`<script src="${SCENE_BASE}index.js"><\/script>`);
   // A project can bring its own typefaces in scenes/fonts.css. @font-face is ignored inside a scene's shadow root,
   // so it has to load in this document.
@@ -632,6 +663,8 @@ const PKEY = 'workspace:' + (PROJECT || 'starter');
 let S = structuredClone(DEFAULTS), kept = {}, mine = null;
 try { kept = JSON.parse(localStorage.getItem('workspace') || '{}'); mine = JSON.parse(localStorage.getItem(PKEY) || 'null'); } catch {}
 Object.assign(S, Object.fromEntries(Object.entries(kept).filter(([k]) => !PER.includes(k))));
+// A page opens centred: a drag, pan or zoom lasts until the next load, never longer (a stray sideways scroll was kept for good).
+S.pan = { x: 0, y: 0 }; S.pos = {}; S.zoom = 0;
 // a project's first visit takes over what the one workspace kept before there were projects (the filters below drop what doesn't fit)
 Object.assign(S, mine || Object.fromEntries(PER.filter(k => kept[k] !== undefined).map(k => [k, kept[k]])));
 /* The screen size is the project's own: a long page wants a tall screen, an app a desktop or a phone. Before a project
@@ -668,6 +701,19 @@ if ('a' in S) { S.shown = [S.a || SCENES[0].id, ...(S.compare ? [S.b] : [])]; S.
 ['a', 'b', 'urlA', 'urlB', 'compare'].forEach(k => delete S[k]);
 S.shown = [...new Set(S.shown)].filter(id => id === 'url' || sceneById(id)).slice(0, 5);
 S.notes = (S.notes || []).filter(n => n.design === 'url' || sceneById(n.design));
+/* A refresh opens the newest version of what was on screen: v6 made while v5 showed opens on v6. When comparing, only
+   the newest one on screen moves up, so the older picks stay to compare against. Versions are newest last in index.js. */
+{
+  const family = id => { const sc = sceneById(id); return sc && !sc.variant ? SCENES.filter(x => x.title === sc.title) : null; };
+  const at = id => SCENES.findIndex(x => x.id === id), seen = new Set();
+  for (const id of [...S.shown]) {
+    const f = family(id); if (!f || seen.has(f[0].title)) continue; seen.add(f[0].title);
+    const newest = f[f.length - 1].id, mine = S.shown.filter(x => (family(x) || [])[0] === f[0]);
+    if (mine.includes(newest)) continue;
+    const top = mine.reduce((a, b) => at(b) > at(a) ? b : a);
+    S.shown = S.shown.map(x => x === top ? newest : x);
+  }
+}
 const fromGallery = new URLSearchParams(location.search).get('design');
 if (fromGallery && sceneById(fromGallery)) S.shown = [fromGallery]; // opened from a gallery thumbnail
 if (!S.shown.length) S.shown = [SCENES[0].id];
@@ -686,7 +732,7 @@ const save = () => {
   } catch {}
   if (stateServer && !CAPTURE && stateJSON() !== stateSent) { clearTimeout(stateTimer); stateTimer = setTimeout(saveState, 400); }
 };
-/* Saved with the version last seen: if workspace.json changed on disk meanwhile (Claude, or another tab), the
+/* Saved with the version last seen: if workspace.json changed on disk meanwhile (an agent, or another tab), the
    save is refused and the page takes the file's variants and values, as with notes. */
 async function saveState() {
   const sent = stateJSON();
@@ -745,6 +791,8 @@ function makeScreen(slot) {
   cat.addEventListener('pointerdown', e => picking ? pickFocus(sc, e) : cutting ? cutNote(sc, e) : noteDown(sc, e));
   cat.addEventListener('pointermove', e => { if (cutting) cutHover(sc, e); });
   cat.addEventListener('pointerleave', () => { cutAt = null; $('cutbox').classList.remove('on'); });
+  // the wheel still scrolls the design under the catcher, or under a pin; the outline and picks follow what moved
+  sc.screen.addEventListener('wheel', e => { if (!e.ctrlKey && (e.target === cat || e.target.closest('.pins')) && scrollUnder(sc, e)) { e.preventDefault(); e.stopPropagation(); requestAnimationFrame(() => { if (cutting && cutAt) cutHover(cutAt.sc, cutAt.e); placePicks(); }); } }, { passive: false });
   wrap.querySelectorAll('.rz').forEach(resizer);
   const wipe = wrap.querySelector('.wipe');
   wipe.addEventListener('pointerdown', e => {
@@ -827,20 +875,120 @@ for (const g of ['gesturestart', 'gesturechange']) addEventListener(g, e => e.pr
 $('canvas').addEventListener('wheel', e => {
   if (e.ctrlKey || e.metaKey || (e.target.closest && e.target.closest('.screen') && !screens.some(s => s.tall))) return;
   e.preventDefault();
+  // Screens that fit stay centred: scrolling only pans when something sticks out past the free space.
+  const fr = $('frames').getBoundingClientRect(), edge = (sc, k) => sc.wrap.getBoundingClientRect()[k];
+  const over = screens.some(sc => edge(sc, 'left') - S.pan.x < fr.left - 1 || edge(sc, 'right') - S.pan.x > fr.right + 1 || edge(sc, 'top') - S.pan.y < fr.top - 1 || edge(sc, 'bottom') - S.pan.y > fr.bottom + 1);
+  if (!over && !screens.some(sc => sc.tall)) { if (S.pan.x || S.pan.y) { S.pan = { x: 0, y: 0 }; panTo(); save(); } return; }
   S.pan = { x: S.pan.x - e.deltaX, y: S.pan.y - e.deltaY };
   // A full page scrolls like a page: it stops at its top and its bottom.
   if (screens.some(sc => sc.tall)) S.pan = { x: 0, y: clamp(S.pan.y, Math.min(0, $('frames').clientHeight - Math.max(...screens.map(sc => sc.wrap.offsetTop + sc.wrap.offsetHeight)) - 64), 0) };
   fit(); save();
 }, { passive: false });
+/* ---------- framed pages ----------
+   A scene can frame a live page (the Sunday canvas frames scenes/canvas/), and a URL design is a page in a frame.
+   Events inside a frame never reach the stage, and the stage's hit tests stop at the frame, so everything that looks at
+   or points into a design goes through these: they look inside any frame served from our own server. */
+const frameDoc = f => { try { return f.contentDocument; } catch { return null; } }; // null for another site's page
+// The frame an element's page sits in, or null when it's on the stage itself.
+const frameOf = el => { try { const w = el.ownerDocument.defaultView; return w && w !== window ? w.frameElement : null; } catch { return null; } };
+// Where a frame's page sits on screen: its top left and its zoom (the screen is scaled, so is the frame).
+function frameBox(f) {
+  const r = f.getBoundingClientRect(), k = f.offsetWidth ? r.width / f.offsetWidth : 1;
+  return { x: r.left + f.clientLeft * k, y: r.top + f.clientTop * k, k };
+}
+// An element's box on screen, whatever page it's in.
+function rectOf(el) {
+  const r = el.getBoundingClientRect();
+  let x = r.left, y = r.top, w = r.width, h = r.height;
+  for (let f = frameOf(el); f; f = frameOf(f)) { const b = frameBox(f); x = b.x + x * b.k; y = b.y + y * b.k; w *= b.k; h *= b.k; }
+  return { left: x, top: y, width: w, height: h, right: x + w, bottom: y + h };
+}
+/* Everything under a point, topmost first, as a pick sees it: elements a design made click-through
+   (pointer-events: none: labels, badges, a map's names) count, and a frame from our own server is looked into rather
+   than stopped at. A sheet that makes everything hittable is adopted for the moment of the test, never left on. */
+const HITTABLE = new WeakMap();
+function hitAll(tree, x, y) {
+  const win = (tree.ownerDocument || tree).defaultView;
+  let sheet = HITTABLE.get(win);
+  if (!sheet) { sheet = new win.CSSStyleSheet(); sheet.replaceSync('*, *::before, *::after { pointer-events: auto !important; }'); HITTABLE.set(win, sheet); }
+  const had = [...tree.adoptedStyleSheets]; // a copy: the property is a live array
+  tree.adoptedStyleSheets = [...had, sheet];
+  try { return tree.elementsFromPoint(x, y); } finally { tree.adoptedStyleSheets = had; }
+}
+// plain: only what really takes the pointer, without the sheet (cheap enough to run for every pin, every frame)
+function stackAt(L, cx, cy, plain) {
+  if (!L || !L.root) return [];
+  const sr = L.root.getRootNode(), out = [], hit = plain ? (t, x, y) => t.elementsFromPoint(x, y) : hitAll;
+  // a framed page's elements go just above its frame, and a frame inside it is looked into the same way
+  const add = (list, x, y) => list.forEach(n => {
+    const d = n.tagName === 'IFRAME' && frameDoc(n);
+    if (d && d.documentElement) { const b = frameBox(n), fx = (x - b.x) / b.k, fy = (y - b.y) / b.k; add(hit(d, fx, fy), fx, fy); }
+    out.push(n);
+  });
+  add(hit(sr, cx, cy).filter(n => sr.contains(n) && n !== L.root), cx, cy);
+  return out;
+}
+// One step out from an element, crossing from a framed page's top to its frame, and never past the design's root.
+function upFrom(L, el) {
+  const p = el.parentElement || frameOf(el);
+  return p && p !== L.root && (p.ownerDocument !== document || L.root.contains(p)) ? p : null;
+}
+const cssOf = el => el.ownerDocument.defaultView.getComputedStyle(el);
+// how much bigger a pixel of this element's page is on screen than in the page
+const zoomOf = el => { let k = frameOf(el) ? 1 : K; for (let f = frameOf(el); f; f = frameOf(f)) k *= frameBox(f).k; return k; };
+/* The wheel over a screen in note, cut or focus mode lands on the stage's catcher, not the design, so it's handed to
+   whatever under the pointer can scroll that way (a list, a panel, the framed page itself). */
+function scrollUnder(sc, e) {
+  const { L } = layerAt(sc, e), unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
+  const dx = e.deltaX * unit, dy = e.deltaY * unit;
+  const can = el => {
+    const cs = cssOf(el), doc = el === el.ownerDocument.scrollingElement;
+    const ok = v => doc ? v !== 'hidden' && v !== 'clip' : /(auto|scroll|overlay)/.test(v);
+    return (dy && ok(cs.overflowY) && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0))
+      || (dx && ok(cs.overflowX) && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0));
+  };
+  for (let el = stackAt(L, e.clientX, e.clientY, true)[0]; el; el = upFrom(L, el)) { // what the wheel would really land on
+    const target = el.tagName === 'HTML' || el.tagName === 'BODY' ? el.ownerDocument.scrollingElement : el;
+    if (target && can(target)) { const k = zoomOf(el); target.scrollBy({ left: dx / k, top: dy / k, behavior: 'instant' }); return true; }
+  }
+  return false;
+}
+/* A same-site frame gets the stage's keys (Space, N, X, Esc, the arrows) once you've clicked into it, keeps a pinch
+   from zooming the whole window, and re-pins notes as it scrolls. A press inside it is also announced on the frame
+   itself, so whatever closes on a click outside (the note editor, the colour picker, the agent's popovers) closes. */
+// Once per window and once per page: a frame's first page can keep the window of the blank page before it.
+const wiredWins = new WeakSet(), wiredDocs = new WeakSet();
+function wireFrame(f) {
+  const hook = () => {
+    const d = frameDoc(f), w = d && d.defaultView; if (!w) return;
+    if (!wiredWins.has(w)) {
+      wiredWins.add(w);
+      w.addEventListener('keydown', e => { if (!e.defaultPrevented) onKey(e); }); // unless the page used the key itself
+      w.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+      for (const ev of ['keydown', 'keyup', 'pointermove', 'pointerdown']) w.addEventListener(ev, e => through(e.altKey), true);
+      w.addEventListener('pointerdown', e => f.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true, altKey: e.altKey, button: e.button, pointerId: e.pointerId })), true);
+    }
+    if (!wiredDocs.has(d)) { wiredDocs.add(d); d.addEventListener('scroll', () => placeAnchors(), { capture: true, passive: true }); }
+  };
+  f.addEventListener('load', hook); hook();
+}
+
 /* Each design is a layer in the screen: a scene in its own shadow root (so its styles never touch the stage), or a URL in an iframe. */
 function makeLayer({ id, url }, cls) {
   const host = document.createElement('div'); host.className = 'host ' + cls;
   if (id === 'url') {
     host.innerHTML = url ? '' : '<div class="empty">Paste an address in the panel</div>';
-    if (url) { const f = document.createElement('iframe'); f.src = url; f.title = 'Preview'; host.append(f); }
+    if (url) { const f = document.createElement('iframe'); f.src = url; f.title = 'Preview'; host.append(f); wireFrame(f); }
     return { host };
   }
-  return Engine.mount(host, sceneById(id));
+  const L = Engine.mount(host, sceneById(id));
+  L.root.querySelectorAll('iframe').forEach(wireFrame);
+  L.framed = !!L.root.querySelector('iframe'); // a live page in a frame: its notes follow what they're on, as a prototype's do
+  // A live design scrolls inside its own shadow root, where the stage can't see it: re-pin its notes on every scroll.
+  if (L.live) L.root.getRootNode().addEventListener('scroll', () => placeAnchors(), { capture: true, passive: true });
+  // A tap on a prototype while its tour plays stops the tour where it is: from there it's yours to use.
+  if (L.live) host.addEventListener('pointerdown', () => setPlaying(false, 'land'), true);
+  return L;
 }
 function fillScreen(sc, designs) {
   sc.screen.querySelectorAll('.host').forEach(h => h.remove());
@@ -958,7 +1106,9 @@ const SAFE = { handheld: [54, 34], tablet: [32, 20] };
 function fit() {
   const f = $('frames'), cs = getComputedStyle(f);
   const availW = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (screens.length - 1);
-  const availH = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 24;
+  const AG = Math.min(window.AG_BELOW || 0, f.clientHeight * .35); // room an agent's card needs under the screens (agent.js)
+  f.style.paddingBottom = AG ? parseFloat(cs.paddingTop) + AG + 'px' : '';
+  const availH = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 24 - AG;
   const dim = sc => sc.crop ? sc.crop : sc; // a focused screen is only as big as its element
   const totalW = screens.reduce((a, s) => a + dim(s).w, 0), maxH = Math.max(...screens.map(s => dim(s).h));
   // Focused elements are often wide and short, so they stack in a column when that shows them bigger.
@@ -970,12 +1120,17 @@ function fit() {
     const colW = [], rowH = [];
     screens.forEach(s => { const d = dim(s); colW[s.col] = Math.max(colW[s.col] || 0, d.w); rowH[s.row] = Math.max(rowH[s.row] || 0, d.h); });
     const gw = colW.reduce((a, b) => a + (b || 0), 0), gh = rowH.reduce((a, b) => a + (b || 0), 0);
-    const ow = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (colW.length - 1), oh = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 56 * rowH.length;
+    // the cards under a row of screens need their room before the next row starts; with several rows each gets a
+    // share of the room, so the screens never shrink to nothing
+    const agRow = Math.min(AG, Math.max(180, f.clientHeight * .35 / rowH.length)); // a landed card is about 160 tall
+    f.style.rowGap = 56 + agRow + 'px';
+    f.style.paddingBottom = AG ? parseFloat(cs.paddingTop) + agRow + 'px' : '';
+    const ow = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (colW.length - 1), oh = f.clientHeight - parseFloat(cs.paddingTop) * 2 - (56 + agRow) * rowH.length;
     kGrid = tall ? Math.min(1, ow / gw) : Math.min(1, ow / gw, oh / gh);
     f.style.alignContent = tall ? 'start' : 'center';
   }
   const n = screens.length, kCol = Math.min(2, (f.clientWidth - parseFloat(cs.paddingLeft) * 2) / Math.max(...screens.map(s => dim(s).w)),
-    (f.clientHeight - parseFloat(cs.paddingTop) * 2 - 32 * (n - 1) - 24 * n) / screens.reduce((a, s) => a + dim(s).h, 0));
+    (f.clientHeight - parseFloat(cs.paddingTop) * 2 - 32 * (n - 1) - 24 * n - AG) / screens.reduce((a, s) => a + dim(s).h, 0));
   const col = !!focus && n > 1 && kCol > kRow;
   f.style.flexDirection = col ? 'column' : '';
   K = held || S.zoom || (GRID ? kGrid : col ? kCol : kRow);
@@ -1000,7 +1155,7 @@ function fit() {
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function drive() {
   const pos = posAt(t), i = stepIndex();
-  screens.forEach(sc => sc.layers.forEach(L => Engine.drive(L, pos)));
+  screens.forEach(sc => sc.layers.forEach(L => { Engine.drive(L, pos); L.root && L.root.toggleAttribute('data-paused', !playing); }));
   // bar
   $('scrub').value = t; $('scrub').style.setProperty('--p', (t / DURATION * 100) + '%');
   $('clock').textContent = fmt(t); $('total').textContent = fmt(DURATION);
@@ -1046,7 +1201,7 @@ function ink() {
     sc.frame.classList.toggle('ink-top', !!sc.inkTop); sc.frame.classList.toggle('ink-bottom', !!sc.inkBottom);
   });
 }
-function seek(x) { t = clamp(x, 0, DURATION); drive(); }
+function seek(x) { t = clamp(x, 0, DURATION); drive(); if (!playing) land(); }
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -1055,17 +1210,48 @@ function frame(now) {
     if (t >= DURATION) { if (S.loop) t = 0; else { t = DURATION; playing = false; } }
     drive();
   }
+  if (anchored() && S.notes.some(n => !n.done)) placeAnchors();
   requestAnimationFrame(frame);
 }
 
+/* ---------- pause ----------
+   Pause stops everything on screen, not just the clock (Eric, Oct 18: "pressing pause doesn't stop the animation, it
+   keeps going until the next step"). A step's CSS transitions and animations run on their own once the step starts,
+   and a framed live page plays its beats on its own timers. So pausing also freezes every animation running in the
+   designs (shadow roots, and pages framed from our own server), and each scene root carries data-paused while the bar
+   is paused, which a framed page reads to hold its own timers (the contract is in AGENTS.md). Play lets the frozen ones go on.
+   A seek while paused (a step, the scrubber, a frame) lands them where they were going instead, so the screen shows
+   that step at rest. Every change of play state goes through setPlaying. */
+let frozen = [];
+function animsOf(L) {
+  const out = [], sh = L.host.shadowRoot;
+  if (sh) out.push(...sh.getAnimations());
+  (sh || L.host).querySelectorAll('iframe').forEach(f => { const d = frameDoc(f); if (d) out.push(...d.getAnimations()); });
+  return out;
+}
+const allAnims = () => screens.flatMap(sc => sc.layers.flatMap(animsOf));
+function setPlaying(on, how = 'freeze') {
+  if (on === playing) return;
+  playing = on;
+  if (on) { frozen.forEach(a => { try { a.play(); } catch {} }); frozen = []; }
+  else if (how === 'land') land();
+  else allAnims().forEach(a => { if (a.playState === 'running') { a.pause(); frozen.push(a); } });
+  drive();
+}
+// lands every finite animation at its end; one that never ends (a spinner) holds where it is
+function land() {
+  const was = new Set(frozen); frozen = [];
+  allAnims().forEach(a => { try { if (isFinite(a.effect?.getComputedTiming().endTime)) a.finish(); else if (a.playState === 'running' || was.has(a)) { a.pause(); frozen.push(a); } } catch {} });
+}
+
 /* ---------- bar ---------- */
-const goStep = k => { playing = false; seek(STARTS[clamp(k, 0, STEPS.length - 1)]); };
+const goStep = k => { setPlaying(false, 'land'); seek(STARTS[clamp(k, 0, STEPS.length - 1)]); };
 $('marks').onclick = e => { const b = e.target.closest('.mark'); if (b) goStep(+b.dataset.k); };
 $('steps').onclick = e => { const b = e.target.closest('li'); if (b) goStep(+b.dataset.k); };
-$('play').onclick = () => { if (t >= DURATION) t = 0; playing = !playing; drive(); };
+$('play').onclick = () => { if (t >= DURATION) t = 0; setPlaying(!playing); };
 $('prev').onclick = () => { const i = stepIndex(); goStep(posAt(t) - i > 0.15 ? i : i - 1); };
 $('next').onclick = () => goStep(stepIndex() + 1);
-$('scrub').oninput = e => { playing = false; seek(+e.target.value); };
+$('scrub').oninput = e => { setPlaying(false, 'land'); seek(+e.target.value); };
 
 /* ---------- scene controls ----------
    A scene lists its knobs in controls; they show under Design > Controls for every design on screen,
@@ -1076,37 +1262,88 @@ function applyControls() {
   screens.forEach(sc => sc.layers.forEach(L => L.scene && Engine.controls(L, sc.ctl ? { ...S.ctl[L.scene.id], ...sc.ctl } : S.ctl[L.scene.id])));
 }
 const esc = x => String(x).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+/* A scene's controls: range, seg, select, color, toggle. { type: 'group', label } starts a named group that folds;
+   with a key it also has a switch in its head (a toggle like any other), and the head counts what's been changed.
+   Colours next to each other share one row of swatches, and short toggles next to each other pair up two to a row.
+   A swatch opens the colour picker (colorpick.js). */
 function ctlHTML(sc, c) {
   const v = ctlVal(sc, c), at = `data-s="${sc.id}" data-k="${c.key}"`;
   if (c.type === 'range') return `<div class="lbl">${esc(c.label)}<output>${v}${c.unit || ''}</output></div><input class="range" type="range" ${at} min="${c.min}" max="${c.max}" step="${c.step || 1}" value="${v}" aria-label="${esc(c.label)}">`;
   if (c.type === 'seg') return `<div class="lbl">${esc(c.label)}</div><div class="seg" ${at}>${c.options.map(([o, n]) => `<button class="pill" data-v="${o}" aria-pressed="${o === v}">${esc(n)}</button>`).join('')}</div>`;
-  if (c.type === 'color') return `<label class="chk">${esc(c.label)}<input class="swatch" type="color" ${at} value="${v}"></label>`;
+  if (c.type === 'select') return `<div class="lbl">${esc(c.label)}</div><select class="txt" ${at} aria-label="${esc(c.label)}">${c.options.map(([o, n]) => `<option value="${esc(o)}"${String(o) === String(v) ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+  if (c.type === 'color') return `<div class="chk">${esc(c.label)}<button class="swatch" type="button" ${at} style="--sw:${esc(v)}" aria-label="${esc(c.label)}"></button></div>`;
   return `<label class="chk">${esc(c.label)}<input type="checkbox" ${at}${v ? ' checked' : ''}></label>`;
+}
+function ctlRun(sc, list) { // colours side by side, short toggles in pairs, the rest one to a row
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const c = list[i];
+    if (c.type === 'color' && list[i + 1]?.type === 'color') {
+      let j = i; while (list[j]?.type === 'color') j++;
+      const row = list.slice(i, j);
+      out.push(`<div class="lbl">${esc(row.map(x => x.label).join(' · '))}</div><div class="swrow">${row.map(x => `<button class="swatch" type="button" data-s="${sc.id}" data-k="${x.key}" style="--sw:${esc(ctlVal(sc, x))}" title="${esc(x.label)}" aria-label="${esc(x.label)}"></button>`).join('')}</div>`);
+      i = j - 1; continue;
+    }
+    const short = x => x && (x.type === 'toggle' || !x.type) && x.label.length <= 12;
+    if (short(c) && short(list[i + 1])) { out.push(`<div class="pair">${ctlHTML(sc, c)}${ctlHTML(sc, list[i + 1])}</div>`); i++; continue; }
+    out.push(ctlHTML(sc, c));
+  }
+  return out.join('');
+}
+const changed = (sc, list) => list.filter(c => c.key && c.type !== 'group' && ctlVal(sc, c) !== c.value).length;
+function ctlBlocks(sc) {
+  const blocks = [{ head: null, items: [] }];
+  sc.controls.forEach(c => c.type === 'group' ? blocks.push({ head: c, items: [] }) : blocks.at(-1).items.push(c));
+  return blocks.filter(b => b.head || b.items.length).map(b => {
+    if (!b.head) return ctlRun(sc, b.items);
+    const g = b.head, fk = `g:${sc.id}:${g.label}`, shut = S.folded.includes(fk), on = g.key ? !!ctlVal(sc, g) : true, n = changed(sc, b.items);
+    return `<div class="cgroup${shut ? ' shut' : ''}${on ? '' : ' off'}" data-fold="${esc(fk)}">`
+      + `<div class="cghead"><button class="cgname" type="button" aria-expanded="${!shut}">${esc(g.label)}</button><span class="cgn">${n ? `${n} changed` : ''}</span>`
+      + (g.key ? `<input type="checkbox" class="cgon" data-s="${sc.id}" data-k="${g.key}"${on ? ' checked' : ''} aria-label="${esc(g.label)} on">` : '') + '</div>'
+      + `<div class="cgbody stack">${ctlRun(sc, b.items)}</div></div>`;
+  }).join('');
+}
+function groupCounts() { // the "2 changed" in each group's head, and its switch, without rebuilding the controls
+  document.querySelectorAll('#ctls .cgroup').forEach(el => {
+    const [, sid, label] = el.dataset.fold.match(/^g:(.*?):(.*)$/) || [], sc = sceneById(sid); if (!sc) return;
+    const at = sc.controls.findIndex(c => c.type === 'group' && c.label === label), next = sc.controls.findIndex((c, i) => i > at && c.type === 'group');
+    const n = changed(sc, sc.controls.slice(at + 1, next < 0 ? undefined : next)), g = sc.controls[at];
+    el.querySelector('.cgn').textContent = n ? `${n} changed` : '';
+    el.classList.toggle('off', !!g.key && !ctlVal(sc, g));
+  });
 }
 /* rebuilt only when the designs change, so a slider keeps hold of the pointer while it moves */
 let ctlKey = '';
 function renderControls() {
   const list = ctlScenes(), on = shownDesigns().map(d => d.id), key = on.join() + '|' + list.map(x => x.id).join();
   $('ctlsect').hidden = !list.length;
+  // one design: Save variant sits with Copy values and Reset, and the design's name isn't repeated above its controls
+  const one = list.length === 1; $('ctlsave').hidden = !one; $('ctlsave').dataset.save = one ? list[0].id : '';
   if (key === ctlKey) return; ctlKey = key;
-  $('ctls').innerHTML = list.map(sc => `<div class="stack"><div class="subrow"><span class="sub">${comparing() ? letter(on.indexOf(sc.id)) + ' · ' : ''}${esc(designName(sc.id))}</span>`
-    + `<button class="link" data-save="${sc.id}">Save variant</button></div>${sc.controls.map(c => ctlHTML(sc, c)).join('')}</div>`).join('');
+  $('ctls').innerHTML = list.map(sc => `<div class="stack">${one ? '' : `<div class="subrow"><span class="sub">${comparing() ? letter(on.indexOf(sc.id)) + ' · ' : ''}${esc(designName(sc.id))}</span>`
+    + `<button class="link" data-save="${sc.id}">Save variant</button></div>`}${ctlBlocks(sc)}</div>`).join('');
 }
-const setCtl = (sid, k, v) => { (S.ctl[sid] ||= {})[k] = v; applyControls(); save(); };
+const setCtl = (sid, k, v) => { (S.ctl[sid] ||= {})[k] = v; applyControls(); groupCounts(); save(); };
 $('ctls').addEventListener('input', e => {
   const t = e.target; if (!t.dataset.k) return;
   const c = sceneById(t.dataset.s).controls.find(x => x.key === t.dataset.k);
-  const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value;
+  const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.tagName === 'SELECT' ? (c.options.find(o => String(o[0]) === t.value) || [t.value])[0] : t.value;
   if (t.type === 'range') t.previousElementSibling.querySelector('output').textContent = v + (c.unit || '');
   setCtl(t.dataset.s, c.key, v);
 });
 $('ctls').addEventListener('click', e => {
   const sv = e.target.closest('[data-save]'); if (sv) return saveVariant(sceneById(sv.dataset.save));
+  const sw = e.target.closest('.swatch');
+  if (sw) { const sid = sw.dataset.s, k = sw.dataset.k, c = sceneById(sid).controls.find(x => x.key === k);
+    return ColorPick.open(sw, ctlVal(sceneById(sid), c), v => { sw.style.setProperty('--sw', v); setCtl(sid, k, v); }); }
+  const gn = e.target.closest('.cgname');
+  if (gn) { const g = gn.closest('.cgroup'), k = g.dataset.fold, shut = !g.classList.contains('shut');
+    g.classList.toggle('shut', shut); gn.setAttribute('aria-expanded', !shut); S.folded = shut ? [...S.folded, k] : S.folded.filter(x => x !== k); return save(); }
   const b = e.target.closest('.pill'); if (!b) return;
   const g = b.parentElement; setCtl(g.dataset.s, g.dataset.k, b.dataset.v);
   g.querySelectorAll('.pill').forEach(p => p.setAttribute('aria-pressed', p === b));
 });
-/* every control moved off its default, in every scene and variant, as lines Claude can act on */
+/* every control moved off its default, in every scene and variant, as lines an agent can act on */
 const ctlChanges = () => DESIGNS().map(sceneById).filter(Boolean).flatMap(sc => (sc.controls || []).filter(c => ctlVal(sc, c) !== c.value).map(c =>
   `- ${sc.variant ? `variant "${sc.version}" of ` : ''}${SCENE_PATH}${sc.base || sc.id}.js: ${c.label} (${c.css || 'data-' + c.attr}) = ${ctlVal(sc, c)}${c.unit || ''}, default ${c.value}${c.unit || ''}`));
 
@@ -1136,12 +1373,13 @@ async function copy(text, btn) {
   try { await navigator.clipboard.writeText(text); UI.say(btn, 'Copied'); } catch { UI.say(btn, 'Not copied'); }
   clearTimeout(btn._back); btn._back = setTimeout(() => UI.say(btn, was, -1), 1400);
 }
+$('ctlsave').onclick = e => { const sc = sceneById(e.currentTarget.dataset.save); if (sc) saveVariant(sc); };
 $('ctlcopy').onclick = e => { const ch = ctlChanges(); copy(ch.length ? 'Make these the new defaults in the scene files:\n' + ch.join('\n') : 'Every control is at its default.', e.currentTarget); };
 $('ctlreset').onclick = () => { ctlScenes().filter(sc => !sc.variant).forEach(sc => delete S.ctl[sc.id]); ctlKey = ''; apply(); }; // variants keep their values
 
 /* ---------- notes ----------
    N (or Add) turns on note mode: a click on a screen pins a numbered note there, on that step and that design,
-   and records the element under it. Copy brief turns every note into a brief Claude can act on. */
+   and records the element under it. Copy brief turns every note into a brief any agent can act on. */
 let noting = false, editing = null, pinStep = -1;
 const stepLabel = n => (sceneById(n.design)?.steps[n.step] || {}).label || '';
 const setNoting = on => {
@@ -1149,11 +1387,19 @@ const setNoting = on => {
   if (on && cutting) setCutting(false);
   if (on && S.tab !== 'notes') { S.tab = 'notes'; apply(); } // the list the new pins land in
   noting = on; document.body.classList.toggle('noting', on); $('noteadd').setAttribute('aria-pressed', on);
-  $('toast').textContent = 'Click a screen to pin a note'; $('toast').hidden = !on;
+  $('toast').textContent = NOTE_TIP; $('toast').hidden = !on;
 };
+const NOTE_TIP = 'Click to pin a note · hold ⌥ to use the design';
+/* Note, cut and focus modes lay a catcher over the screens, so a click pins instead of pressing. Holding ⌥ moves it
+   aside: the design takes clicks, hovers, typing and drags as usual, and letting go goes back to pinning (Eric, Oct 18:
+   "can't click or interact with the design while in note mode"). Framed pages report ⌥ too (wireFrame), since their
+   events never reach the stage. */
+const through = on => document.body.classList.toggle('through', !!on);
+for (const ev of ['keydown', 'keyup', 'pointermove', 'pointerdown']) addEventListener(ev, e => through(e.altKey), true);
+addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) through(false); }));
 
 /* ---------- focus ----------
-   F (or Focus) and a click on an element crops every screen to that element, so one part can be compared across
+   F and a click on an element crops every screen to that element, so one part can be compared across
    designs. An element with data-focus is found by that name in every design; anything else by its place in the scene. */
 let focus = null, picking = false;
 const setPicking = on => {
@@ -1163,7 +1409,11 @@ const setPicking = on => {
   $('toast').textContent = 'Click an element to focus on it'; $('toast').hidden = !on;
   focusLabel();
 };
-const focusLabel = () => { UI.say($('focusbtn'), focus ? 'Focus · ' + focus.name : 'Focus', focus ? 1 : -1); $('focusbtn').setAttribute('aria-pressed', !!focus || picking); };
+// No button: F starts it, and while it's on the toast at the top names what it's on. F or Esc ends it.
+const focusLabel = () => {
+  if (focus) { $('toast').textContent = `Focus · ${focus.name} · F to end`; $('toast').hidden = false; }
+  else if (!picking && !noting && !cutting) $('toast').hidden = true;
+};
 const visible = n => !n.closest('[data-in]:not(.on)') && n.getBoundingClientRect().width > 0;
 function pathTo(n, rootEl) {
   const parts = [];
@@ -1196,26 +1446,35 @@ function measureFocus() {
   focusLabel(); fit();
 }
 const clearFocus = () => { focus = null; screens.forEach(sc => sc.crop = null); focusLabel(); fit(); };
-$('focusbtn').onclick = () => { if (focus) clearFocus(); else setPicking(!picking); };
+const toggleFocus = () => { if (focus) clearFocus(); else setPicking(!picking); };
+const isSVG = n => n && n.namespaceURI === 'http://www.w3.org/2000/svg'; // not instanceof: a framed page's SVG is another window's
 function describe(n) {
-  while (n && n instanceof SVGElement) n = n.parentElement;
+  while (isSVG(n)) n = n.parentElement;
   if (!n) return '';
   const attrs = ['class', 'data-in', 'data-out', 'data-state', 'data-type'].filter(a => n.getAttribute(a)).map(a => `${a}="${n.getAttribute(a)}"`).join(' ');
-  const text = (n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  return `<${n.tagName.toLowerCase()}${attrs ? ' ' + attrs : ''}>` + (text ? ` "${text}"` : '');
+  const text = (n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60), f = frameOf(n);
+  return `<${n.tagName.toLowerCase()}${attrs ? ' ' + attrs : ''}>` + (text ? ` "${text}"` : '') + (f ? ` in the framed page ${new URL(f.src, location.href).pathname}` : '');
 }
 /* What a note is about: the topmost element under the point that actually paints (text, a picture, a fill, a border),
    so an invisible layer on top (a click catcher, a transparent wrapper) never gets the blame. As in Cuttings. */
+/* Elements a design made click-through count (a map's names, a badge), and so does a page the design frames (the
+   Sunday canvas): before, every note on it said "<iframe class="live">". Two things never get the blame: a see-through
+   one (opacity 0, a hidden tool) and a click-through layer over most of the design (a vignette, a fade). */
 function pickUnder(L, cx, cy) {
   if (!L || !L.root) return null;
-  const sr = L.root.getRootNode(), ok = n => sr.contains(n) && n !== L.root && !n.closest('[data-in]:not(.on)');
+  const box = L.root.getBoundingClientRect(), whole = box.width * box.height * .8;
+  const ok = n => !n.closest('[data-in]:not(.on)') && (n.tagName === 'HTML' || n.tagName === 'BODY' || (() => {
+    const cs = cssOf(n); if (+cs.opacity === 0) return false;
+    if (cs.pointerEvents !== 'none') return true;
+    const r = rectOf(n); return r.width * r.height < whole;
+  })());
   const paints = n => {
     if (/^(img|svg|canvas|video|input|textarea|select|button)$/i.test(n.tagName)) return true;
     if ([...n.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) return true;
-    const cs = getComputedStyle(n);
+    const cs = cssOf(n);
     return cs.backgroundImage !== 'none' || !/^(transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor) || (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none');
   };
-  const stack = sr.elementsFromPoint(cx, cy).filter(ok);
+  const stack = stackAt(L, cx, cy).filter(ok);
   return stack.find(paints) || stack[0] || null;
 }
 // Which design a point on a screen belongs to (the right one past a swipe's divider), and where it is on the screen.
@@ -1227,7 +1486,57 @@ function layerAt(sc, e) {
 function newNote(sc, e, at, el) {
   const { k, x, y, d } = at;
   return { id: Date.now(), design: d.id, url: d.url || '', side: !comparing() ? '' : sc.layers.length > 1 ? letter(k) : sc.tag, kind: kindOf(sc.w, sc.h),
-    step: Math.min(stepIndex(), (sceneById(d.id)?.steps.length || STEPS.length) - 1), pos: +posAt(t).toFixed(2), x: +x.toFixed(3), y: +y.toFixed(3), size: `${sc.n}, ${sc.w} × ${sc.h}`, on: describe(el), text: '' };
+    step: Math.min(stepIndex(), (sceneById(d.id)?.steps.length || STEPS.length) - 1), pos: +posAt(t).toFixed(2), x: +x.toFixed(3), y: +y.toFixed(3), size: `${sc.n}, ${sc.w} × ${sc.h}`, on: describe(el), anchor: anchorOf(at.L, el, e.clientX, e.clientY), text: '' };
+}
+/* Notes on a live design follow what they were put on (Eric, Oct 18: "comments don't follow scroll"). A prototype
+   scrolls, changes screen and redraws, so a spot on the screen means nothing: the note keeps the element under it (its
+   place in the tree, its tag and its words) and where on it, and the pin is put back on that element every frame. When
+   it's scrolled away or covered (another screen slid over it), the pin hides until it's back. */
+const textOf = n => (n.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+/* A live page in a frame (the Sunday canvas) scrolls and redraws the same way, so its notes do the same, with the path
+   taken from the top of the framed page (frame: true). */
+const anchored = () => screens.some(sc => sc.layers.some(L => L.live || L.framed));
+const pageOf = L => { const f = L && L.root && L.root.querySelector('iframe'), d = f && frameDoc(f); return d && d.documentElement; };
+function anchorOf(L, el, cx, cy) {
+  if (!L || !el) return null;
+  const top = L.live && L.root.contains(el) ? L.root : L.framed && pageOf(L) && pageOf(L).contains(el) ? pageOf(L) : null;
+  if (!top || el === top) return null;
+  const r = rectOf(el); if (!r.width || !r.height) return null;
+  const path = []; for (let n = el; n && n !== top; n = n.parentElement) path.unshift([...n.parentElement.children].indexOf(n));
+  return { path, tag: el.tagName, text: textOf(el), fx: +((cx - r.left) / r.width).toFixed(3), fy: +((cy - r.top) / r.height).toFixed(3), ...(top !== L.root && { frame: true }) };
+}
+function findAnchor(L, a) {
+  const top = a.frame ? pageOf(L) : L.live ? L.root : null; if (!top) return null;
+  let el = top; for (const i of a.path) el = el && el.children[i];
+  const same = n => n && n.tagName === a.tag && textOf(n) === a.text;
+  if (same(el)) return el;
+  // The design redrew and things moved: the same element by its tag and words, wherever it is now.
+  return (a.text && [...top.querySelectorAll(a.tag)].find(same)) || null;
+}
+const anchorTried = new Set(); // notes from before anchors: given one once, from their spot on a freshly opened design
+function placeAnchors() {
+  screens.forEach(sc => {
+    const box = sc.screen.getBoundingClientRect(); if (!box.width) return;
+    sc.pins.querySelectorAll('.pin').forEach(p => {
+      const n = noteById(p.dataset.id); if (!n || n.words || n.area || p.classList.contains('drag')) return;
+      const L = sc.layers[Math.max(0, sc.designs.findIndex(d => d.id === n.design))];
+      if (!L || !(L.live || L.framed)) return;
+      if (!n.anchor) {
+        if (anchorTried.has(n.id)) return; anchorTried.add(n.id);
+        const cx = box.left + n.x * box.width, cy = box.top + n.y * box.height;
+        const el = pickUnder(L, cx, cy); if (!el || describe(el) !== n.on) return; // only what it was really put on
+        n.anchor = anchorOf(L, el, cx, cy); if (!n.anchor) return;
+        touch(n);
+      }
+      const el = findAnchor(L, n.anchor), r = el && rectOf(el);
+      let show = !!(r && r.width && r.height);
+      const x = show && r.left + r.width * n.anchor.fx, y = show && r.top + r.height * n.anchor.fy;
+      if (show) { const hit = stackAt(L, x, y, true).find(m => !frameOf(el) || frameOf(m) === frameOf(el)); show = x > box.left && x < box.right && y > box.top && y < box.bottom && !!hit && (el.contains(hit) || hit.contains(el)); }
+      if (editing === n) show = true; // the one being written stays put
+      p.style.visibility = show ? '' : 'hidden';
+      if (show) { p.style.left = ((x - box.left) / box.width * 100).toFixed(3) + '%'; p.style.top = ((y - box.top) / box.height * 100).toFixed(3) + '%'; }
+    });
+  });
 }
 // A quick note: click, type, done. It still keeps a snapshot for the brief, but never shows it.
 function pinNote(sc, e) {
@@ -1238,11 +1547,163 @@ function pinNote(sc, e) {
   snapNote(note, at.L, e.clientX, e.clientY);
 }
 
+/* ---------- notes on words ----------
+   Select words in a design and press N (or the Note chip over them): the note belongs to those words, like a comment
+   in a Doc, and the brief quotes them so the agent changes that exact line. It keeps the words with a few on either side.
+   Designs redraw all the time (a line typing out, a step, a saved file), so nothing is written into them: the words are
+   looked up again whenever pins are drawn, and a soft wash goes under them. Words that aren't on screen right now keep
+   their pin where it was. */
+const WORDS_SKIP = 'style, script, template, [hidden], [data-in]:not(.on)';
+// A design's visible text as one string, each run of whitespace as one space, and where every character came from.
+// Words in two different boxes (a title and the line under it) get a space between them, so they never run together.
+function readText(rootEl) {
+  let text = '', last = null;
+  const at = [], disp = new Map();
+  const boxOf = el => {
+    for (; el && el !== rootEl; el = el.parentElement) {
+      if (!disp.has(el)) disp.set(el, getComputedStyle(el).display);
+      const d = disp.get(el); if (!d.startsWith('inline') && d !== 'contents') return el;
+    }
+    return rootEl;
+  };
+  const walk = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walk.nextNode());) {
+    const el = n.parentElement;
+    if (!n.data.trim() || el.closest(WORDS_SKIP) || !el.getClientRects().length) continue;
+    const box = boxOf(el);
+    if (text && box !== last && !text.endsWith(' ')) { text += ' '; at.push(null); }
+    last = box;
+    for (let i = 0; i < n.data.length; i++) {
+      const space = /\s/.test(n.data[i]);
+      if (space && (!text || text.endsWith(' '))) continue;
+      text += space ? ' ' : n.data[i]; at.push([n, i]);
+    }
+  }
+  return { text, at };
+}
+// The first character at or after a point in the page (a selection's start or end).
+function charAt(T, node, off) {
+  const r = document.createRange(); r.setStart(node, off);
+  const i = T.at.findIndex(a => a && r.comparePoint(a[0], a[1]) >= 0);
+  return i < 0 ? T.text.length : i;
+}
+// How many characters two strings share, from their ends (back) or their starts.
+const shared = (a, b, back) => { let n = 0; while (n < a.length && n < b.length && (back ? a[a.length - 1 - n] === b[b.length - 1 - n] : a[n] === b[n])) n++; return n; };
+// The words again, as a range: of every place they appear, the one whose neighbours match best.
+function findWords(L, w) {
+  if (!L || !L.root || !w || !w.text) return null;
+  const T = readText(L.root);
+  let best = -1, score = -1;
+  for (let i = T.text.indexOf(w.text); i >= 0; i = T.text.indexOf(w.text, i + 1)) {
+    const s = shared(T.text.slice(Math.max(0, i - w.before.length), i), w.before, true) + shared(T.text.slice(i + w.text.length), w.after, false);
+    if (s > score) { score = s; best = i; }
+  }
+  if (best < 0) return null;
+  let a = best, b = best + w.text.length - 1;
+  while (a <= b && !T.at[a]) a++;
+  while (b >= a && !T.at[b]) b--;
+  if (a > b) return null;
+  const r = document.createRange(); r.setStart(T.at[a][0], T.at[a][1]); r.setEnd(T.at[b][0], T.at[b][1] + 1);
+  return r;
+}
+// The words selected in a design right now: which screen, which design on it, and the range. Designs sit in shadow
+// roots; getComposedRanges is the standard way to see into one, shadowRoot.getSelection the older Chrome one.
+function selectedWords() {
+  const sel = getSelection(); if (!sel) return null;
+  for (const sc of screens) for (let k = 0; k < sc.layers.length; k++) {
+    const L = sc.layers[k]; if (!L || !L.root) continue;
+    const sr = L.root.getRootNode(), inside = r => r && !r.collapsed && L.root.contains(r.commonAncestorContainer);
+    let r = null;
+    try {
+      const c = sel.getComposedRanges({ shadowRoots: [sr] })[0];
+      if (c && !c.collapsed) { r = document.createRange(); r.setStart(c.startContainer, c.startOffset); r.setEnd(c.endContainer, c.endOffset); }
+    } catch {}
+    if (!inside(r) && sr.getSelection) { const s = sr.getSelection(); r = s && s.rangeCount ? s.getRangeAt(0) : null; }
+    if (inside(r) && r.toString().trim()) return { sc, k, L, r };
+  }
+  return null;
+}
+function wordNote() {
+  const got = selectedWords(); if (!got) return false;
+  const { sc, k, L } = got, T = readText(L.root);
+  let r = got.r;
+  let s = charAt(T, r.startContainer, r.startOffset), e = charAt(T, r.endContainer, r.endOffset);
+  while (s < e && T.text[s] === ' ') s++;
+  while (e > s && T.text[e - 1] === ' ') e--;
+  // a selection that stops halfway through a word takes the whole word ("Your cu" is no use to anyone)
+  const letter = i => /[\p{L}\p{N}'’]/u.test(T.text[i] || '');
+  while (s > 0 && letter(s - 1) && letter(s)) s--;
+  while (e < T.text.length && letter(e - 1) && letter(e)) e++;
+  if (e > s) r = findWords(L, { text: T.text.slice(s, e), before: T.text.slice(Math.max(0, s - 30), s), after: T.text.slice(e, e + 30) }) || r;
+  const rects = [...r.getClientRects()].filter(b => b.width && b.height);
+  if (e <= s || !rects.length) return false;
+  const first = rects[0], last = rects.at(-1), box = sc.screen.getBoundingClientRect();
+  let el = r.commonAncestorContainer; if (el.nodeType !== 1) el = el.parentElement;
+  const pt = { clientX: last.right + 18, clientY: (last.top + last.bottom) / 2 };
+  if (editing) closeEditor(true);
+  if (noting) setNoting(false);
+  if (cutting) setCutting(false);
+  const note = newNote(sc, pt, { k, d: sc.designs[k], x: (pt.clientX - box.left) / box.width, y: (pt.clientY - box.top) / box.height }, el);
+  note.words = { text: T.text.slice(s, Math.min(e, s + 400)), before: T.text.slice(Math.max(0, s - 30), s), after: T.text.slice(e, e + 30) };
+  getSelection().removeAllRanges(); $('wordchip').hidden = true;
+  if (S.tab !== 'notes') { S.tab = 'notes'; apply(); } // the list the new note lands in
+  S.notes.push(note); touch(note); renderNotes();
+  openEditor(note, pt.clientX, pt.clientY, true, { left: Math.min(first.left, last.left), right: Math.max(first.right, last.right) });
+  snapNote(note, L, (first.left + last.right) / 2, (first.top + last.bottom) / 2);
+  return true;
+}
+// A pin on words sits on the line, just after the last word, so the words stay readable and it's clear which they are.
+var wordsDrawn = ''; // var: renderPins may run before this line does
+function placeWords() {
+  const marks = [];
+  screens.forEach(sc => {
+    const box = sc.screen.getBoundingClientRect(); if (!box.width || !box.height) return;
+    sc.pins.querySelectorAll('.pin').forEach(p => {
+      const n = noteById(p.dataset.id); if (!n || !n.words) return;
+      const r = findWords(sc.layers[Math.max(0, sc.designs.findIndex(d => d.id === n.design))], n.words);
+      const rects = r ? [...r.getClientRects()].filter(b => b.width && b.height && b.right > box.left && b.left < box.right && b.bottom > box.top && b.top < box.bottom) : [];
+      if (!rects.length) return;
+      const pc = (v, a, w) => ((v - a) / w * 100).toFixed(3) + '%', last = rects.at(-1);
+      marks.push({ sc, p, left: `calc(${pc(last.right, box.left, box.width)} + ${(18 / K).toFixed(2)}px)`, top: pc((last.top + last.bottom) / 2, box.top, box.height),
+        cls: 'whl' + (n.sent ? ' sent' : '') + (editing === n ? ' on' : ''),
+        rects: rects.map(b => [pc(b.left, box.left, box.width), pc(b.top, box.top, box.height), (b.width / box.width * 100).toFixed(3) + '%', (b.height / box.height * 100).toFixed(3) + '%']) });
+    });
+  });
+  const key = marks.map(m => [m.p.dataset.id, m.left, m.top, m.cls, m.rects].join()).join('|');
+  if (key === wordsDrawn) return;
+  screens.forEach(sc => sc.pins.querySelectorAll('.whl').forEach(x => x.remove()));
+  marks.forEach(m => {
+    m.p.style.left = m.left; m.p.style.top = m.top;
+    m.rects.forEach(([left, top, width, height]) => { const i = document.createElement('i'); i.className = m.cls; Object.assign(i.style, { left, top, width, height }); m.sc.pins.prepend(i); });
+  });
+  wordsDrawn = key;
+}
+// A line typing out, a resize, a saved file: the words move, so their pins keep up.
+setInterval(() => { if (!document.hidden && S.notes.some(n => n.words && !n.done)) placeWords(); }, 500);
+setInterval(() => { if (!document.hidden && anchored()) placeAnchors(); }, 250); // taps that change screens
+// The chip over selected words: Note, with its key.
+function placeChip() {
+  const chip = $('wordchip'), got = !noting && !cutting && !picking && selectedWords();
+  const rects = got ? [...got.r.getClientRects()].filter(b => b.width) : [];
+  if (!rects.length) { chip.hidden = true; return; }
+  chip.hidden = false;
+  const w = chip.offsetWidth, h = chip.offsetHeight, first = rects[0], last = rects.at(-1);
+  chip.style.left = clamp(first.left, 8, innerWidth - w - 8) + 'px';
+  chip.style.top = (first.top - h - 8 < 8 ? last.bottom + 8 : first.top - h - 8) + 'px';
+}
+$('wordchip').addEventListener('pointerdown', e => e.preventDefault()); // keep the selection
+$('wordchip').onclick = () => wordNote();
+addEventListener('pointerup', e => { if (e.target !== $('wordchip')) setTimeout(placeChip); });
+addEventListener('keyup', e => { if (e.shiftKey || e.key === 'Shift') placeChip(); });
+document.addEventListener('selectionchange', () => { if (!$('wordchip').hidden && !selectedWords()) $('wordchip').hidden = true; });
+addEventListener('wheel', () => { $('wordchip').hidden = true; }, { passive: true });
+
 /* A press in note mode: let go where you pressed and it pins a note there; drag first and it notes the area you drew,
    with every element inside it and their text, as Agentation does. The pin sits on the area's top left corner. */
 function noteDown(sc, e) {
   e.preventDefault(); e.stopPropagation();
   const x0 = e.clientX, y0 = e.clientY, box = $('areabox'), start = { clientX: x0, clientY: y0, preventDefault() {}, stopPropagation() {} };
+  try { e.target.setPointerCapture(e.pointerId); } catch {} // a release over a framed page still ends the drag
   let dragged = false;
   const move = ev => {
     if (!dragged && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
@@ -1252,13 +1713,14 @@ function noteDown(sc, e) {
     box.classList.add('on');
   };
   const up = ev => {
-    removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
     box.classList.remove('on');
+    if (ev.type === 'pointercancel') return;
     if (!dragged) return pinNote(sc, start);
     const r = sc.screen.getBoundingClientRect(), x1 = clamp(ev.clientX, r.left, r.right), y1 = clamp(ev.clientY, r.top, r.bottom);
     areaNote(sc, start, { left: Math.min(x0, x1), top: Math.min(y0, y1), right: Math.max(x0, x1), bottom: Math.max(y0, y1) });
   };
-  addEventListener('pointermove', move); addEventListener('pointerup', up);
+  addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
 function areaNote(sc, e, a) {
   if (editing) closeEditor(true);
@@ -1266,7 +1728,9 @@ function areaNote(sc, e, a) {
   // the outermost elements that sit wholly inside the area, in reading order
   const inside = [];
   if (at.L && at.L.root) {
-    const all = [...at.L.root.querySelectorAll('*')].filter(el => { if (el.closest('[data-in]:not(.on)')) return false; const b = el.getBoundingClientRect(); return b.width && b.height && b.left >= a.left - 1 && b.top >= a.top - 1 && b.right <= a.right + 1 && b.bottom <= a.bottom + 1; });
+    // a framed page's elements count, read through its frame (one level: the frames a scene makes)
+    const pages = [...at.L.root.querySelectorAll('iframe')].map(frameDoc).filter(d => d && d.body);
+    const all = [at.L.root, ...pages.map(d => d.body)].flatMap(r => [...r.querySelectorAll('*')]).filter(el => { if (el.closest('[data-in]:not(.on)')) return false; const b = rectOf(el); return b.width && b.height && b.left >= a.left - 1 && b.top >= a.top - 1 && b.right <= a.right + 1 && b.bottom <= a.bottom + 1; });
     all.forEach(el => { if (!all.includes(el.parentElement)) inside.push(el); });
   }
   const pin = { clientX: a.left, clientY: a.top };
@@ -1285,6 +1749,8 @@ function areaNote(sc, e, a) {
    Shift- or ⌘-click gathers several elements first (each stays outlined); a plain click or Return makes one note of all of them. */
 let cutting = false, cutDepth = 0, cutBase = null, cutAt = null, cutPicks = [];
 const clearPicks = () => { cutPicks = []; document.querySelectorAll('.cutsel').forEach(x => x.remove()); };
+// each gathered element keeps its outline on it, scrolled or not
+const placePicks = () => cutPicks.forEach(({ el, mark }) => { const r = rectOf(el); Object.assign(mark.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); });
 const setCutting = on => {
   if (on && (focus || picking)) setPicking(false), clearFocus();
   if (on && noting) setNoting(false);
@@ -1297,7 +1763,7 @@ function cutTarget(L, cx, cy) {
   const base = pickUnder(L, cx, cy);
   if (base !== cutBase) { cutBase = base; cutDepth = 0; }
   let el = base, i = 0;
-  while (el && i < cutDepth && el.parentElement && L.root.contains(el.parentElement) && el.parentElement !== L.root) { el = el.parentElement; i++; }
+  for (let up; el && i < cutDepth && (up = upFrom(L, el)); i++) el = up;
   cutDepth = i; // stops at the top, so Down always comes straight back
   return el;
 }
@@ -1307,13 +1773,13 @@ function cutHover(sc, e) {
   cutAt = { sc, e: { clientX: e.clientX, clientY: e.clientY } };
   const { L } = layerAt(sc, e), el = L && cutTarget(L, e.clientX, e.clientY), box = $('cutbox');
   if (!el) return box.classList.remove('on');
-  const r = el.getBoundingClientRect(), { k } = scale(L);
+  const r = rectOf(el), k = zoomOf(el);
   Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
   box.classList.toggle('below', r.top < 40);
   $('cutlabel').textContent = `${elName(el)} · ${Math.round(r.width / k)} × ${Math.round(r.height / k)}`;
   box.classList.add('on');
 }
-// A selector a person (or Claude) can find again: up to five steps, each a tag, its first classes, and its place when it has twins.
+// A selector a person (or an agent) can find again: up to five steps, each a tag, its first classes, and its place when it has twins.
 function cssPath(el, root) {
   const parts = [];
   for (let n = el; n && n !== root && parts.length < 5; n = n.parentElement) {
@@ -1325,7 +1791,7 @@ function cssPath(el, root) {
   return parts.join(' > ');
 }
 function styleLine(el) {
-  const cs = getComputedStyle(el), out = [`font ${cs.fontSize}/${cs.lineHeight} ${cs.fontWeight} ${cs.fontFamily.split(',')[0].replace(/"/g, '')}`, `colour ${cs.color}`];
+  const cs = cssOf(el), out = [`font ${cs.fontSize}/${cs.lineHeight} ${cs.fontWeight} ${cs.fontFamily.split(',')[0].replace(/"/g, '')}`, `colour ${cs.color}`];
   if (!/^(transparent|rgba\(0, 0, 0, 0\))$/.test(cs.backgroundColor)) out.push(`background ${cs.backgroundColor}`);
   if (cs.padding !== '0px') out.push(`padding ${cs.padding}`);
   if (cs.borderRadius !== '0px') out.push(`radius ${cs.borderRadius}`);
@@ -1333,7 +1799,7 @@ function styleLine(el) {
   if (cs.boxShadow !== 'none') out.push(`shadow ${cs.boxShadow}`);
   return out.join(', ');
 }
-const cutOf = (el, L) => { const { rr, k } = scale(L), r = el.getBoundingClientRect();
+const cutOf = (el, L) => { const { rr, k } = scale(L), r = rectOf(el);
   return { path: cssPath(el, L.root), box: [(r.left - rr.left) / k, (r.top - rr.top) / k, r.width / k, r.height / k].map(Math.round), style: styleLine(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 280) }; };
 function cutNote(sc, e) {
   e.preventDefault(); e.stopPropagation();
@@ -1343,9 +1809,8 @@ function cutNote(sc, e) {
   if (e.shiftKey || e.metaKey || e.ctrlKey) { // gather: outline it and wait for more
     const had = cutPicks.findIndex(p => p.el === el);
     if (had >= 0) { cutPicks[had].mark.remove(); cutPicks.splice(had, 1); }
-    else { const r = el.getBoundingClientRect(), mark = document.createElement('div'); mark.className = 'cutsel';
-      Object.assign(mark.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
-      mark.dataset.n = cutPicks.length + 1; document.body.append(mark); cutPicks.push({ el, sc, at, e: { clientX: e.clientX, clientY: e.clientY }, mark }); }
+    else { const mark = document.createElement('div'); mark.className = 'cutsel';
+      mark.dataset.n = cutPicks.length + 1; document.body.append(mark); cutPicks.push({ el, sc, at, e: { clientX: e.clientX, clientY: e.clientY }, mark }); placePicks(); }
     $('toast').textContent = cutPicks.length ? `${cutPicks.length} picked. Click one more, or press Return, to note them together` : 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
     return;
   }
@@ -1358,7 +1823,7 @@ function cutMake(picks) {
   if (picks.length > 1) note.cuts = picks.map(p => cutOf(p.el, p.at.L));
   clearPicks();
   $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
-  S.notes.push(note); touch(note); renderNotes(); openEditor(note, e.clientX, e.clientY, true, el.getBoundingClientRect());
+  S.notes.push(note); touch(note); renderNotes(); openEditor(note, e.clientX, e.clientY, true, rectOf(el));
   snapNote(note, at.L, e.clientX, e.clientY);
 }
 $('notecut').onclick = () => setCutting(!cutting);
@@ -1379,6 +1844,69 @@ async function inlineUrls(css, base) {
   return css;
 }
 let snapFonts = null;
+// A picture of the DOM starts every animation from 0, so a copy runs none and carries each animated value as it is now.
+const FROZEN = '*, *::before, *::after { animation: none !important; transition: none !important; }\n';
+const kebab = p => p.startsWith('--') ? p : p.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
+// What a clone doesn't carry: which radio is checked, typed values, scroll, animation, canvas pixels, the pictures
+// (inlined, so the canvas stays readable) and a frame's page (drawn in, when it's ours: a live page framed by a scene).
+async function freeze(el, clone) {
+  const A = [el, ...el.querySelectorAll('*')], B = [clone, ...clone.querySelectorAll('*')], twin = new Map(A.map((a, i) => [a, B[i]]));
+  const win = el.ownerDocument.defaultView, doc = el.ownerDocument, jobs = [];
+  for (const an of el.getAnimations({ subtree: true })) {
+    const fx = an.effect, b = fx && !fx.pseudoElement && twin.get(fx.target); if (!b) continue;
+    const cs = win.getComputedStyle(fx.target);
+    for (const kf of fx.getKeyframes()) for (const p in kf) if (!/^(offset|computedOffset|easing|composite)$/.test(p)) b.style.setProperty(kebab(p), cs.getPropertyValue(kebab(p)), 'important');
+  }
+  A.forEach((a, i) => {
+    const b = B[i], tag = a.localName;
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+      if (a.checked) b.setAttribute('checked', ''); else b.removeAttribute('checked');
+      if (tag === 'textarea') b.textContent = a.value; else if (tag === 'select') [...b.options].forEach((o, k) => o.toggleAttribute('selected', k === a.selectedIndex));
+      else if (!/^(radio|checkbox)$/.test(a.type)) b.setAttribute('value', a.value);
+    } else if (tag === 'img') jobs.push(toDataURL(a.currentSrc || a.src).then(d => { b.removeAttribute('srcset'); b.removeAttribute('loading'); if (d) b.setAttribute('src', d); }));
+    else if (tag === 'canvas') { try { b.style.setProperty('background', `url(${a.toDataURL()}) 0 0 / 100% 100% no-repeat`, 'important'); } catch (x) {} }
+    // a frame draws as nothing in a picture, so its page goes in as an img in its place, with its classes and size
+    else if (tag === 'iframe') jobs.push(frameImage(a).then(d => {
+      if (!d) return;
+      const im = document.createElement('img'); for (const at of b.attributes) if (!/^(src|srcdoc|loading|allow|sandbox)$/.test(at.name)) im.setAttribute(at.name, at.value);
+      const r = win.getComputedStyle(a); for (const p of ['position', 'inset', 'width', 'height', 'display', 'box-sizing']) im.style.setProperty(p, r.getPropertyValue(p));
+      im.setAttribute('src', d); b.replaceWith(im);
+    }));
+    // a scrolled box: its children moved by the scroll (the page's own scroll leaves its fixed bars where they are)
+    if (a.scrollTop || a.scrollLeft) {
+      const kids = a === doc.scrollingElement ? [...(doc.body ? doc.body.children : [])] : [...a.children];
+      for (const k of kids) { const ks = win.getComputedStyle(k); if (ks.position !== 'fixed' && ks.translate === 'none') twin.get(k).style.translate = `${-a.scrollLeft}px ${-a.scrollTop}px`; }
+    }
+  });
+  await Promise.all(jobs);
+}
+// A frame on our own server (a scene that frames a live page): its page drawn into a picture at the frame's size.
+async function frameImage(f) {
+  let d; try { d = f.contentDocument; } catch (x) { d = null; }
+  if (!d) return null;
+  if (d.readyState !== 'complete') await new Promise(ok => { f.addEventListener('load', ok, { once: true }); setTimeout(ok, 3000); });
+  d = f.contentDocument; if (!d || !d.body) return null;
+  await d.fonts.ready.catch(() => {});
+  await new Promise(ok => f.contentWindow.requestAnimationFrame(() => ok()));
+  const w = f.clientWidth, h = f.clientHeight; if (!w || !h) return null;
+  const rules = s => { try { return [...s.cssRules].map(r => r.styleSheet ? rules(r.styleSheet) : r.cssText).join('\n'); } catch (x) { return ''; } };
+  let css = '';
+  for (const s of d.styleSheets) if (!s.disabled) css += await inlineUrls(rules(s), s.href || d.baseURI) + '\n';
+  const html = d.documentElement.cloneNode(true);
+  await freeze(d.documentElement, html);
+  html.querySelectorAll('script, link, style, noscript').forEach(n => n.remove());
+  // the frame is the page's viewport: it holds its fixed bars, and :root now names the copy's html
+  const bg = x => d.defaultView.getComputedStyle(x).backgroundColor, paint = /^(transparent|rgba\(0, 0, 0, 0\))$/.test(bg(d.documentElement)) ? bg(d.body) : bg(d.documentElement);
+  html.style.cssText += `;width:${w}px;height:${h}px;overflow:hidden;transform:translate(0);background-color:${paint}`;
+  css = (FROZEN + css.replace(/:root\b/g, 'html:not(.\\-)')).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const body = new XMLSerializer().serializeToString(html).replace(/^(<html[^>]*>)/, `$1<style>${css}</style>`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject x="0" y="0" width="${w}" height="${h}">${body}</foreignObject></svg>`;
+  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  try { await img.decode(); } catch (x) { return null; }
+  const k = 2, cv = document.createElement('canvas'); cv.width = w * k; cv.height = h * k;
+  const g = cv.getContext('2d'); g.fillStyle = '#141414'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/jpeg', .9);
+}
 // Cut crop: the element and 24 around it, inside the scene.
 const cutCrop = (b, w, h) => { const x0 = Math.max(0, b[0] - 24), y0 = Math.max(0, b[1] - 24); return [x0, y0, Math.min(w - x0, b[2] + 48), Math.min(h - y0, b[3] + 48)]; };
 async function snapScene(L, px, py, cutBox) {
@@ -1386,14 +1914,10 @@ async function snapScene(L, px, py, cutBox) {
   let CW = Math.min(w, 720), CH = Math.min(h, 440), x0 = clamp(px - CW / 2, 0, w - CW), y0 = clamp(py - CH / 2, 0, h - CH);
   if (cutBox) [x0, y0, CW, CH] = cutCrop(cutBox, w, h);
   const clone = el.cloneNode(true);
-  // what a clone doesn't carry: which radio is checked, typed values, and the pictures (inlined, so the canvas stays readable)
-  const live = el.querySelectorAll('input, textarea, select'), copy = clone.querySelectorAll('input, textarea, select');
-  live.forEach((n, i) => { if (n.checked) copy[i].setAttribute('checked', ''); else copy[i].removeAttribute('checked'); if (!/^(radio|checkbox)$/.test(n.type)) copy[i].setAttribute('value', n.value); });
-  const imgs = el.querySelectorAll('img');
-  await Promise.all([...clone.querySelectorAll('img')].map(async (im, i) => { const d = await toDataURL(imgs[i].currentSrc || imgs[i].src); im.removeAttribute('srcset'); im.removeAttribute('loading'); if (d) im.setAttribute('src', d); }));
+  await freeze(el, clone);
   if (snapFonts === null) snapFonts = PROJECT && (PROJECTS.find(x => x.id === PROJECT) || {}).fonts !== false ? await fetch(SCENE_BASE + 'fonts.css').then(r => r.ok ? r.text() : '').then(t => inlineUrls(t, location.origin + SCENE_BASE)).catch(() => '') : '';
   // a copy has no live scroll state, so it would draw scrollbars the screen hides and shift centred content by half of one
-  const css = ('.snaphost * { scrollbar-width: none; }\n' + snapFonts + '\n' + await inlineUrls([...sr.querySelectorAll('style')].map(x => x.textContent).join('\n').replace(/:host/g, '.snaphost'), location.href))
+  const css = ('.snaphost * { scrollbar-width: none; }\n' + FROZEN + snapFonts + '\n' + await inlineUrls([...sr.querySelectorAll('style')].map(x => x.textContent).join('\n').replace(/:host/g, '.snaphost'), location.href))
     .replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CW}" height="${CH}"><foreignObject x="0" y="0" width="${CW}" height="${CH}">`
     + `<div xmlns="http://www.w3.org/1999/xhtml" class="snaphost" style="display:block;position:relative;width:${w}px;height:${h}px;transform:translate(${-x0}px,${-y0}px)"><style>${css}</style>`
@@ -1438,23 +1962,26 @@ const sceneLayer = n => { for (const sc of screens) { const i = sc.designs.findI
 let pinDragged = false;
 $('frames').addEventListener('pointerdown', e => {
   const p = e.target.closest('.pin'); if (!p) return;
-  const n = noteById(p.dataset.id), sc = screens.find(x => x.pins.contains(p)); if (!n || !sc) return;
+  const n = noteById(p.dataset.id), sc = screens.find(x => x.pins.contains(p)); if (!n || !sc || n.words) return; // a pin on words stays on them
   const r = sc.screen.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+  try { p.setPointerCapture(e.pointerId); } catch {} // dragged over a framed page, the pin still follows and lets go
   let moved = false;
   const at = ev => [clamp((ev.clientX - r.left) / r.width, 0, 1), clamp((ev.clientY - r.top) / r.height, 0, 1)];
   const move = ev => {
     if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
-    moved = true; const [x, y] = at(ev); p.style.left = x * 100 + '%'; p.style.top = y * 100 + '%';
+    moved = true; p.classList.add('drag'); const [x, y] = at(ev); p.style.left = x * 100 + '%'; p.style.top = y * 100 + '%';
   };
   const up = ev => {
-    removeEventListener('pointermove', move); removeEventListener('pointerup', up);
-    if (!moved) return;
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    p.classList.remove('drag');
+    if (!moved || ev.type === 'pointercancel') return;
     pinDragged = true; setTimeout(() => { pinDragged = false; });
     const [x, y] = at(ev), L = sc.layers.find(l => l.root) || sc.layers[0];
-    n.x = +x.toFixed(3); n.y = +y.toFixed(3); n.on = describe(pickUnder(L, ev.clientX, ev.clientY));
+    const under = pickUnder(L, ev.clientX, ev.clientY);
+    n.x = +x.toFixed(3); n.y = +y.toFixed(3); n.on = describe(under); n.anchor = anchorOf(L, under, ev.clientX, ev.clientY);
     touch(n); renderNotes(); snapNote(n, L, ev.clientX, ev.clientY);
   };
-  addEventListener('pointermove', move); addEventListener('pointerup', up);
+  addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 });
 /* a note shows on any screen of the same kind (window, phone, tablet) showing its design, on its step */
 function renderPins() {
@@ -1463,8 +1990,10 @@ function renderPins() {
     const ids = sc.designs.map(d => d.id);
     sc.pins.innerHTML = S.notes.map((n, k) => (editing === n || !n.done && n.step === pinStep) && (n.kind === kindOf(sc.w, sc.h) || n.kind === sc.kind) && ids.includes(n.design)
       ? (n.area ? `<i class="area${n.sent ? ' sent' : ''}" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
-        + `<button class="pin${editing === n ? ' open' : ''}${n.sent ? ' sent' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.sent ? 'Claude is on it: ' + n.text : n.text)}">${k + 1}</button>` : '').join('');
+        + `<button class="pin${editing === n ? ' open' : ''}${n.sent ? ' sent' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.sent ? 'An agent is on it: ' + n.text : n.text)}">${k + 1}</button>` : '').join('');
   });
+  wordsDrawn = ''; placeWords(); // pins were rebuilt: put the ones on words back on their words
+  placeAnchors();
 }
 // A gap of over half an hour starts a new sitting. Newest sitting first, so round five isn't buried under round one;
 // inside a sitting notes keep their order, and every number still matches its pin.
@@ -1488,10 +2017,15 @@ const noteWhere = n => {
   const sc = sceneById(n.design) || sceneById(String(n.design).replace(/-\d+$/, '-v1')), page = n.design === 'url' ? 'URL' : sc ? [sc.title, sc.version].filter(Boolean).join(' ') : n.design;
   return sc && sc.steps.length > 1 ? `${page} · Step ${n.step + 1} ${stepLabel(n)}` : page;
 };
+/* /try 3 in a note: shown as a chip, so a note that asks for takes reads differently from one that asks for a fix */
+const TRYRE = /(^|\s)\/try(?:\s+(\d))?\b/i;
+const tryChip = text => { const m = text.match(TRYRE); if (!m) return esc(text);
+  const k = Math.max(2, Math.min(4, +(m[2] || 3))), at = m.index + m[1].length;
+  return esc(text.slice(0, at)) + `<span class="trytag">${k} takes</span>` + esc(text.slice(at + m[0].length - m[1].length)); };
 function renderNotes() {
   const said = n => (n.replies || []).map(r => `<span class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}${r.made && sceneById(r.made) ? ` <button class="link vlink" data-show="${esc(n.design)}|${esc(r.made)}">${esc(sceneById(r.made).version || r.made)}</button>` : ''}</span>`).join('');
-  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}${n.sent ? ' sent' : ''}"><span class="nbadge">${k + 1}</span><span class="nb"><span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
-    <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${n.sent ? '<span class="nr working"><i class="agspin"></i>Claude is on it</span>' : ''}${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
+  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}${n.sent ? ' sent' : ''}"><span class="nbadge">${k + 1}</span><span class="nb">${n.words ? `<span class="nq">${esc(n.words.text)}</span>` : ''}<span class="nt">${n.text ? tryChip(n.text) : '<i>Empty</i>'}</span>
+    <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${n.sent ? (TRYRE.test(n.text) ? `<span class="nr working" data-try="${n.id}"></span>` : '<span class="nr working"><i class="agspin"></i>An agent is on it</span>') : ''}${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
   $('notelist').innerHTML = groups.length < 2 ? groups.flatMap(g => g.items).map(noteRow).join('') : groups.map((g, i) => {
     const open = g.items.filter(([n]) => !n.done).length, shown = sitOpen[g.start] ?? (i === 0 || open > 0);
     return `<li class="sit${shown ? '' : ' shut'}" data-sit="${g.start}"><span>${sitWhen(g.start)}</span><span class="ver">${open ? `${open} open` : 'Done'}</span></li>`
@@ -1499,21 +2033,22 @@ function renderNotes() {
   }).join('');
   $('notelist').hidden = !S.notes.length; $('noteempty').hidden = !!S.notes.length;
   $('notesync').hidden = document.querySelector('.notelinks').hidden = !S.notes.length; // nothing to copy, clear or save yet
-  $('notesync').textContent = notesServer ? `Saved to ${SCENE_PATH}notes/brief.md` : 'Saved in this browser only';
+  $('notesync').textContent = notesServer ? '' : 'Saved in this browser only'; // on disk is the normal case: the path is on Copy brief
+  $('notesync').hidden = !!notesServer || !S.notes.length; $('notecopy').title = notesServer ? `Also in ${SCENE_PATH}notes/brief.md` : '';
   renderPins(); save(); queueSync();
   window.Agent && Agent.notesChanged();
 }
 
 /* ---------- notes on disk ----------
-   Served by serve.py, notes live in notes/notes.json and notes/brief.md, so Claude can read them and answer them.
-   The page saves every change, and every 2s picks up changes made to the file (Claude marking a note done, say).
+   Served by serve.py, notes live in notes/notes.json and notes/brief.md, so an agent can read them and answer them.
+   The page saves every change, and every 2s picks up changes made to the file (an agent marking a note done, say).
    If the file changed since the page last saw it, the save is refused and the page takes the file's version.
    Opened any other way, notes stay in this browser. */
 let notesServer = false, notesVersion = null, notesSent = '', syncTimer = 0;
 const NOTES_API = '/api/notes?project=' + encodeURIComponent(PROJECT);
 const notesJSON = () => JSON.stringify(S.notes);
 /* Notes changed here and not yet saved (id → the note, or null once deleted). When the file's notes come in, these
-   go back on top, so a refused save (Claude edited the file meanwhile) keeps both: the file's changes and yours. */
+   go back on top, so a refused save (an agent edited the file meanwhile) keeps both: the file's changes and yours. */
 const unsaved = new Map();
 const touch = (n, gone) => unsaved.set(n.id, gone ? null : n);
 function takeNotes(d) {
@@ -1568,13 +2103,14 @@ let popHide = 0;
 function openEditor(n, x, y, fresh, around) {
   if (editing === n) return; // its own pin: keep what's typed
   if (editing) closeEditor(true); // another note: keep the draft (an empty new one goes)
-  if (playing) { playing = false; drive(); } // the screen holds still while you write about it
+  setPlaying(false); // the screen holds still while you write about it
   editing = n; $('popdone').textContent = n.done ? 'Reopen' : 'Resolve'; $('popdone').hidden = !!fresh; renderPins();
   $('popn').textContent = S.notes.indexOf(n) + 1;
   $('popmeta').textContent = (n.side ? n.side + ' · ' : '') + noteWhere(n);
   $('poptext').value = n.text; showSnap(n);
+  $('popwords').hidden = !n.words; $('popwords').textContent = n.words ? n.words.text : '';
   $('popthread').hidden = !(n.replies && n.replies.length) && !n.sent;
-  $('popthread').innerHTML = (n.sent ? '<p class="nr working"><i class="agspin"></i>Claude is on it</p>' : '') + (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
+  $('popthread').innerHTML = (n.sent ? '<p class="nr working"><i class="agspin"></i>An agent is on it</p>' : '') + (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
   const pop = $('notepop'), was = !pop.hidden && pop.classList.contains('show');
   clearTimeout(popHide); pop.hidden = false;
   const w = pop.offsetWidth, R = 12, GAP = 8;
@@ -1593,7 +2129,9 @@ function openEditor(n, x, y, fresh, around) {
 }
 function closeEditor(keep, done) {
   const n = editing; if (!n) return;
+  $('popslash').hidden = true;
   editing = null;
+  if (document.activeElement === $('poptext')) $('poptext').blur(); // or the hidden box keeps the keys: Esc, N, Space did nothing
   const pop = $('notepop'); pop.classList.remove('show'); clearTimeout(popHide);
   popHide = setTimeout(() => { if (!editing) pop.hidden = true; }, 160);
   if (keep) n.text = $('poptext').value.trim();
@@ -1604,7 +2142,20 @@ function closeEditor(keep, done) {
 $('popsave').onclick = () => closeEditor(true);
 $('popdel').onclick = () => { $('poptext').value = ''; closeEditor(true); };
 $('popdone').onclick = () => closeEditor(true, !editing.done);
+/* Commands in a note. Typing / at the start of a word offers the one there is: /try 3, three takes on just this
+   part, with everything else held still. Tab or a click takes it. */
+const SLASH = /(^|\s)\/[a-z]*$/i;
+const slashOn = () => { const t = $('poptext'), v = t.value.slice(0, t.selectionStart); const m = v.match(SLASH);
+  $('popslash').hidden = !m || !'/try'.startsWith(m[0].trim().toLowerCase()); };
+const slashTake = () => { const t = $('poptext'), at = t.selectionStart, v = t.value, m = v.slice(0, at).match(SLASH); if (!m) return;
+  const from = at - m[0].length + m[1].length; t.value = v.slice(0, from) + '/try 3 ' + v.slice(at); t.selectionStart = t.selectionEnd = from + 7;
+  $('popslash').hidden = true; t.focus(); };
+$('poptext').addEventListener('input', slashOn);
+$('popslash').addEventListener('pointerdown', e => e.preventDefault()); // keep the caret in the note
+$('popslash').onclick = slashTake;
 $('poptext').addEventListener('keydown', e => {
+  if (!$('popslash').hidden && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) { e.preventDefault(); slashTake(); e.stopPropagation(); return; }
+  if (!$('popslash').hidden && e.key === 'Escape') { e.preventDefault(); $('popslash').hidden = true; e.stopPropagation(); return; }
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
   else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); }
   e.stopPropagation();
@@ -1629,7 +2180,7 @@ $('notelist').addEventListener('click', e => {
 });
 $('noteadd').onclick = () => setNoting(!noting);
 $('noteclear').onclick = () => { if (S.notes.length && confirm(`Delete all ${S.notes.length} notes?`)) { S.notes.forEach(n => touch(n, true)); S.notes = []; renderNotes(); } };
-/* One note as the brief writes it: where it is, what it's on, what it says. Send to Claude uses the same lines. */
+/* One note as the brief writes it: where it is, what it's on, what it says. Send to agent uses the same lines. */
 function noteLines(n, k) {
   const sc = sceneById(n.design), file = n.design === 'url' ? n.url : `${SCENE_PATH}${sc ? sc.base || sc.id : n.design}.js` + (sc && sc.variant ? `, variant "${sc.version}"` : '');
   const lines = [`${k + 1}. ${n.side ? n.side + ', ' : ''}${designName(n.design, n.url)} (${file}), step ${n.step + 1} "${stepLabel(n)}" at position ${n.pos}, ${n.size}, ${Math.round(n.x * 100)}% across and ${Math.round(n.y * 100)}% down.`];
@@ -1639,6 +2190,7 @@ function noteLines(n, k) {
   else if (n.cuts) n.cuts.forEach((c, i) => lines.push(`   Cut ${i + 1}: ${c.path}, ${c.box[2]} × ${c.box[3]} at ${c.box[0]}, ${c.box[1]}`, `     Styles: ${c.style}`));
   else if (n.cut) lines.push(`   Cut: ${n.cut.path}, ${n.cut.box[2]} × ${n.cut.box[3]} at ${n.cut.box[0]}, ${n.cut.box[1]}`, `   Styles: ${n.cut.style}`, `   Markup: ${n.cut.html}`);
   else if (n.on) lines.push(`   Under the pin: ${n.on}`);
+  if (n.words) lines.push(`   On the words: "${n.words.text}"`);
   if (n.snap) lines.push(`   Snapshot: ${SCENE_PATH}notes/${n.snap}`);
   lines.push(`   Note: ${n.text}`);
   return lines;
@@ -1658,7 +2210,11 @@ $('notecopy').onclick = e => copy(brief(), e.currentTarget);
 /* ---------- projects ----------
    The menu lists every project serve.py found. New project asks for a name and makes <name>/scenes/ from the starter.
    Switching reloads the page on that project, so its scenes load fresh. */
-$('proj').innerHTML = '<option value="+home">All projects</option>' + (PROJECTS.length ? PROJECTS.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('') : '<option value="">Starter</option>')
+// a client with several projects lists them under its name (Acme: Checkout, Modals)
+const projOpt = p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`, byClient = new Map();
+PROJECTS.forEach(p => { const g = p.group || p.id; if (!byClient.has(g)) byClient.set(g, []); byClient.get(g).push(p); });
+$('proj').innerHTML = '<option value="+home">All projects</option>' + (PROJECTS.length ? [...byClient.values()].map(ms => ms.length > 1
+    ? `<optgroup label="${esc(ms[0].client || '')}">${ms.map(projOpt).join('')}</optgroup>` : projOpt(ms[0])).join('') : '<option value="">Starter</option>')
   + (PROJECTS.length ? '<option value="+new">New project…</option>' : '');
 $('proj').value = PROJECT;
 const openProject = id => { location.search = '?project=' + encodeURIComponent(id); };
@@ -1674,7 +2230,7 @@ $('proj').onchange = async e => {
   } catch { alert('The Atelier server is not running.'); }
 };
 if (PROJECT && !CAPTURE && location.search !== '?project=' + encodeURIComponent(PROJECT)) history.replaceState(null, '', '?project=' + encodeURIComponent(PROJECT)); // so the address is a link to this project
-document.title = PROJECT_NAME + ' · Atelier';
+{ const me = PROJECTS.find(x => x.id === PROJECT); document.title = (me && me.client && me.client !== me.name ? me.client + ' · ' : '') + PROJECT_NAME + ' · Atelier'; }
 /* a menu is as wide as its longest option; size it to the project's name so the chevron sits right after it */
 const fitProj = () => { const c = document.createElement('canvas').getContext('2d'), st = getComputedStyle($('proj'));
   c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`; c.letterSpacing = st.letterSpacing;
@@ -1695,7 +2251,7 @@ $('second').onchange = e => { S.second = e.target.checked; S.zoom = 0; S.pos = {
 $('zsel').innerHTML = '<option value="now" hidden></option>' + [[0, 'Zoom to fit'], [0.5, 'Zoom to 50%'], [1, 'Zoom to 100%'], [2, 'Zoom to 200%']].map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
 $('zsel').onchange = e => { const z = +e.target.value; if (!z) return recentre(); S.zoom = z; S.pan = { x: 0, y: 0 }; apply(); }; // Zoom to fit also puts everything back in place
 /* tabs */
-const TABS = [['design', 'Design'], ['prototype', 'Prototype'], ['notes', 'Notes'], ['agent', 'Agent'], ['taste', 'Taste'], ['stage', 'Stage']];
+const TABS = [['design', 'Design'], ['prototype', 'Prototype'], ['notes', 'Notes'], ['taste', 'Taste'], ['stage', 'Stage']];
 const sects = [...document.querySelectorAll('.sect[data-tab]')];
 $('tabbar').innerHTML = TABS.filter(([k]) => sects.some(x => x.dataset.tab === k)).map(([k, n]) => `<button class="tab" role="tab" data-t="${k}">${n}</button>`).join('');
 $('tabbar').onclick = e => { const b = e.target.closest('.tab'); if (b) { S.tab = b.dataset.t; apply(); $('panes').scrollTop = 0; } };
@@ -1712,7 +2268,7 @@ async function duplicateDesign(id, from) {
   if (duping || from?.wrap?.classList.contains('agbusy')) return; duping = true;
   const sc = sceneById(id);
   try {
-    const r = await fetch('/api/duplicate?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sc.base || sc.id }) });
+    const r = await fetch('/api/duplicate?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sc.base || sc.id, file: (sceneById(sc.base) || sc).file || '' }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.id) throw new Error(d.error || 'Not duplicated');
     S.ctl[d.id] = { ...(S.ctl[id] || {}) };
@@ -1723,7 +2279,7 @@ async function duplicateDesign(id, from) {
     const u = new URL(location.href); u.searchParams.delete('design'); location.replace(u); // the new file loads with the page
   } catch (err) {
     duping = false; $('toast').textContent = err.message; $('toast').hidden = false;
-    setTimeout(() => { $('toast').textContent = 'Click a screen to pin a note'; $('toast').hidden = !noting; }, 2400);
+    setTimeout(() => { $('toast').textContent = NOTE_TIP; $('toast').hidden = !noting; }, 2400);
   }
 }
 /* designs: click a row to put it on screen or take it off. At least one stays on, at most five. A scene's note is its tooltip. */
@@ -1740,7 +2296,7 @@ function families() {
   return out;
 }
 /* Designs, like layers. A design with one version is one row. A design with several is its name, then a row per
-   version: the version, what it is (the direction Claude named it, or the scene's note), and a star on the one
+   version: the version, what it is (the direction the agent named it, or the scene's note), and a star on the one
    picked. A small dot marks the one on screen; with several on screen, each one that's on gets its letter (A to E,
    matching the screen) instead.
    Click shows just that one; shift- or ⌘-click adds it to the screen (or takes it off), up to five. */
@@ -1765,7 +2321,7 @@ function renderDesigns() {
     if (f.ids.length === 1) return row(f.ids[0]);
     const latest = f.ids.filter(id => !sceneById(id).variant).at(-1);
     return `<li class="fh" data-id="${latest}" title="Click for the newest version"><span>${esc(f.title)}</span><span class="ver">${f.ids.length}</span></li>` + f.ids.map(vrow).join('');
-  }).join('') + row('url');
+  }).join('') + (S.shown.includes('url') ? row('url') : ''); // the URL row only while a URL is on screen (from before)
 }
 $('dlist').onclick = e => {
   const del = e.target.closest('[data-del]'); if (del) return dropVariant(del.dataset.del);
@@ -1811,6 +2367,8 @@ $('dimr').oninput = e => { S.dim = +e.target.value; apply(); };
 $('blurr').oninput = e => { S.blur = +e.target.value; apply(); };
 $('tintr').oninput = e => { S.tint = +e.target.value; apply(); };
 $('baron').onchange = e => { S.bar = e.target.checked; apply(); };
+const restartLive = () => { screens.forEach(sc => sc.designs && fillScreen(sc, sc.designs)); renderPins(); };
+$('restart').onclick = restartLive;
 $('loop').onchange = e => { S.loop = e.target.checked; apply(); };
 $('reset').onclick = () => {
   const keep = { notes: S.notes, variants: S.variants, ctl: Object.fromEntries(Object.entries(S.ctl).filter(([k]) => S.variants.some(v => v.id === k))) };
@@ -1821,27 +2379,31 @@ document.querySelectorAll('.sect[data-k] > .st').forEach(b => b.onclick = () => 
 });
 
 let uiHidden = false;
-addEventListener('keydown', e => {
-  if (e.target.matches?.('input:not([type=range]):not([type=checkbox]), textarea, select') || e.metaKey || e.ctrlKey) return;
+addEventListener('keydown', onKey);
+function onKey(e) {
+  // Typing inside a live design (its own shadow root) is the design's: the real target is the first in the path.
+  const tgt = e.composedPath?.()[0] || e.target;
+  if (tgt.matches?.('input:not([type=range]):not([type=checkbox]), textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey) return;
   if (e.key === 'Escape' && noting) { setNoting(false); return; }
   if (e.key === 'Escape' && cutting && cutPicks.length) { clearPicks(); setCutting(true); return; }
   if (e.key === 'Escape' && cutting) { setCutting(false); return; }
   if (e.key === 'Enter' && cutting && cutPicks.length) { e.preventDefault(); cutMake(cutPicks); return; }
-  if ((e.key === 'e' || e.key === 'E') && window.Agent) { e.preventDefault(); Agent.explore(); return; }
   if (cutting && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault(); cutDepth = Math.max(0, cutDepth + (e.key === 'ArrowUp' ? 1 : -1)); if (cutAt) cutHover(cutAt.sc, cutAt.e); return;
   }
   if (e.key === 'x' || e.key === 'X') { setCutting(!cutting); return; }
   if (e.key === 'Escape' && (picking || focus)) { setPicking(false); clearFocus(); return; }
-  if (e.key === 'f' || e.key === 'F') { $('focusbtn').click(); return; }
+  if (e.key === 'f' || e.key === 'F') { toggleFocus(); return; }
+  if ((e.key === 'n' || e.key === 'N') && !noting && wordNote()) return; // words selected: a note on them
   if (e.key === 'n' || e.key === 'N') { setNoting(!noting); return; }
   if (e.key === ' ') { e.preventDefault(); $('play').click(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); $('prev').click(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); $('next').click(); }
   else if (e.key === '\\') { S.panel = !S.panel; apply(); }
   else if (e.key === 'h' || e.key === 'H') { uiHidden = !uiHidden; apply(); }
-  else if (e.key === 'r' || e.key === 'R') { t = 0; playing = true; drive(); }
-  else if (e.key === ',' || e.key === '.') { playing = false; seek(t + (e.key === '.' ? 1 : -1) / 30); }
+  else if ((e.key === 'r' || e.key === 'R') && root.dataset.live === 'on') restartLive();
+  else if (e.key === 'r' || e.key === 'R') { t = 0; setPlaying(true); drive(); }
+  else if (e.key === ',' || e.key === '.') { setPlaying(false, 'land'); seek(t + (e.key === '.' ? 1 : -1) / 30); }
   else if (e.key === '0') recentre();
   /* C: back to one design, or add the next one. V: next view, comparing exactly two. */
   else if (e.key === 'c' || e.key === 'C') { if (comparing()) S.shown = [shownDesigns()[0].id]; else { const nx = SCENES.find(x => !S.shown.includes(x.id)); if (nx) S.shown = [...S.shown, nx.id]; } S.zoom = 0; S.pos = {}; apply(); }
@@ -1852,7 +2414,7 @@ addEventListener('keydown', e => {
     S.zoom = 0; S.pos = {}; apply();
   }
   else if (e.key === '1') { S.zoom = 1; apply(); }
-});
+}
 
 /* one place that turns settings into the page */
 function apply() {
@@ -1875,6 +2437,7 @@ function apply() {
   $('url').hidden = !S.shown.includes('url'); if (document.activeElement !== $('url')) $('url').value = S.url;
   $('colorrow').hidden = S.wall !== 'color';
   $('viewwrap').hidden = S.shown.length !== 2 || matrix(); $('secondrow').hidden = comparing();
+  $('laywrap').hidden = S.shown.length < 2; // rows and columns mean nothing for one design
   $('onionwrap').hidden = S.view !== 'onion'; $('onionr').value = S.onion; $('oniono').textContent = Math.round(S.onion * 100) + '%';
   if (!TABS.some(([k]) => k === S.tab)) S.tab = 'design';
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.t === S.tab));
@@ -1889,7 +2452,9 @@ function apply() {
   document.querySelectorAll('.sect[data-k]').forEach(s => s.classList.toggle('folded', S.folded.includes(s.dataset.k)));
   buildTimeline();
   // The timeline only shows when what's on screen has more than one step: a still page has nothing to play.
-  root.dataset.bar = S.bar && !uiHidden && shownDesigns().some(d => (sceneById(d.id)?.steps || []).length > 1) ? 'on' : 'off';
+  const allLive = shownDesigns().length > 0 && shownDesigns().every(d => typeof sceneById(d.id)?.live === 'function' && (sceneById(d.id).steps || []).length < 2);
+  root.dataset.live = allLive ? 'on' : 'off';
+  root.dataset.bar = S.bar && !uiHidden && (allLive || shownDesigns().some(d => (sceneById(d.id)?.steps || []).length > 1)) ? 'on' : 'off';
   layoutScreens();
   renderControls(); applyControls();
   drive(); renderNotes();
@@ -1950,7 +2515,7 @@ if (CAPTURE) {
     layout: () => apply(),
     // each screen's content, without its device frame: what gets exported
     boxes: () => screens.map(s => { const r = s.screen.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }; }),
-    still: () => { t = clamp(at, 0, DURATION); drive(); },
+    still: () => { playing = false; t = clamp(at, 0, DURATION); drive(); land(); }, // stopped and landed, or a page that was playing keeps moving and the picture lands mid-transition
     play: () => { t = 0; drive(); playing = true; return DURATION; },
   };
 }
@@ -1970,5 +2535,8 @@ if (fromGallery && screens[0]) { screens[0].frame.style.viewTransitionName = 'sc
 <script src="agent.js"></script>
 <script src="taste.js"></script>
 <div id="ready" hidden></div>
+
+<script>window.NOTES_ABOUT = 'atelier'; window.NOTES_PATH = location.pathname;</script>
+<script src="/notes-layer.js" async></script>
 </body>
 </html>

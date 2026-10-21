@@ -1,0 +1,65 @@
+/* Atelier's tokens: every colour, size and radius the tool's own UI uses. Both pages (index.html, stage.html) load this
+   first; ui.css, agent.css and the pages' own rules only read from it.
+
+   The scale and the names match the writing canvas and the vault (one family of tools), behind a --c- prefix ("chrome"):
+   a design on the stage renders inside the page, and custom properties inherit into it, so an unprefixed --accent or
+   --text here would leak into a design that reads one without setting it.
+
+   Atelier is dark only and sits on a wallpaper, so its colours are white at an opacity rather than solid greys. */
+:root {
+  color-scheme: dark;
+
+  /* ---- type: Geist. The tool's text is 13, a step under the vault's 14 (12 read small on the glass, Oct 16) ---- */
+  --c-font: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --c-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;   /* code only */
+  --c-t-xs: 12px;    --c-lh-xs: 16px;     /* badges, timeline ticks, kbd hints */
+  --c-t-ui: 13px;    --c-lh-ui: 18px;     /* everything in a panel: the default */
+  --c-t-sm: 14px;    --c-lh-sm: 20px;     /* menus, a section's title */
+  --c-t-md: 15px;    --c-lh-md: 22px;     /* a project's name, a card's title */
+  --c-t-lg: 16px;    --c-lh-lg: 22px;     /* a count beside the page title */
+  --c-t-title: 20px; --c-lh-title: 26px;  /* the page title on home */
+  --c-w-body: 400;   /* light text on a dark ground gains weight, so 400 here where the vault uses 420 */
+  --c-w-medium: 500;
+  --c-tr-tight: -0.02em; --c-tr-snug: -0.01em;
+
+  /* ---- radius: the vault's grid ---- */
+  --c-r-xs: 4px;     /* kbd, code, an area note's box */
+  --c-r-sm: 8px;     /* thumbnails */
+  --c-r-md: 12px;    /* rows, fields, cards */
+  --c-r-lg: 24px;    /* the glass panels */
+  --c-r-pill: 999px;
+
+  /* ---- colour: text, the same ladder as the vault, as white over the glass ---- */
+  --c-text: #fff;
+  --c-text-2: rgb(255 255 255 / .8);     /* secondary */
+  --c-text-3: rgb(255 255 255 / .64);    /* labels, meta */
+  --c-fill: rgb(255 255 255 / .1);       /* something sitting on the panel: a row's hover, a thread, kbd */
+  --c-hover: rgb(255 255 255 / .2);
+  --c-line: rgb(255 255 255 / .1);       /* only where a line is the thing */
+  --c-line-2: rgb(255 255 255 / .22);    /* a field's focus */
+  --c-ground: #05070d;                   /* behind the wallpaper, before it loads */
+
+  /* ---- colour: the one accent. Blue only ever means "an agent is here" ---- */
+  --c-accent: #4da6ff;                                                   /* the vault's night blue */
+  --c-accent-soft: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  --c-on-accent: #05070d;
+  --c-bad: #ff7a6b;                                                      /* the vault's night red */
+  --c-ease: cubic-bezier(.23, 1, .32, 1);
+
+  /* ---- glass: buttons are glass everywhere, on home and the stage. A little white, a little frost, a hairline edge,
+     and light from straight above (a soft rim along the top, a quarter as much along the bottom). Never a solid fill.
+     liquid.js sets --g-* from the glass tuner; these are the fallbacks. In Chrome it also bends the background at the
+     rims like a lens. ---- */
+  --g-fill: .03; --g-blur: 1px; --g-light: .2; --g-edge: .04;
+  --glass-btn: rgb(255 255 255 / var(--g-fill));                          /* at rest */
+  --glass-btn-hover: rgb(255 255 255 / calc(var(--g-fill) + .06));
+  --glass-btn-on: rgb(255 255 255 / calc(var(--g-fill) + .12));           /* pressed, chosen, or the main action (play) */
+  --glass-edge: inset 0 0 0 0.5px rgb(255 255 255 / var(--g-edge)), inset 0 1px 0.5px rgb(255 255 255 / var(--g-light)), inset 0 -1px 0.5px rgb(255 255 255 / calc(var(--g-light) / 4));
+  --glass-blur: blur(var(--g-blur));
+  /* The surface of everything you press, type in, pick or drag (buttons, pills, fields, menus, toggles, slider tracks),
+     so every control reads as one material. Two looks, picked with the tuner's Controls pills (liquid.js sets
+     data-look on <html>): flat, the default, plain translucent white with no edge, frost or lens;
+     or glass, with the edge, top light and frost from the tuner. */
+  --surf: rgb(255 255 255 / .1); --surf-hover: rgb(255 255 255 / .14); --surf-on: rgb(255 255 255 / .22); --surf-edge: none; --surf-blur: none;
+}
+:root[data-look="glass"] { --surf: var(--glass-btn); --surf-hover: var(--glass-btn-hover); --surf-on: var(--glass-btn-on); --surf-edge: var(--glass-edge); --surf-blur: var(--glass-blur); }

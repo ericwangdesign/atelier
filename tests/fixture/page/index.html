@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Live page</title>
+<!-- A page a scene frames (framed-v1). It follows the scene root around its frame, as docs/live-pages.md says:
+     data-step for where the bar is, data-paused while it's paused. For tests/stage.test.mjs. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font: 16px system-ui; }
+  .scroll { position: absolute; left: 40px; top: 40px; width: 360px; height: 400px; overflow: auto; background: #f4f4f4; }
+  .row { height: 40px; }
+  .press { position: absolute; left: 500px; top: 40px; padding: 8px 16px; }
+  .ml { position: absolute; left: 500px; top: 120px; padding: 4px 8px; background: #222; color: #fff; pointer-events: none; }
+  .bar { position: absolute; left: 500px; top: 200px; width: 10px; height: 20px; background: #0071e3; transform-origin: left; animation: grow 4s linear infinite; }
+  @keyframes grow { to { transform: scaleX(30); } }
+</style>
+<div class="scroll"></div>
+<button class="press">Press</button>
+<span class="ml">Map name</span>
+<div class="bar"></div>
+<script>
+  document.querySelector('.scroll').innerHTML = Array.from({ length: 30 }, (_, i) => `<div class="row">Row ${i + 1}</div>`).join('');
+  let presses = 0;
+  document.querySelector('.press').onclick = () => { presses++; document.body.dataset.presses = presses; };
+  // The contract: a page reads its scene root every frame and holds its own timers while data-paused is there.
+  let follow = null; try { follow = frameElement && frameElement.closest('.scene'); } catch (x) {}
+  let ticks = 0;
+  const tick = () => {
+    const paused = !!follow && follow.hasAttribute('data-paused');
+    document.body.dataset.paused = paused;
+    if (!paused) document.body.dataset.ticks = ++ticks; // stands in for the page's own beats
+    requestAnimationFrame(tick);
+  };
+  tick();
+</script>

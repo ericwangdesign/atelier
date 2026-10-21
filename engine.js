@@ -6,19 +6,37 @@
    Engine.posAt(steps, seconds)   turns seconds into a step position
    Engine.duration(steps)         how long the scene plays, in seconds
 
-   The attributes a scene animates with (data-in, data-out, data-type, data-state) are explained in starter/first.js. */
+   The attributes a scene animates with (data-in, data-out, data-type, data-state) are explained in starter/first.js.
+   A scene with live(root) is a prototype: mount runs it once with the scene's root (inside its shadow root) and the
+   design is used, not played. It can also have a tour: steps, and live() returns at(i), which drive calls when the step
+   changes, to put the prototype in that step's state and play its move. A tap while it plays stops it (stage.html). Taps, swipes and typing are its own; the clock never drives it (Eric, Oct 18:
+   "everything in the atelier workspace should be 100% interactable like a prototype, not just a motion replay"). */
 window.Engine = (() => {
   const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
   function mount(host, sc) {
     const sh = host.attachShadow({ mode: 'open' });
     sh.innerHTML = `<style>:host { all: initial; } .scene { position: absolute; inset: 0; overflow: hidden; } ${sc.css}</style><div class="scene">${sc.html}</div>`;
-    return { host, scene: sc, root: sh.querySelector('.scene'), els: {
+    const root = sh.querySelector('.scene');
+    if (typeof sc.live === 'function') {
+      root.dataset.live = '';
+      let at = null;
+      try { at = sc.live(root); } catch (e) { console.error(sc.id, 'live', e); }
+      return { host, scene: sc, root, live: true, at: typeof at === 'function' ? at : null, step: -1 };
+    }
+    return { host, scene: sc, root, els: {
       in: [...sh.querySelectorAll('[data-in]')].map(el => ({ el, a: +el.dataset.in, b: el.dataset.out == null ? Infinity : +el.dataset.out })),
       type: [...sh.querySelectorAll('[data-type]')].map(el => { const [a, b] = el.dataset.type.split('-').map(Number); return { el, a, b: b ?? a + 1, full: el.textContent }; }),
       state: [...sh.querySelectorAll('[data-state]')].map(el => ({ el, list: el.dataset.state.trim().split(/\s+/).map(x => { const [p, s] = x.split(':'); return [+p, s]; }) })),
     } };
   }
   function drive(L, pos) {
+    // A prototype with a tour: live() returned at(i), which puts it in step i's state and plays that step's move.
+    if (L.live) {
+      const i = Math.min(Math.floor(pos), L.scene.steps.length - 1);
+      L.root.dataset.step = i;
+      if (L.at && L.step !== i) { L.step = i; try { L.at(i); } catch (e) { console.error(L.scene.id, 'tour', e); } }
+      return;
+    }
     const E = L.els; if (!E) return;
     const i = Math.min(Math.floor(pos), L.scene.steps.length - 1);
     L.root.dataset.step = i; L.root.style.setProperty('--p', Math.min(1, pos - i).toFixed(3)); // a design with fewer steps holds its last one at 1

@@ -4,7 +4,8 @@
   "private": true,
   "description": "A design stage where you and coding agents work on the same screens: notes they answer, directions they explore, and the trail of why each version exists.",
   "scripts": {
-    "start": "python3 serve.py"
+    "start": "python3 serve.py",
+    "test": "node tests/stage.test.mjs"
   },
   "devDependencies": {
     "ffmpeg-static": "^5.3.0",

@@ -52,24 +52,26 @@ def write_page(write_atomic, name, base, body):
 
 TEMPLATE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap">
 <title>{title}</title>
 <style>
-:root {{ --bg: #f2f2f2; --card: #fff; --fg: #141414; --sub: #5e5e5e; --line: rgb(0 0 0 / .08); --pin: #0069d1; --pinfg: #fff; color-scheme: light; }}
+:root {{ --bg: #f2f2f2; --card: #fff; --fg: #141414; --sub: #5e5e5e; --line: rgb(0 0 0 / .08); --pin: #0071e3; --pinfg: #fff; color-scheme: light; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg: #0d0d0d; --card: #181818; --fg: #f2f2f2; --sub: #9a9a9a; --line: rgb(255 255 255 / .08); --pin: #4da6ff; --pinfg: #05070d; color-scheme: dark; }} }}
 * {{ box-sizing: border-box; }}
 body {{ margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 Geist, "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }}
 main {{ max-width: 1120px; margin: 0 auto; padding: 56px 16px 80px; }}
-h1 {{ margin: 0; font-size: 28px; line-height: 1.2; font-weight: 600; letter-spacing: -.02em; max-width: 720px; }}
+h1 {{ margin: 0; font-size: 28px; line-height: 1.2; font-weight: 500; letter-spacing: -.02em; max-width: 720px; }}
 .sub {{ margin: 8px 0 0; color: var(--sub); max-width: 640px; }}
 .why {{ margin: 16px 0 0; padding: 12px 16px; border-radius: 12px; background: var(--card); max-width: 640px; }}
 .why::before {{ content: "Why this one"; display: block; color: var(--sub); font-size: 12px; }}
 .bar {{ display: flex; gap: 4px; margin: 32px 0 12px; padding: 3px; width: max-content; border-radius: 999px; background: var(--card); }}
 .bar button {{ height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--sub); font: inherit; font-size: 13px; cursor: pointer; }}
 .bar button[aria-pressed="true"] {{ background: var(--bg); color: var(--fg); }}
-.stage {{ position: relative; border-radius: 16px; overflow: hidden; background: var(--card); box-shadow: 0 0 0 1px var(--line); user-select: none; touch-action: pan-y; }}
-.stage img {{ display: block; width: 100%; height: auto; }}
+.stage {{ position: relative; width: max-content; max-width: 100%; border-radius: 16px; overflow: hidden; background: var(--card); box-shadow: 0 0 0 1px var(--line); user-select: none; touch-action: pan-y; }}
+/* the whole picture fits the window, so the change is never below the fold */
+.stage > img {{ display: block; width: auto; max-width: 100%; height: auto; max-height: max(320px, calc(100vh - 260px)); }}
 .stage .b {{ position: absolute; inset: 0; transition: opacity .35s cubic-bezier(.23, 1, .32, 1); }}
-.stage .b img {{ height: 100%; object-fit: cover; object-position: top left; }}
+.stage .b img {{ display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }}
 .stage[data-show="before"] .b {{ opacity: 0; }}
 .stage[data-mode="slide"] .b {{ opacity: 1; clip-path: inset(0 0 0 var(--split, 50%)); transition: none; }}
 .split {{ display: none; position: absolute; top: 0; bottom: 0; left: var(--split, 50%); width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 8px rgb(0 0 0 / .4); cursor: ew-resize; }}
@@ -78,7 +80,7 @@ h1 {{ margin: 0; font-size: 28px; line-height: 1.2; font-weight: 600; letter-spa
 .tag.l {{ left: 12px; }} .tag.r {{ right: 12px; }}
 .stage[data-mode="flip"][data-show="after"] .tag.l, .stage[data-mode="flip"][data-show="before"] .tag.r {{ display: none; }}
 .stage[data-mode="flip"] .tag.r {{ left: 12px; right: auto; }}
-.pin {{ position: absolute; translate: -50% -50%; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; background: var(--pin); color: var(--pinfg); font: 600 12px/24px system-ui; font-style: normal; text-align: center; box-shadow: 0 2px 8px rgb(0 0 0 / .3); }}
+.pin {{ position: absolute; translate: -50% -50%; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; background: var(--pin); color: var(--pinfg); font: 500 12px/24px Geist, system-ui; font-style: normal; text-align: center; box-shadow: 0 2px 8px rgb(0 0 0 / .3); }}
 .notes {{ list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 12px; max-width: 720px; }}
 .notes li {{ display: flex; gap: 12px; }}
 .notes b {{ flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--pin); color: var(--pinfg); font-size: 12px; line-height: 24px; text-align: center; }}

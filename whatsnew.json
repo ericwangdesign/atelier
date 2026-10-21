@@ -1,0 +1,31 @@
+[
+  {
+    "at": "2026-10-19",
+    "lines": [
+      "Take names, the Pick button and rank badges are medium weight now, not semibold.",
+      "Send to agent, Pick and the other main buttons are a blue tint now, never white.",
+      "Atelier works with any coding agent: Claude Code by default, or ATELIER_AGENT=gemini, codex, or your own. The button is Send to agent now.",
+      "The critic's top take is a faint blue tint now, not a blue ring."
+    ]
+  },
+  {
+    "at": "2026-10-18",
+    "lines": [
+      "A refresh opens the newest version of what you were looking at. Comparing keeps your older picks.",
+      "Screens stay centred: a sideways scroll on the wallpaper no longer nudges them, and a refresh always lands centred.",
+      "A note on a design that frames a live page now keeps a real picture of the page, not an empty frame.",
+      "Pause stops everything, mid-step too. In note mode the wheel scrolls the design, ⌥ lets you use it, and notes land on the element in a live page, not on its frame."
+    ]
+  },
+  {
+    "at": "2026-10-17",
+    "lines": [
+      "Notes are the only way to ask now. `/try 3` in a note gives three takes on just that part.",
+      "Taste learns from each design's whole run, first version to latest. Re-read all in the Taste tab.",
+      "Colour picker, dropdowns and folding groups in the Design tab.",
+      "⌥N pins a note on Atelier itself, for Claude to fix.",
+      "Takes waiting for a pick show on the vault's Today, under Needs you.",
+      "Type `atelier` in any terminal: opens it, and starts it if it isn't running."
+    ]
+  }
+]

@@ -155,7 +155,7 @@ window.Liquid = (() => {
       if (l) { G.look = l.dataset.look; save(); retune(); syncTuners(); return; }
       const a = e.target.closest('[data-a]'); if (!a) return;
       if (a.dataset.a === 'reset') { G = { ...DEFAULTS }; save(); retune(); syncTuners(); return; }
-      const text = 'Make these the liquid glass defaults (DEFAULTS in workspace/liquid.js):\n' + JSON.stringify(G);
+      const text = 'Make these the liquid glass defaults (DEFAULTS in atelier/liquid.js):\n' + JSON.stringify(G);
       const was = a.dataset.label ||= a.textContent, say = window.UI ? UI.say : (b, t) => { b.textContent = t; };
       try { await navigator.clipboard.writeText(text); say(a, 'Copied'); } catch { say(a, 'Not copied'); }
       clearTimeout(a._back); a._back = setTimeout(() => say(a, was, -1), 1400);

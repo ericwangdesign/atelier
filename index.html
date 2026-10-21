@@ -18,37 +18,38 @@
   - coming back from the stage (All projects) lands on the project you were in.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Geist for the tool itself; Inter Tight for the starter design (starter/first.js). -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- Nothing is drawn until the page has built itself (the #ready marker at the end of the body), so it never shows
      an empty panel while its scripts and scenes load, and the crossfade from the other page lands on the finished page. -->
 <link rel="expect" href="#ready" blocking="render">
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="wall.css">
 <link rel="stylesheet" href="ui.css">
 <style>
-  :root { --c-text: #fff; --c-dim: rgb(255 255 255 / .8); --c-faint: rgb(255 255 255 / .64); --c-inset: rgb(255 255 255 / .12); --c-hover: rgb(255 255 255 / .2); --c-line2: rgb(255 255 255 / .22);
-    --c-font: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --dim: 0; --shadow: 0 1px 2px rgb(0 0 0 / .45); color-scheme: dark; }
+  :root { --dim: 0; --shadow: 0 1px 2px rgb(0 0 0 / .45); }   /* the rest is tokens.css */
   :root[data-wall="light"] { --shadow: 0 1px 3px rgb(0 0 0 / .7), 0 0 12px rgb(0 0 0 / .5); }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; min-height: 100%; }
   html { scroll-behavior: smooth; }
-  body { background: #05070d; color: var(--c-text); font: 400 12px/16px var(--c-font); -webkit-font-smoothing: antialiased; }
+  body { background: var(--c-ground); color: var(--c-text); font: var(--c-w-body) var(--c-t-ui)/var(--c-lh-ui) var(--c-font); -webkit-font-smoothing: antialiased; }
   a { color: inherit; text-decoration: none; }
   button, input, select { font: inherit; color: inherit; }
   :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
   /* Every control is glass, from ui.css: translucent white over a blur, a hairline edge, a soft top highlight. */
-  .ctl { height: 32px; padding: 0 14px; border: 0; border-radius: 999px; color: #fff; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-shadow: none;
+  .ctl { height: 32px; padding: 0 14px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-shadow: none;
     background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
   .ctl:hover { background-color: var(--surf-hover); }
   .ctl svg { width: 10px; height: 10px; }
-  input.ctl { width: 180px; cursor: text; } input.ctl::placeholder { color: var(--c-faint); }
+  input.ctl { width: 180px; cursor: text; } input.ctl::placeholder { color: var(--c-text-3); }
   select.ctl { padding-right: 30px;
     background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 13px center no-repeat; }
   select.ctl:hover { background-color: var(--surf-hover); }
-  .seg { display: inline-flex; height: 32px; padding: 2px; border-radius: 999px; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
-  .pill { height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--c-dim); cursor: pointer; }
-  .pill:hover { color: #fff; } .pill[aria-pressed="true"] { background: var(--surf-on); color: #fff; box-shadow: var(--surf-edge); }
+  .seg { display: inline-flex; height: 32px; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
+  .pill { height: 28px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); cursor: pointer; }
+  .pill:hover { color: var(--c-text); } .pill[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); box-shadow: var(--surf-edge); }
   .swatch { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
   .swatch::-webkit-color-swatch-wrapper { padding: 0; } .swatch::-webkit-color-swatch { border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
 
@@ -56,8 +57,8 @@
   .top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 16px max(32px, calc((100% - 1360px) / 2 + 32px)); /* lines up with the page's column */ transition: background .25s, box-shadow .25s; }
   /* a tint, not frost: frost here would hide the wallpaper from the liquid buttons on top of it */
   .top.scrolled { background: linear-gradient(rgb(10 10 14 / .78), rgb(10 10 14 / .6)); box-shadow: 0 0.5px 0 rgb(255 255 255 / .16); }
-  h1 { margin: 0 auto 0 0; font-size: 22px; line-height: 28px; font-weight: 500; letter-spacing: -.02em; text-shadow: var(--shadow); white-space: nowrap; }
-  h1 span { margin-left: 8px; color: var(--c-faint); font-size: 15px; font-weight: 400; }
+  h1 { margin: 0 auto 0 0; font-size: var(--c-t-title); line-height: var(--c-lh-title); font-weight: var(--c-w-medium); letter-spacing: var(--c-tr-tight); text-shadow: var(--shadow); white-space: nowrap; }
+  h1 span { margin-left: 8px; color: var(--c-text-3); font-size: var(--c-t-lg); font-weight: var(--c-w-body); }
 
   /* the same wallpaper as the stage, with a soft wash on the left where the names and facts sit, so they read on any wallpaper */
   .scrim { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgb(5 7 13 / .55) 0, rgb(5 7 13 / .3) 320px, rgb(5 7 13 / .08) 70%); }
@@ -66,10 +67,9 @@
   .proj { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; scroll-margin-top: 88px; }
   .proj + .proj { margin-top: 48px; }
   .about { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; text-shadow: var(--shadow); min-width: 0; }
-  .about h2 { margin: 0 0 2px; font-size: 15px; line-height: 20px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .about h2 a:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--c-line2); }
-  .fact { color: var(--c-faint); line-height: 16px; }
-  .fact.notes { color: var(--c-dim); }
+  .about h2 { margin: 0 0 2px; font-size: var(--c-t-md); line-height: var(--c-lh-md); font-weight: var(--c-w-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fact { color: var(--c-text-3); line-height: var(--c-lh-ui); }
+  .fact.notes { color: var(--c-text-2); }
   /* an agent working on one of the project's designs (agent.js): the same blue as on the stage, and only then */
   .fact.working { display: flex; align-items: center; gap: 6px; color: #4da6ff; }
   .fact.working i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid rgb(77 166 255 / .3); border-top-color: #4da6ff; animation: wkspin .8s linear infinite; }
@@ -80,54 +80,59 @@
 
   /* a design: its screen at 1440 × 900, scaled to the card; a placeholder holds the same size until it loads */
   .card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .shot { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; border-radius: 10px; background: rgb(20 20 20 / .6);
+  .shot { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; border-radius: var(--c-r-md); background: rgb(20 20 20 / .6);
     box-shadow: 0 0 0 1px rgb(255 255 255 / .12), 0 12px 32px rgb(0 0 20 / .35); transition: box-shadow .2s ease, transform .2s cubic-bezier(.23, 1, .32, 1); }
   a.card:hover .shot { box-shadow: 0 0 0 1px rgb(255 255 255 / .4), 0 16px 40px rgb(0 0 20 / .45); transform: translateY(-2px); }
   .card.wait .shot { background: rgb(255 255 255 / .06); animation: wait 1.6s ease-in-out infinite; box-shadow: 0 0 0 1px rgb(255 255 255 / .08); }
   @keyframes wait { 50% { background: rgb(255 255 255 / .1); } }
-  .card.wait .cap::before { content: ""; width: 96px; height: 10px; border-radius: 999px; background: rgb(255 255 255 / .1); }
+  .card.wait .cap::before { content: ""; width: 96px; height: 10px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .1); }
   .screen { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; pointer-events: none; }
   .screen .host { pointer-events: none; } /* again on the host: its :host { all: initial } turns pointer events back on, and a live page in an iframe would take the click */
   .host { position: absolute; inset: 0; }
   .cap { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; text-shadow: var(--shadow); }
   .cap .t { color: rgb(255 255 255 / .92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 60%; }
-  .cap .v { color: var(--c-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cap .n { margin-left: auto; flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--c-line2); text-align: center; line-height: 20px; font-size: 11px; font-weight: 500; text-shadow: none; }
-  .cap .k { margin-left: auto; color: var(--c-faint); white-space: nowrap; flex: none; }
+  .cap .v { color: var(--c-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cap .n { margin-left: auto; flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--c-r-pill); background: var(--c-line-2); text-align: center; line-height: 20px; font-size: var(--c-t-xs); font-weight: var(--c-w-medium); text-shadow: none; }
+  .cap .k { margin-left: auto; color: var(--c-text-3); white-space: nowrap; flex: none; }
   .cap .k + .n { margin-left: 4px; }
   /* a bundle: the older versions show as two sheets behind the card, peeking out above it. Every card keeps the room
      for them, so cards with and without versions line up. */
   .pile { position: relative; padding-top: 10px; isolation: isolate; }
-  .card.many .pile::before, .card.many .pile::after { content: ""; position: absolute; top: 5px; left: 5%; right: 5%; height: 40px; border-radius: 10px 10px 0 0;
+  .card.many .pile::before, .card.many .pile::after { content: ""; position: absolute; top: 5px; left: 5%; right: 5%; height: 40px; border-radius: var(--c-r-md) var(--c-r-md) 0 0;
     z-index: -1; background: rgb(255 255 255 / .1); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
   .card.many .pile::before { top: 0; left: 10%; right: 10%; background: rgb(255 255 255 / .05); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
   /* which version the card shows, while the pointer skims it */
   .ticks { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity .2s; }
-  .ticks i { flex: 1; height: 3px; border-radius: 999px; background: rgb(255 255 255 / .35); box-shadow: 0 0 3px rgb(0 0 0 / .5); }
+  .ticks i { flex: 1; height: 3px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .35); box-shadow: 0 0 3px rgb(0 0 0 / .5); }
   .ticks i.on { background: #fff; }
   a.card:hover .ticks { opacity: 1; }
-  .card.none .shot { display: grid; place-items: center; padding: 16px; color: var(--c-faint); text-align: center; line-height: 16px; }
+  .card.none .shot { display: grid; place-items: center; padding: 16px; color: var(--c-text-3); text-align: center; line-height: var(--c-lh-ui); }
 
   /* the glass tuner: a frosted panel at the right, the same rhythm as the stage's panel (12 between, 6 label to slider) */
   .ctl[aria-pressed="true"] { background: var(--surf-on); }
-  .tunepanel { position: fixed; top: 72px; right: 16px; z-index: 10; width: 288px; padding: 16px; border-radius: 24px; color: #fff;
+  .tunepanel { position: fixed; top: 72px; right: 16px; z-index: 10; width: 288px; padding: 16px; border-radius: var(--c-r-lg); color: var(--c-text);
     background: rgb(40 40 46 / .45); -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
     box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .22), inset 0 1px 0 rgb(255 255 255 / .14), 0 16px 48px rgb(0 0 0 / .35); }
-  .tunepanel .tt { font-size: 13px; line-height: 20px; font-weight: 500; margin-bottom: 10px; }
-  .tunepanel .lbl { display: flex; justify-content: space-between; color: var(--c-dim); line-height: 16px; }
-  .tunepanel .lbl output { color: #fff; font-variant-numeric: tabular-nums; }
+  .tunepanel .tt { font-size: var(--c-t-sm); line-height: 20px; font-weight: var(--c-w-medium); margin-bottom: 10px; }
+  .tunepanel .lbl { display: flex; justify-content: space-between; color: var(--c-text-2); line-height: var(--c-lh-ui); }
+  .tunepanel .lbl output { color: var(--c-text); font-variant-numeric: tabular-nums; }
   .tunepanel .lbl:not(:first-child) { margin-top: 12px; }
   .tunepanel .range { display: block; width: 100%; height: 14px; margin: 6px 0 0; -webkit-appearance: none; appearance: none; background: none; cursor: pointer; }
-  .tunepanel .range::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--surf-hover); box-shadow: var(--surf-edge); }
+  .tunepanel .range::-webkit-slider-runnable-track { height: 4px; border-radius: var(--c-r-pill); background: var(--surf-hover); box-shadow: var(--surf-edge); }
   .tunepanel .range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
   .tunepanel .seg { display: flex; margin-top: 6px; } .tunepanel .pill { flex: 1; }
   .tunepanel .acts { display: flex; gap: 8px; margin-top: 16px; }
-  .tunepanel .btn { flex: 1; height: 30px; border: 0; border-radius: 999px; cursor: pointer; color: #fff; background: var(--surf); box-shadow: var(--surf-edge); }
+  .tunepanel .btn { flex: 1; height: 30px; border: 0; border-radius: var(--c-r-pill); cursor: pointer; color: var(--c-text); background: var(--surf); box-shadow: var(--surf-edge); }
   .tunepanel .btn:hover { background: var(--surf-hover); }
-  .empty { max-width: 380px; margin: 16vh auto 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--c-dim); text-shadow: var(--shadow); }
-  .empty h2 { margin: 0; color: var(--c-text); font-size: 15px; line-height: 20px; font-weight: 500; }
+  /* What changed since you last looked (whatsnew.json), once: a line per change, gone after Got it until the next one */
+  .news { max-width: 560px; margin: 0 0 24px; padding: 16px; border-radius: var(--c-r-lg); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text); }
+  .news-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--c-t-sm); line-height: var(--c-lh-sm); font-weight: 500; }
+  .news ul { margin: 8px 0 0; padding: 0 0 0 18px; display: grid; gap: 4px; color: var(--c-text-2); font-size: var(--c-t-sm); line-height: var(--c-lh-sm); }
+  .news code { font: inherit; color: var(--c-text); }
+  .empty { max-width: 380px; margin: 16vh auto 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--c-text-2); text-shadow: var(--shadow); }
+  .empty h2 { margin: 0; color: var(--c-text); font-size: var(--c-t-md); line-height: var(--c-lh-md); font-weight: var(--c-w-medium); }
   .empty p { margin: 0; }
-  code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 6px; border-radius: 6px; background: var(--c-inset); color: var(--c-text); text-shadow: none; }
+  code { font: var(--c-t-ui) var(--c-mono); padding: 2px 6px; border-radius: var(--c-r-xs); background: var(--c-fill); color: var(--c-text); text-shadow: none; }
 
   @media (max-width: 900px) { .top { flex-wrap: wrap; padding: 12px 16px; } h1 { flex-basis: 100%; } input.ctl { flex: 1; width: auto; min-width: 120px; }
     .page { padding: 8px 16px 64px; } .proj { grid-template-columns: 1fr; gap: 16px; } .designs { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
@@ -149,10 +154,11 @@
   <button class="ctl" id="new" hidden><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 1v8M1 5h8"/></svg>New project</button>
 </header>
 <main class="page">
+  <section class="news" id="news" hidden aria-label="New in Atelier"><div class="news-head"><span id="newshead">New</span><button class="ctl" id="newsok">Got it</button></div><ul id="newslist"></ul></section>
   <div id="list"></div>
   <div class="empty" id="nomatch" hidden><h2>No projects match</h2><p>Try another word, or clear the filter.</p></div>
   <div class="empty" id="none" hidden><h2>No projects yet</h2><p>A project is a folder next to the atelier folder with a scenes/ folder in it. New project makes one with a starter scene.</p></div>
-  <div class="empty" id="offline" hidden><h2>The Atelier server isn't running</h2><p>Start it in Terminal, then reload:</p><code>python3 serve.py</code><p><a class="ctl" href="stage.html">Open the starter stage</a></p></div>
+  <div class="empty" id="offline" hidden><h2>The Atelier server isn't running</h2><p>Start it in Terminal, then reload:</p><code>atelier</code><p><a class="ctl" href="stage.html">Open the starter stage</a></p></div>
 </main>
 
 <script src="engine.js"></script>
@@ -199,22 +205,23 @@ async function loadScenes(id) {
   for (const n of [...libs, ...names]) await addScript(`/p/${enc(id)}/${enc(n)}.js`); // helper scripts first
   // The project's own typefaces (scenes/fonts.css), loaded in this document since a shadow root ignores @font-face.
   const fonts = `/p/${enc(id)}/fonts.css`;
-  if (projects.some(p => p.id === id && p.fonts !== false) && !document.querySelector(`link[href="${fonts}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = fonts; document.head.append(l); }
+  if (all.some(p => p.id === id && p.fonts !== false) && !document.querySelector(`link[href="${fonts}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = fonts; document.head.append(l); }
   return window.SCENES.slice();
 }
 
-/* A design and its versions, bundled: one card, the newest version (the last listed) on top and the others stacked
-   behind it. The card shows that version's last step. Moving the pointer across it skims the versions, the first at the
-   left edge and the newest at the right, and plays the one under the pointer from the start; a click opens that one.
-   vers: [{ sc, vals, id, name, open }], in list order. */
+/* A project, as one card: its designs bundled, each shown by its newest version, the first design on top and the
+   others stacked behind it. Moving the pointer across it skims the designs, the first at the left edge, and plays the
+   one under the pointer from the start; a click opens that design. Home has one level per thing: a row is a client,
+   a card is a project, and a design's versions only show on the stage.
+   vers: [{ sc, vals, id, name (the design's title), open }], one per design, in list order. */
 function bundle(p, vers) {
   const a = document.createElement('a'), many = vers.length > 1, total = vers.reduce((n, v) => n + v.open, 0);
   a.className = 'card' + (many ? ' many' : '');
   a.addEventListener('click', () => a.querySelector('.shot').style.viewTransitionName = 'screen'); // grows into the stage's screen
   a.innerHTML = `<div class="pile"><div class="shot"><div class="screen"></div>${many ? `<div class="ticks">${vers.map(() => '<i></i>').join('')}</div>` : ''}</div></div>`
-    + `<div class="cap"><span class="t">${esc(vers[0].sc.title)}</span><span class="v"></span>`
-    + (many ? `<span class="k">${vers.length} versions</span>` : '')
-    + (total ? `<span class="n" title="${plural(total, 'open note', 'open notes')}">${total}</span>` : '') + `</div>`;
+    + `<div class="cap"><span class="t">${esc(p.name)}</span><span class="v"></span>`
+    + `<span class="k">${plural(vers.length, 'design', 'designs')}</span>`
+    + (total ? `<span class="n" title="${plural(total, 'open note', 'open notes')}">${plural(total, 'note', 'notes')}</span>` : '') + `</div>`;
   const shot = a.querySelector('.shot'), screen = a.querySelector('.screen'), ticks = [...a.querySelectorAll('.ticks i')];
   const layers = vers.map(v => {
     const host = document.createElement('div'); host.className = 'host'; screen.append(host);
@@ -228,7 +235,7 @@ function bundle(p, vers) {
       cur = i; layers.forEach((L, k) => L.host.hidden = k !== i);
       ticks.forEach((t, k) => t.classList.toggle('on', k === i));
       a.href = `stage.html?project=${enc(p.id)}&design=${enc(vers[i].id)}`;
-      a.querySelector('.v').textContent = vers[i].name;
+      a.querySelector('.v').textContent = vers[i].name === p.name ? '' : vers[i].name; // the design under the pointer
       t0 = performance.now();
     }
     cancelAnimationFrame(raf);
@@ -239,32 +246,64 @@ function bundle(p, vers) {
   const under = e => { const r = shot.getBoundingClientRect(); return Math.min(vers.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * vers.length))); };
   a.addEventListener('pointerenter', e => show(under(e), true));
   a.addEventListener('pointermove', e => { const i = under(e); if (i !== cur) show(i, true); });
-  a.addEventListener('pointerleave', () => show(vers.length - 1, false));
-  show(vers.length - 1, false);
+  a.addEventListener('pointerleave', () => show(0, false));
+  show(0, false);
   new ResizeObserver(() => screen.style.transform = `scale(${shot.clientWidth / 1440})`).observe(shot);
   return a;
 }
 const placeholder = () => { const d = document.createElement('div'); d.className = 'card wait'; d.innerHTML = '<div class="pile"><div class="shot"></div></div><div class="cap"></div>'; return d; };
 
 /* ---------- rows: drawn at full size from the summary, filled in when they scroll near ---------- */
-let projects = [];
+/* A row is a client (a folder next to atelier/), its cards its projects (each scenes/ folder in it): acme has
+   acme-checkout and acme-modals. A folder's own scenes/ is its one project, named after it. */
+let projects = [], all = []; // projects: the rows; all: every project the server found
+function grouped(list) {
+  const by = new Map();
+  for (const p of list) { const g = p.group || p.id; if (!by.has(g)) by.set(g, []); by.get(g).push(p); }
+  return [...by.entries()].map(([id, ms]) => {
+    ms.sort((a, b) => (b.id === id) - (a.id === id) || a.name.localeCompare(b.name));
+    const sum = k => ms.reduce((n, m) => n + (m[k] || 0), 0);
+    return { id, name: ms[0].client || ms[0].name, members: ms, scenes: ms.flatMap(m => m.scenes),
+      open: sum('open'), working: sum('working'), updated: Math.max(...ms.map(m => m.updated)) };
+  });
+}
 function row(p) {
-  const total = p.designs ?? p.scenes.length, versions = p.scenes.length + p.variants;
+  const total = p.members.length;
   const el = document.createElement('section');
   el.className = 'proj'; el.id = 'p-' + p.id; el._p = p;
-  el.innerHTML = `<div class="about"><h2><a href="stage.html?project=${enc(p.id)}" title="${esc(p.name)}">${esc(p.name)}</a></h2>`
-    + `<div class="fact">${plural(total, 'design', 'designs')}${versions > total ? ' · ' + plural(versions, 'version', 'versions') : ''}</div>`
+  el.innerHTML = `<div class="about"><h2 title="${esc(p.name)}">${esc(p.name)}</h2>`
+    + `<div class="fact">${plural(total, 'project', 'projects')}</div>`
     + (p.open ? `<div class="fact notes">${plural(p.open, 'open note', 'open notes')}</div>` : '')
-    + (p.working ? `<div class="fact working"><i></i>${p.working === 1 ? 'Claude is working' : `${p.working} agents working`}</div>` : '')
+    + (p.working ? `<div class="fact working"><i></i>${p.working === 1 ? 'An agent is working' : `${p.working} agents working`}</div>` : '')
     + `<div class="fact">Edited ${ago(p.updated)}</div>`
-    + `<div class="acts"><a class="ctl" href="stage.html?project=${enc(p.id)}">Open</a><button class="ctl more" hidden>Show all ${total}</button></div></div><div class="designs"></div>`;
+    + `<div class="acts"><button class="ctl more" hidden>Show all ${total}</button></div></div><div class="designs"></div>`;
   const grid = el.querySelector('.designs');
-  if (!total) { const d = document.createElement('div'); d.className = 'card none'; d.innerHTML = `<div class="shot">No designs yet. Add one to ${esc(p.id)}/scenes/index.js</div><div class="cap"></div>`; grid.append(d); }
   for (let i = 0; i < Math.min(total, SHOW); i++) grid.append(placeholder());
   return el;
 }
 async function fill(el) {
-  const p = el._p, scenes = await loadScenes(p.id);
+  const cards = [], titles = [];
+  for (const m of el._p.members) {
+    const c = await cardsFor(m); titles.push(m.name.toLowerCase(), c.titles);
+    if (!c.groups.length) {
+      cards.push(() => { const d = document.createElement('a'); d.className = 'card none'; d.href = `stage.html?project=${enc(m.id)}`;
+        d.innerHTML = `<div class="shot">No designs yet. Add one to ${esc(m.path || m.id + '/scenes/')}index.js</div><div class="cap"><span class="t">${esc(m.name)}</span></div>`; return d; });
+      continue;
+    }
+    // a design's newest version stands for it, with the open notes of all its versions
+    cards.push(() => bundle(m, c.groups.map(g => ({ ...g[g.length - 1], name: g[0].sc.title, open: g.reduce((n, v) => n + v.open, 0) }))));
+  }
+  el._titles = titles.join(' ');
+  const grid = el.querySelector('.designs'), more = el.querySelector('.more');
+  if (!cards.length) return;
+  grid.replaceChildren(...cards.slice(0, SHOW).map(f => f()));
+  if (cards.length > SHOW) {
+    more.hidden = false;
+    more.onclick = () => { grid.append(...cards.slice(SHOW).map(f => f())); more.hidden = true; };
+  }
+}
+async function cardsFor(p) {
+  const scenes = await loadScenes(p.id);
   const state = (await getJSON(`/api/state?project=${enc(p.id)}`) || {}).state || {};
   const notes = ((await getJSON(`/api/notes?project=${enc(p.id)}`) || {}).notes || []).filter(n => !n.done && n.text);
   const variants = (state.variants || []).filter(v => scenes.some(s => s.id === v.base)), ctl = state.ctl || {};
@@ -276,15 +315,8 @@ async function fill(el) {
     groups.get(sc.title).push({ sc, vals: ctl[sc.id], id: sc.id, name: sc.version || '', open: openOn(sc.id) },
       ...variants.filter(v => v.base === sc.id).map(v => ({ sc, vals: ctl[v.id], id: v.id, name: v.name, open: openOn(v.id) })));
   }
-  const cards = [...groups.values()].map(vers => () => bundle(p, vers));
-  el._titles = scenes.map(s => s.title + ' ' + (s.version || '')).join(' ').toLowerCase();
-  const grid = el.querySelector('.designs'), more = el.querySelector('.more');
-  if (!cards.length) return;
-  grid.replaceChildren(...cards.slice(0, SHOW).map(f => f()));
-  if (cards.length > SHOW) {
-    more.hidden = false;
-    more.onclick = () => { grid.append(...cards.slice(SHOW).map(f => f())); more.hidden = true; };
-  }
+  return { groups: [...groups.values()],
+    titles: scenes.map(s => s.title + ' ' + (s.version || '')).join(' ').toLowerCase() };
 }
 /* one project loads at a time, in the order they come into view */
 let chain = Promise.resolve();
@@ -307,7 +339,7 @@ function filter() {
   const q = $('filter').value.trim().toLowerCase();
   let shown = 0;
   for (const p of projects) {
-    const hit = !q || p.name.toLowerCase().includes(q) || p.id.includes(q) || p.scenes.join(' ').toLowerCase().includes(q) || (p._row._titles || '').includes(q);
+    const hit = !q || p.name.toLowerCase().includes(q) || p.members.some(m => m.id.includes(q)) || p.scenes.join(' ').toLowerCase().includes(q) || (p._row._titles || '').includes(q);
     p._row.hidden = !hit; shown += hit;
   }
   $('nomatch').hidden = !!shown;
@@ -321,17 +353,33 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.activeElement === $('filter')) { $('filter').value = ''; filter(); $('filter').blur(); }
 });
 
+// whatsnew.json, newest first: every change not seen yet, once. Seen means Got it was pressed after it (this browser).
+async function showNews() {
+  const all = await getJSON('whatsnew.json');
+  let seen = ''; try { seen = localStorage.getItem('atelier.newsSeen') || ''; } catch {}
+  const fresh = (all || []).filter(e => e && e.at > seen);
+  if (!fresh.length) return;
+  const md = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/`([^`]+)`/g, '<code>$1</code>');
+  const d = new Date(fresh[0].at + 'T12:00:00');
+  $('newshead').textContent = 'New · ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  $('newslist').innerHTML = fresh.flatMap(e => e.lines).map(l => '<li>' + md(l) + '</li>').join('');
+  $('news').hidden = false;
+  $('newsok').onclick = () => { try { localStorage.setItem('atelier.newsSeen', fresh[0].at); } catch {} $('news').hidden = true; };
+}
+
 async function start() {
   const list = await getJSON('/api/projects');
   if (!list) { $('offline').hidden = false; return; }
+  showNews();
   $('new').hidden = false;
-  projects = list;
+  all = list; projects = grouped(list);
   if (!projects.length) { $('none').hidden = false; return; }
   $('filter').hidden = $('sort').hidden = projects.length < 2; // filter and sort only once there is something to sort
   projects.forEach(p => { p._row = row(p); io.observe(p._row); });
   order(); filter();
   // back from the stage: land on the project you were in (rows already have their final size, so this is exact)
-  const back = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  const from = location.hash && decodeURIComponent(location.hash.slice(1)), mine = all.find(p => 'p-' + p.id === from);
+  const back = from && document.getElementById(mine ? 'p-' + (mine.group || mine.id) : from);
   if (back) { back.scrollIntoView({ block: 'start', behavior: 'instant' }); history.replaceState(null, '', location.pathname); }
 }
 
@@ -352,5 +400,8 @@ $('glassbtn').onclick = () => showTuner($('tunepanel').hidden);
 addEventListener('keydown', e => { if ((e.key === 'g' || e.key === 'G') && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.matches?.('input, select, textarea')) showTuner($('tunepanel').hidden); });
 </script>
 <div id="ready" hidden></div>
+
+<script>window.NOTES_ABOUT = 'atelier'; window.NOTES_PATH = location.pathname;</script>
+<script src="/notes-layer.js" async></script>
 </body>
 </html>

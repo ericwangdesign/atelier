@@ -1,21 +1,4 @@
-/* Buttons are glass everywhere, on home and the stage: a little white, a little frost, a hairline edge, and light
-   from straight above (a soft rim along the top, a quarter as much along the bottom). Never a solid fill.
-   The values (--g-fill, --g-blur, --g-light, --g-edge) are set by liquid.js from the glass tuner; these are the
-   fallbacks. In Chrome, liquid.js also bends the background at the rims like a lens. */
-:root {
-  --g-fill: .03; --g-blur: 1px; --g-light: .2; --g-edge: .04;
-  --glass-btn: rgb(255 255 255 / var(--g-fill));                          /* at rest */
-  --glass-btn-hover: rgb(255 255 255 / calc(var(--g-fill) + .06));
-  --glass-btn-on: rgb(255 255 255 / calc(var(--g-fill) + .12));           /* pressed, chosen, or the main action (play) */
-  --glass-edge: inset 0 0 0 0.5px rgb(255 255 255 / var(--g-edge)), inset 0 1px 0.5px rgb(255 255 255 / var(--g-light)), inset 0 -1px 0.5px rgb(255 255 255 / calc(var(--g-light) / 4));
-  --glass-blur: blur(var(--g-blur));
-  /* The surface of everything you press, type in, pick or drag (buttons, pills, fields, menus, toggles, slider tracks),
-     so every control reads as one material. Two looks, picked with the tuner's Controls pills (liquid.js sets
-     data-look on <html>): flat, the default, plain translucent white with no edge, frost or lens;
-     or glass, with the edge, top light and frost from the tuner. */
-  --surf: rgb(255 255 255 / .1); --surf-hover: rgb(255 255 255 / .14); --surf-on: rgb(255 255 255 / .22); --surf-edge: none; --surf-blur: none;
-}
-:root[data-look="glass"] { --surf: var(--glass-btn); --surf-hover: var(--glass-btn-hover); --surf-on: var(--glass-btn-on); --surf-edge: var(--glass-edge); --surf-blur: var(--glass-blur); }
+/* The tokens (glass, surfaces, colours, type) are in tokens.css, loaded before this. */
 
 /* A label change (ui.js): the leaving text sits over the arriving one until it's gone. */
 :is(.btn, .tbtn, .ctl, .ibtn) { position: relative; }
@@ -47,7 +30,7 @@ select { appearance: none; -webkit-appearance: none; }
     min-width: max(anchor-size(width), 128px); margin: 6px 0; padding: 4px; border: 0; border-radius: 18px;
     background: rgb(30 30 36 / .55); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
     box-shadow: var(--glass-edge), 0 12px 32px rgb(0 0 0 / .32);
-    color: #fff; font: 400 13px/16px "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: 0;
+    color: var(--c-text); font: var(--c-w-body) var(--c-t-sm)/var(--c-lh-ui) var(--c-font); letter-spacing: 0;
     /* opens in 200ms from just under the control, closes in 120ms */
     transform-origin: top center; opacity: 1; transform: none;
     transition: opacity .2s cubic-bezier(.19, 1, .22, 1), transform .2s cubic-bezier(.19, 1, .22, 1), display .2s allow-discrete, overlay .2s allow-discrete;
@@ -56,8 +39,8 @@ select { appearance: none; -webkit-appearance: none; }
   @starting-style { ::picker(select):popover-open { opacity: 0; transform: translateY(-4px) scale(.98); } }
   select option { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px 0 8px; border-radius: 14px;
     background: none; color: rgb(255 255 255 / .72); font: inherit; white-space: nowrap; cursor: pointer; outline: 0; }
-  select option:is(:hover, :focus-visible) { background: rgb(255 255 255 / .1); color: #fff; }
-  select option:checked { color: #fff; }
+  select option:is(:hover, :focus-visible) { background: rgb(255 255 255 / .1); color: var(--c-text); }
+  select option:checked { color: var(--c-text); }
   select option::checkmark { content: ""; width: 12px; height: 12px; flex: none; background: currentColor;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12'%3E%3Cpath d='M2.5 6.3l2.4 2.4 4.6-5.2' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px no-repeat; }
   select option:not(:checked)::checkmark { visibility: hidden; }

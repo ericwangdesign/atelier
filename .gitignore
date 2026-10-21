@@ -11,3 +11,4 @@ out/
 exports/
 __pycache__/
 taste.json
+taste.md
