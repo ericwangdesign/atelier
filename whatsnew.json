@@ -1,5 +1,28 @@
 [
   {
+    "at": "2026-11-15",
+    "lines": [
+      "Home has a new look, picked from 28 versions: neutral greys with no blue tint, no wallpaper and no screenshots.",
+      "A folder is the one object on the shelf: grey glass with pages standing in it that name what's inside. Point at it and they rise.",
+      "A project or a design is a card set in type: its name large, its facts small. Nothing is a picture of the UI.",
+      "Folders go as deep as you like. New folder makes one; drag a project or a folder onto a folder to move it; double-click a folder's name at the top to rename it.",
+      "A project's page has its context (click to write), its docs, and its designs. A design's iterations are chips under its card: pick one, then click the card to open it or Remix to copy a brief for your agent.",
+      "A design doesn't have to be made in Atelier. `atelier publish <project> --title … --open <url>` adds any prototype.",
+      "The magnifier at the top left searches the shelf (or press /). `atelier shelf`, `atelier folder` and `atelier move` do the same from the terminal."
+    ]
+  },
+  {
+    "at": "2026-10-27",
+    "lines": [
+      "Draw on a note: pen, ellipse, rectangle and arrow, in blue. The agent gets the drawing and what it's on.",
+      "In note mode, double-click words to edit them in place. Return notes the old and new words for the agent.",
+      "Edit CSS on a cut element: change its spacing, type, colour or radius right on screen, and the note carries old → new.",
+      "Dictate a note: the mic in the note types what you say.",
+      "⌘Return in a note sends just that note to the agent, now. Return still only saves.",
+      "The note editor reads in order: your words first, a small picture, quiet tools, Edit CSS folded away, and Send the one blue button. A blank picture is left out."
+    ]
+  },
+  {
     "at": "2026-10-19",
     "lines": [
       "Take names, the Pick button and rank badges are medium weight now, not semibold.",

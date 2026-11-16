@@ -108,6 +108,22 @@ animate with.
 `scenes(['a-v1'], ['helpers'])` loads `scenes/helpers.js` before the designs, for code they share. A project's
 typefaces go in `scenes/fonts.css`.
 
+## The shelf
+
+Home is a file browser: folders, and in them projects. Everything is set in type: a folder shows the names of what's
+in it, a project or a design is a card with its name and facts. A project's page has its context, its docs and its
+designs, one card each; a design's iterations are the chips under its card. It's one file, `project.json`, in the project's folder.
+
+- **Folders** go as deep as you like. New folder makes one; drag a project or a folder onto a folder to move it;
+  double-click a folder's name at the top to rename it. Nothing moves on disk.
+- A design can be any prototype, not only one made in Atelier:
+  `atelier publish my-app --title "One-page checkout" --open http://localhost:5173 --run "npm run dev" --source <repo>`.
+  Atelier takes a picture of it. A project with `scenes/` lists its designs by itself.
+- **Remix** on a design copies a brief for your agent: the context, the docs, how to run the iteration you picked, and
+  the `atelier publish … --from <iteration>` line that puts your take back on the same card.
+- Share the projects folder (a repo, a drive) and a team shares the shelf. `ATELIER_USER` is your name on what you
+  publish; without it, the name git signs your commits with.
+
 ## On the stage
 
 - **Compare.** Shift-click designs to put up to five on screen, lettered A to E, in step: step 3 always shows next to

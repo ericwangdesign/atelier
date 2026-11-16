@@ -4,6 +4,7 @@
    Send to agent (Notes)   the open notes on a design go to an agent. It works on a copy, the next version, which
                             appears beside the original at once and rebuilds live every time the agent saves it.
                             Each note gets a reply and is marked done; its reply links to the version it made.
+   ⌘Return in a note        sends just that note, now, as its own run (Send in the note does the same).
    /try 3 in a note         that note isn't done with the others: once they land, three agents each make a take on
                             it, on top of the new version, with nothing else on screen changing. They show side by
                             side and each offers Pick, with a line for why. The next /try note starts from the pick.
@@ -110,11 +111,12 @@ window.Agent = (() => {
   }
 
   /* ---------- send notes ---------- */
-  async function sendNotes() {
+  // only: one note, sent now as its own run (⌘Return in the note); otherwise every open note
+  async function sendNotes(only) {
     if (editing) closeEditor(true);
-    const open = S.notes.map((n, k) => [n, k]).filter(([n]) => n.text && !n.done && !n.sent && n.design !== 'url' && sceneById(n.design));
-    if (!open.length) return say('No open notes to send');
-    const btn = $('notesend'); UI.say(btn, 'Sending…');
+    const open = S.notes.map((n, k) => [n, k]).filter(([n]) => (!only || n === only) && n.text && !n.done && !n.sent && n.design !== 'url' && sceneById(n.design));
+    if (!open.length) return say(only ? 'Nothing to send in that note' : 'No open notes to send');
+    const btn = $('notesend'); if (only) say(`Sending note ${open[0][1] + 1}…`); else UI.say(btn, 'Sending…');
     await syncNotes(); // the server reads the notes from disk
     const byDesign = new Map();
     open.forEach(([n, k]) => { const sc = sceneById(n.design), id = sc.base || sc.id; byDesign.set(id, [...(byDesign.get(id) || []), [n, k]]); });
@@ -132,11 +134,11 @@ window.Agent = (() => {
     // a version beside its original; takes on their own
     if (made.length) { S.shown = (made[0].length > 2 ? made[0].slice(1) : made[0]).slice(0, MAX); S.view = 'side'; S.rows = 'none'; S.cols = 'shown'; S.zoom = 0; S.pos = {}; }
     runs.forEach(r => r.group && groups.add(r.group));
-    UI.say(btn, made.length ? 'Sent' : 'Send to agent'); setTimeout(() => notesChanged(), 1400);
+    if (!only) UI.say(btn, made.length ? 'Sent' : 'Send to agent'); setTimeout(() => notesChanged(), 1400);
     await pollNotes(); apply(); poll();
   }
 
-  $('notesend').onclick = sendNotes;
+  $('notesend').onclick = () => sendNotes();
 
   /* ---------- pick one take ---------- */
   let picking2 = null;
@@ -440,5 +442,5 @@ window.Agent = (() => {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
   API('trail').then(d => { trail = d.trail || []; trailChanged(); paint(); }).catch(() => {});
   poll();
-  return { paint, notesChanged, info, askCritic };
+  return { paint, notesChanged, info, askCritic, sendNow: n => sendNotes(n) };
 })();

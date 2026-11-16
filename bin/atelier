@@ -6,6 +6,11 @@
 #   atelier stop       stop the one running
 #   atelier log        what it said lately
 #   atelier taste      the taste list; atelier taste add "rule" --why "what Eric said"
+#   atelier shelf      every project on the shelf; atelier shelf <project> lists its versions
+#   atelier remix <project> <version>     the brief for remixing a version on this computer
+#   atelier publish <project> --title "…" --from <version> --open <url> --run "…" --source <where> --note "…"
+#   atelier context <project> "…"   and   atelier doc <project> "<title>" <link>
+#   atelier folder "Team/Area"      and   atelier move <project> "Team/Area"
 # Linked into /opt/homebrew/bin. ATELIER_PORT moves it off 4321.
 self=$(readlink -f "$0" 2>/dev/null || echo "$0")
 DIR=$(cd "$(dirname "$self")/.." && pwd)
@@ -21,7 +26,8 @@ case "$1" in
     exit 0 ;;
   log) tail -n 40 "$LOG"; exit 0 ;;
   taste) shift; exec python3 "$DIR/taste.py" "$@" ;;
-  -h|--help|help) sed -n '2,9p' "$self" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  shelf|remix|publish|context|doc|folder|move) cd "$DIR" && exec python3 "$DIR/hub.py" "$@" ;;
+  -h|--help|help) sed -n '2,14p' "$self" | sed 's/^# \{0,1\}//'; exit 0 ;;
 esac
 
 url="http://localhost:$PORT/"

@@ -10,11 +10,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url)), FIXTURE = join(ROOT, 'tests', 'fixture');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const json = (res, body, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
-let version = 0;
+let version = 0, stored = [];
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'), p = decodeURIComponent(url.pathname);
   if (p === '/api/projects') return json(res, [{ id: 'fixture', name: 'Fixture', path: 'atelier/tests/fixture/', fonts: false }]);
-  if (p === '/api/notes') return json(res, req.method === 'GET' ? { notes: [], version: '0' } : { version: String(++version) });
+  if (p === '/api/notes') { // keeps what the page saves, so a poll never takes its notes away
+    if (req.method === 'GET') return json(res, { notes: stored, version: String(version) });
+    let body = ''; for await (const c of req) body += c; stored = JSON.parse(body).notes || []; return json(res, { version: String(++version) });
+  }
   if (p === '/api/state') return json(res, req.method === 'GET' ? { state: {}, version: '0' } : { version: String(++version) });
   if (p === '/api/agent') return json(res, { runs: [], critic: {} });
   if (p === '/api/trail') return json(res, { trail: [] });
@@ -35,8 +38,10 @@ if (SERVE) { console.log(`${BASE}/stage.html?project=fixture`); await new Promis
 const browser = await chromium.launch({ channel: 'chrome' });
 let failed = 0;
 const errors = [];
-async function stage(design) {
+async function stage(design, init) {
+  stored = []; // every page starts with no notes
   const ctx = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+  if (init) await ctx.addInitScript(init); // before the stage's own script: stand-ins for what the browser has
   const page = await ctx.newPage();
   page.on('pageerror', e => errors.push(`${design}: ${e.message}`));
   // a fresh browser each time: no workspace kept from another check
@@ -195,6 +200,209 @@ console.log('Note mode leaves the design usable');
     expect(await page.evaluate(() => noting), `N inside the page did not start note mode (${await page.evaluate(() => [document.activeElement.tagName, editing && editing.text, cutting, picking, document.body.className])})`);
     await frameEl(page).press('body', 'Escape');
     expect(!(await page.evaluate(() => noting)), 'Esc inside the page did not end note mode');
+  });
+  await ctx.close();
+}
+
+console.log('Notes carry more than words');
+{
+  const { page, ctx } = await stage('built-v1');
+  const snaps = []; page.on('request', r => { if (r.url().includes('/api/snap')) snaps.push(JSON.parse(r.postData()).data); });
+  // how many pixels of a picture are the stage's blue
+  const blue = data => page.evaluate(async d => { const im = new Image(); im.src = d; await im.decode(); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const g = c.getContext('2d'); g.drawImage(im, 0, 0); const px = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
+    for (let i = 0; i < px.length; i += 4) if (Math.abs(px[i] - 77) < 30 && Math.abs(px[i + 1] - 166) < 30 && px[i + 2] > 220) n++; return n; }, data);
+  const drag = async (a, b, steps = 8) => { const p = await at(page, ...a), q = await at(page, ...b); await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(q.x, q.y, { steps }); await page.mouse.up(); };
+  await page.keyboard.press('n');
+  await check('markup: a circle and an arrow are drawn on the note, named by what they are on, and ⌘Z takes one back', async () => {
+    const p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await wait(300);
+    await page.click('#poptools [data-tool="ellipse"]');
+    expect(await page.evaluate(() => document.body.classList.contains('marking') && document.activeElement.id === 'poptext'), 'the tool did not come up (or the note lost the caret)');
+    await drag([44, 90], [160, 130]);
+    let n = await page.evaluate(() => editing);
+    expect(n && n.marks && n.marks.length === 1 && /^Circled .*class="words"/.test(n.marks[0].on), `the circle is on ${n && JSON.stringify(n.marks)}`);
+    expect(await page.evaluate(() => { const m = document.querySelector('.ink.on'); return m && getComputedStyle(m).display !== 'none'; }), 'the markup does not show while the note is open');
+    await page.keyboard.press('Meta+z');
+    expect(await page.evaluate(() => !editing.marks), '⌘Z did not take the circle back');
+    await drag([44, 90], [160, 130]);
+    await page.click('#poptools [data-tool="arrow"]'); await drag([70, 62], [420, 232]);
+    n = await page.evaluate(() => editing);
+    expect(n.marks.length === 2 && /^Arrow from <span class="tag"/.test(n.marks[1].on), `the arrow is ${JSON.stringify(n.marks[1])}`);
+    expect(await page.evaluate(() => editing && !!document.querySelector('.pin.open')), 'drawing closed the note');
+  });
+  await check('markup: kept with the note, in the brief and baked into its snapshot, and off the design once the note closes', async () => {
+    await page.keyboard.type('look'); await page.keyboard.press('Enter'); await wait(400);
+    const n = await lastNote(page), b = await page.evaluate(() => brief());
+    expect(n.text === 'look' && n.marks.length === 2, 'the note lost its markup');
+    expect(/Markup \(drawn in blue/.test(b) && /1\. Circled/.test(b) && /2\. Arrow from/.test(b), 'the brief does not name the markup');
+    expect(await page.evaluate(() => [...document.querySelectorAll('.ink')].every(m => getComputedStyle(m).display === 'none')), `markup stays on the design after the note closed: ${await page.evaluate(() => [...document.querySelectorAll('.ink')].map(m => m.getAttribute('class') + ' ' + getComputedStyle(m).display).join())}`);
+    const pin = await page.evaluate(() => { const r = [...document.querySelectorAll('.pin')].at(-1).getBoundingClientRect(); return { x: r.left + 12, y: r.top + 12 }; });
+    await page.mouse.move(pin.x, pin.y); await wait(50);
+    expect(await page.evaluate(() => [...document.querySelectorAll('.ink')].some(m => getComputedStyle(m).display !== 'none')), 'pointing at the pin does not show its markup');
+    expect(snaps.length >= 2, `the snapshot was not taken again with the markup (${snaps.length})`);
+    const [a, z] = [await blue(snaps[0]), await blue(snaps.at(-1))];
+    expect(z > a * 2 && z > 400, `the snapshot has no markup in it: ${a} blue pixels before, ${z} after`);
+    await page.mouse.move(5, 5);
+  });
+  await check('markup: Esc puts the tool down first, then cancels what was drawn', async () => {
+    await page.keyboard.press('Escape'); // note mode off
+    const p = await at(page, 600, 300); await page.keyboard.press('n'); await page.mouse.click(p.x, p.y); await wait(300);
+    await page.click('#poptools [data-tool="rect"]'); await drag([560, 260], [640, 340]);
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => !!editing && !marking && editing.marks.length === 1), 'the first Esc did not just put the tool down');
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => !editing && !S.notes.some(n => n.marks && n.marks.some(m => m.t === 'rect'))), 'Esc kept the drawing');
+    await page.keyboard.press('Escape');
+  });
+  await check('edit words in place: a double click edits them, Return notes the old and new words, and the screen keeps showing them', async () => {
+    await page.keyboard.press('n');
+    const before = await page.evaluate(() => S.notes.length), p = await at(page, 70, 108);
+    await page.mouse.dblclick(p.x, p.y); await wait(150);
+    expect(await page.evaluate(() => !!texting && texting.el.isContentEditable && texting.el.matches('.words')), `no edit on the words (${await page.evaluate(() => texting && texting.el.outerHTML)})`);
+    expect(await page.evaluate(() => S.notes.length) === before, 'the double click left a note behind');
+    await page.keyboard.type('Fresh words'); await page.keyboard.press('Enter'); await wait(150);
+    const n = await lastNote(page), words = () => page.evaluate(() => screens[0].layers[0].root.querySelector('.words').textContent);
+    expect(n.edit && n.edit.old === 'Card words' && n.edit.new === 'Fresh words' && /p\.words/.test(n.edit.path), `the note's edit is ${JSON.stringify(n.edit)}`);
+    expect(await page.evaluate(() => !!editing && !document.querySelector('#popedit').hidden), 'the note did not open with its edit');
+    await page.keyboard.press('Enter'); await wait(100);
+    expect((await lastNote(page)).text === 'Text: "Card words" → "Fresh words"', `the note's text is ${(await lastNote(page)).text}`);
+    expect(/Text edit on .*p\.words.*from "Card words" to "Fresh words"/.test(await page.evaluate(() => brief())), 'the brief does not carry the edit');
+    expect(await words() === 'Fresh words', 'the screen lost the new words');
+    await page.evaluate(() => { screens[0].layers[0].root.querySelector('.words').textContent = 'Card words'; }); await wait(450); // the design redraws
+    expect(await words() === 'Fresh words', 'the preview did not come back after a redraw');
+    await page.evaluate(() => { const n = S.notes.at(-1); dropNote(n); touch(n, true); renderNotes(); });
+    expect(await words() === 'Card words', 'deleting the note left its words on screen');
+  });
+  await check('edit words in place: Esc puts the words back and makes no note', async () => {
+    const before = await page.evaluate(() => S.notes.length), p = await at(page, 60, 260);
+    await page.mouse.dblclick(p.x, p.y); await wait(150);
+    const el = await page.evaluate(() => texting && texting.el.textContent);
+    await page.keyboard.type('zzz'); await page.keyboard.press('Escape'); await wait(100);
+    expect(await page.evaluate(([t]) => !texting && [...screens[0].layers[0].root.querySelectorAll('.list p')].some(p => p.textContent === t && !p.isContentEditable), [el]), `the words did not come back (${el})`);
+    expect(await page.evaluate(() => S.notes.length) === before && await page.evaluate(() => noting), 'Esc made a note or left note mode');
+    await page.keyboard.press('Escape');
+  });
+  await check('Edit CSS: on a cut element, a change shows on that element only and the note carries old → new', async () => {
+    await page.keyboard.press('x');
+    const p = await at(page, 70, 108); await page.mouse.move(p.x, p.y); await page.mouse.click(p.x, p.y); await wait(200);
+    expect(await page.evaluate(() => editing && editing.cut && !$('popcssbtn').hidden), 'no Edit CSS on the cut');
+    await page.click('#popcssbtn');
+    const size = '#popcss [data-p="font-size"] input';
+    expect(await page.$eval(size, i => i.value) === '16px', 'the size field does not start at the element\'s size');
+    await page.fill(size, '24px');
+    const css = (sel, prop) => page.evaluate(([sel, prop]) => getComputedStyle(screens[0].layers[0].root.querySelector(sel))[prop], [sel, prop]);
+    expect(await css('.words', 'fontSize') === '24px' && await css('.tag', 'fontSize') === '16px', 'the size did not show on the element alone');
+    await page.focus(size); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Shift+ArrowUp');
+    expect(await css('.words', 'fontSize') === '35px', `↑ and ⇧↑ did not step the size: ${await css('.words', 'fontSize')}`);
+    await page.click('#popcss [data-p="color"] .swatch');
+    expect(await page.evaluate(() => ColorPick.isOpen() && !!editing), 'the colour picker did not open (or closed the note)');
+    await page.evaluate(() => { const i = document.querySelector('.cpick .cp-in input'); i.value = 'FF0000'; i.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(await css('.words', 'color') === 'rgb(255, 0, 0)', 'the colour did not show');
+    const n = await page.evaluate(() => editing);
+    expect(n.css['font-size'][0] === '16px' && n.css['font-size'][1] === '35px' && n.css.color[1] === '#ff0000', `the note's diff is ${JSON.stringify(n.css)}`);
+    await page.evaluate(() => ColorPick.close()); await page.focus('#poptext'); await page.keyboard.type('bigger'); await page.keyboard.press('Enter'); await wait(100);
+    expect(/CSS edits on .*p\.words.*font-size 16px → 35px; color #000000 → #ff0000/.test(await page.evaluate(() => brief())), `the brief does not carry the CSS: ${await page.evaluate(() => brief().split('\n').find(l => /CSS/.test(l)))}`);
+    expect(await css('.words', 'fontSize') === '35px', 'the preview went when the note closed');
+  });
+  await check('a cut that draws as nothing shows no picture: the blank snapshot is hidden, a real one shows', async () => {
+    await page.evaluate(() => screens[0].layers[0].root.insertAdjacentHTML('beforeend', '<div class="blank" style="position:absolute;left:700px;top:420px;width:200px;height:140px;background:#fff"></div>'));
+    const p = await at(page, 800, 490); await page.mouse.move(p.x, p.y); await page.mouse.click(p.x, p.y); await wait(1500);
+    let n = await page.evaluate(() => editing && { blank: editing.snapBlank, snap: editing.snap, cut: editing.cut.path, img: $('popsnap').hidden, shot: $('popshot').hidden });
+    expect(n && /div\.blank/.test(n.cut) && n.blank && !n.snap && n.img && !n.shot, `the blank cut shows a picture: ${JSON.stringify(n)}`);
+    await page.keyboard.press('Escape');
+    const q = await at(page, 200, 140); await page.mouse.move(q.x, q.y); await page.mouse.click(q.x, q.y); await wait(1500);
+    n = await page.evaluate(() => editing && { blank: editing.snapBlank, snap: editing.snap, cut: editing.cut.path, img: $('popsnap').hidden });
+    expect(n && /div\.card/.test(n.cut) && !n.blank && n.snap && !n.img, `the card's cut has no picture: ${JSON.stringify(n)}`);
+    await page.keyboard.press('Escape');
+  });
+  await check('Edit CSS: Esc takes the values back, deleting the note takes the preview off', async () => {
+    const pin = await page.evaluate(() => { const r = [...document.querySelectorAll('.pin')].at(-1).getBoundingClientRect(); return { x: r.left + 12, y: r.top + 12 }; });
+    await page.mouse.click(pin.x, pin.y); await wait(100); await page.click('#popcssbtn');
+    await page.fill('#popcss [data-p="padding"] input', '20px'); await page.keyboard.press('Escape'); await wait(100);
+    const css = prop => page.evaluate(prop => getComputedStyle(screens[0].layers[0].root.querySelector('.words'))[prop], prop);
+    expect(await css('paddingTop') === '0px' && await css('fontSize') === '35px', 'Esc kept the padding, or lost the earlier edits');
+    expect(await page.evaluate(() => !S.notes.at(-1).css.padding), 'Esc kept the padding in the note');
+    await page.evaluate(() => { const n = S.notes.at(-1); dropNote(n); touch(n, true); renderNotes(); });
+    expect(await css('fontSize') === '16px' && await css('color') === 'rgb(0, 0, 0)', 'deleting the note left its CSS on screen');
+    await page.keyboard.press('Escape');
+  });
+  await ctx.close();
+}
+
+{
+  const { page, ctx } = await stage('framed-v1');
+  await check('edit words in place on a framed page: the element in the page, kept as a preview', async () => {
+    await page.keyboard.press('n');
+    const p = await inFrame(page, '.ml'), old = await frameEl(page).evaluate(() => document.querySelector('.ml').textContent);
+    await page.mouse.dblclick(p.x, p.y); await wait(150);
+    expect(await page.evaluate(() => !!texting && !!frameOf(texting.el)), 'no edit in the framed page');
+    await page.keyboard.type('Framed words'); await page.keyboard.press('Enter'); await wait(150);
+    const n = await lastNote(page);
+    expect(n.edit && n.edit.old === old.replace(/\s+/g, ' ').trim() && n.edit.new === 'Framed words' && n.edit.ref.frame, `the note's edit is ${JSON.stringify(n.edit)}`);
+    expect(await frameEl(page).evaluate(() => document.querySelector('.ml').textContent) === 'Framed words', 'the page lost the new words');
+    await page.keyboard.press('Escape');
+  });
+  await ctx.close();
+}
+
+{
+  // a stand-in for the browser's speech recognition: the test says the words
+  const { page, ctx } = await stage('built-v1', () => { window.SpeechRecognition = window.webkitSpeechRecognition = class { start() { window.__rec = this; } stop() { this.stopped = true; this.onend && this.onend(); } }; });
+  await check('dictate: the mic fills the note at the caret, and stops when pressed again or the note closes', async () => {
+    await page.keyboard.press('n'); const p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await wait(200);
+    await page.keyboard.type('please');
+    expect(await page.evaluate(() => !$('popmic').hidden), 'the mic is hidden though the browser has speech');
+    await page.click('#popmic');
+    expect(await page.evaluate(() => !!window.__rec && $('popmic').getAttribute('aria-pressed') === 'true' && window.__rec.lang && window.__rec.continuous), 'the mic did not start listening');
+    await page.evaluate(() => __rec.onresult({ results: [[{ transcript: 'make it' }]] }));
+    await page.evaluate(() => __rec.onresult({ results: [[{ transcript: 'make it' }], [{ transcript: ' blue' }]] }));
+    expect(await page.$eval('#poptext', t => t.value) === 'please make it blue', `the note says "${await page.$eval('#poptext', t => t.value)}"`);
+    await page.click('#popmic');
+    expect(await page.evaluate(() => __rec.stopped && $('popmic').getAttribute('aria-pressed') === 'false'), 'pressing the mic again did not stop it');
+    await page.click('#popmic'); await page.keyboard.press('Enter'); await wait(100);
+    expect(await page.evaluate(() => __rec.stopped && !hearing), 'closing the note left the mic on');
+    expect((await lastNote(page)).text === 'please make it blue', 'the dictated words were not kept');
+  });
+  await ctx.close();
+}
+{
+  const { page, ctx } = await stage('built-v1', () => { delete window.webkitSpeechRecognition; delete window.SpeechRecognition; });
+  await check('dictate: no mic where the browser has no speech recognition', async () => {
+    await page.keyboard.press('n'); const p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await wait(200);
+    expect(await page.evaluate(() => $('popmic').hidden && getComputedStyle($('popmic')).display === 'none'), 'the mic shows anyway');
+  });
+  await ctx.close();
+}
+
+{
+  const { page, ctx } = await stage('built-v1');
+  const sent = [];
+  await page.route('**/api/agent?**', route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const b = JSON.parse(route.request().postData()); sent.push(b);
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ runs: [{ id: 'run' + sent.length, status: 'working' }], scenes: [], round: 'q' + sent.length }) });
+  });
+  await check('send one note now: ⌘Return sends just that note as its own run; plain Return only saves', async () => {
+    await page.keyboard.press('n');
+    let p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await page.keyboard.type('one'); await page.keyboard.press('Enter'); await wait(100);
+    expect(!sent.length, 'plain Return sent the note');
+    p = await at(page, 600, 300); await page.mouse.click(p.x, p.y); await wait(100);
+    expect(await page.evaluate(() => !$('popsend').hidden), 'no Send in the note');
+    await page.keyboard.type('two'); await page.keyboard.press('Meta+Enter'); await wait(400);
+    const [one, two] = await page.evaluate(() => S.notes.slice(-2));
+    expect(sent.length === 1 && sent[0].notes.length === 1 && sent[0].notes[0].id === two.id && Object.keys(sent[0].briefs).join() === String(two.id), `sent ${JSON.stringify(sent.map(b => b.notes))}`);
+    expect(/Note: two/.test(sent[0].briefs[two.id]), 'the brief sent is not the note\'s');
+    expect(two.sent === 'run1' && !one.sent && !(await page.evaluate(() => !!editing)), `the note is not marked as sent (${two.sent}), or the other one is`);
+  });
+  await check('send one note now: Send in an open note does the same', async () => {
+    const pin = await page.evaluate(() => { const r = document.querySelector('.pin').getBoundingClientRect(); return { x: r.left + 12, y: r.top + 12 }; });
+    await page.mouse.click(pin.x, pin.y); await wait(100);
+    await page.click('#popsend'); await wait(400);
+    const one = await page.evaluate(() => S.notes.at(-2));
+    expect(sent.length === 2 && sent[1].notes.length === 1 && sent[1].notes[0].id === one.id && one.sent === 'run2', `sent ${JSON.stringify(sent.map(b => b.notes))}`);
+    await page.mouse.click(pin.x, pin.y); await wait(100);
+    expect(await page.evaluate(() => $('popsend').hidden), 'a note already with the agent can be sent again');
+    await page.keyboard.press('Escape');
   });
   await ctx.close();
 }

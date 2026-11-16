@@ -343,6 +343,10 @@
   .nq { color: var(--c-text-2); line-height: var(--c-lh-ui); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .nq::before { content: "“"; } .nq::after { content: "”"; }
   .notepop .nq { margin-top: 8px; }
+  /* a note that edits words: the old ones struck through, the new ones after */
+  .popedit { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 8px; line-height: var(--c-lh-ui); overflow-wrap: anywhere; }
+  .popedit s { color: var(--c-text-3); } .popedit b { font-weight: var(--c-w-body); color: var(--c-text); }
+  .popedit[hidden] { display: none; }
   .catch { display: none; position: absolute; inset: 0; z-index: 7; cursor: crosshair; }
   body.noting .catch, body.picking .catch, body.cutting .catch { display: block; }
   /* holding ⌥ in those modes moves the catcher aside, so the design takes the click (see through() in the script) */
@@ -361,18 +365,62 @@
   .fwrap.fixed .rz { display: none; } /* phones and tablets keep their size; only desktop-size screens resize by dragging */
   :root[data-ui="off"] .pins { display: none; }
   /* The editor grows out of its pin: a short fade and a small slide from the pin's side, never a pop. */
-  .notepop { position: fixed; z-index: 60; width: 264px; padding: 12px; opacity: 0; transform: translateX(var(--from, -6px)) scale(.97); transform-origin: var(--ox, left) 22px;
+  .notepop { position: fixed; z-index: 60; width: 280px; padding: 12px; opacity: 0; transform: translateX(var(--from, -6px)) scale(.97); transform-origin: var(--ox, left) 22px;
     transition: opacity .14s ease, transform .14s ease; }
   .notepop.show { opacity: 1; transform: none; transition: opacity .2s cubic-bezier(.23, 1, .32, 1), transform .32s cubic-bezier(.23, 1, .32, 1); }
   .pophead { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .pophead .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .notepop .snap { margin-top: 8px; }
-  .notepop .popcut { margin-top: 6px; }
-  .notepop textarea { margin-top: 8px; }
   @media (prefers-reduced-motion: reduce) { .notepop, .notepop.show { transform: none; } .toast { animation: none; } }
-  .notepop textarea { display: block; width: 100%; min-height: 64px; padding: 8px 12px; border: 0; border-radius: var(--c-r-md); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text); font: inherit; line-height: var(--c-lh-ui); resize: none; }
+  /* The editor reads in one order (Eric, Oct 27: "there is no hierarchy"): what you write leads, the picture and the
+     tools step back, Edit CSS folds away, and Send is the one thing in blue. */
+  .notepop textarea { display: block; width: 100%; min-height: 88px; margin-top: 10px; padding: 10px 12px; border: 0; border-radius: var(--c-r-md); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text); font: inherit; line-height: var(--c-lh-ui); resize: none; }
   .notepop textarea:focus { outline: none; box-shadow: inset 0 0 0 1px var(--c-line-2); }
-  .notepop .acts { margin-top: 8px; }
+  /* what the note is on: a small picture with its name beside it; a click shows it whole */
+  .popshot { display: flex; align-items: center; gap: 10px; margin-top: 10px; min-width: 0; }
+  .popshot[hidden] { display: none; }
+  .popshot .snap { flex: none; width: auto; height: 56px; max-width: 55%; margin: 0; object-fit: contain; cursor: zoom-in; }
+  .popshot .snap[hidden] { display: none; }
+  .popshot .popcut { min-width: 0; font-size: var(--c-t-sm); overflow-wrap: anywhere; }
+  .popshot.big { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .popshot.big .snap { width: 100%; height: auto; max-width: none; max-height: 220px; cursor: zoom-out; }
+  /* tools: one quiet fill for the drawing tools and the mic; the one in hand gets a lighter fill, not blue */
+  .poptools { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .poptools .gap, .popacts .gap { flex: 1; }
+  .tseg { display: flex; gap: 2px; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); }
+  .ptool { flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
+  .ptool:hover { color: var(--c-text); }
+  .ptool[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); }
+  .ptool svg { width: 14px; height: 14px; }
+  .ptool[hidden] { display: none; }
+  .pchip { flex: none; height: 28px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-2); font: inherit; cursor: pointer; white-space: nowrap; }
+  .pchip:hover { background: var(--surf-hover); color: var(--c-text); }
+  .pchip[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); }
+  .pchip[hidden] { display: none; }
+  /* Edit CSS: one block, names in grey and values in white, two to a row (padding and margin get a row each) */
+  .popcss { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 8px; padding: 4px 12px; border-radius: var(--c-r-md); background: var(--surf); box-shadow: var(--surf-edge); }
+  .popcss[hidden] { display: none; }
+  .cssf { display: flex; align-items: center; gap: 8px; min-width: 0; height: 30px; }
+  .cssf span { flex: none; color: var(--c-text-3); }
+  .cssf.on span { color: var(--c-text); }
+  .cssf input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--c-text); font: inherit; text-align: right; font-variant-numeric: tabular-nums; }
+  .cssf input:focus { outline: none; }
+  .cssf .swatch { margin-left: auto; }
+  .cssf.wide { grid-column: 1 / -1; }
+  /* the end: Delete is a quiet bin, Resolve and Save are grey, Send is the one blue pill; each as wide as its word */
+  .popacts { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .popacts .btn { flex: none; padding: 0 14px; }
+  .popacts .btn[hidden] { display: none; }
+  .pbin { flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
+  .pbin:hover { background: var(--surf-hover); color: var(--c-text); }
+  .pbin svg { width: 14px; height: 14px; }
+  /* Markup on a note: blue strokes with a dark edge under them, so they read on light and dark designs. Only while
+     its note is open or its pin is pointed at; nothing stays on the design. */
+  .ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; display: none; }
+  .ink.on, .ink.hover { display: block; }
+  .ink path { fill: none; stroke: var(--c-accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .ink path.halo { stroke: rgb(0 0 0 / .45); stroke-width: 5; }
+  body.marking .catch { display: block; cursor: crosshair; }
+  body.marking .rz { pointer-events: none; } /* a stroke that starts at the screen's edge draws, never resizes */
   .acts + .acts { margin-top: 8px; }
   .acts.tools { margin-bottom: 12px; }
   .acts.tools .btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -586,7 +634,7 @@
   </div>
 </aside>
 <div class="cutbox" id="cutbox"><span id="cutlabel"></span></div>
-<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><img class="snap" id="popsnap" alt="" hidden><div class="nm popcut" id="popcut" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="3" placeholder="Note · / for commands"></textarea><button class="slash" id="popslash" type="button" hidden><b>/try 3</b><span>Three takes on just this</span><kbd>Tab</kbd></button><div class="acts"><button class="btn" id="popdel">Delete</button><button class="btn" id="popdone">Done</button><button class="btn" id="popsave">Save</button></div></div>
+<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><div class="popedit" id="popedit" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="4" placeholder="Note · / for commands"></textarea><button class="slash" id="popslash" type="button" hidden><b>/try 3</b><span>Three takes on just this</span><kbd>Tab</kbd></button><div class="popshot" id="popshot" hidden><img class="snap" id="popsnap" alt="" hidden><span class="nm popcut" id="popcut"></span></div><div class="poptools" id="poptools"><div class="tseg"><button class="ptool" type="button" data-tool="pen" aria-pressed="false" aria-label="Pen" title="Pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></button><button class="ptool" type="button" data-tool="ellipse" aria-pressed="false" aria-label="Ellipse" title="Ellipse"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></button><button class="ptool" type="button" data-tool="rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/></svg></button><button class="ptool" type="button" data-tool="arrow" aria-pressed="false" aria-label="Arrow" title="Arrow"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13L13 3M7 3h6v6"/></svg></button><button class="ptool" type="button" id="popmic" aria-pressed="false" aria-label="Dictate" title="Dictate"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.75" y="1.75" width="4.5" height="8" rx="2.25"/><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.25"/></svg></button></div><i class="gap"></i><button class="pchip" type="button" id="popcssbtn" aria-pressed="false" hidden>Edit CSS</button></div><div class="popcss" id="popcss" hidden></div><div class="popacts"><button class="pbin" type="button" id="popdel" aria-label="Delete note" title="Delete note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 4.25h10.5M6.25 4.25V2.75h3.5v1.5M4.25 4.25l.6 8.5a1 1 0 0 0 1 .9h4.3a1 1 0 0 0 1-.9l.6-8.5"/></svg></button><button class="btn" id="popdone">Resolve</button><i class="gap"></i><button class="btn" id="popsave">Save</button><button class="btn go" id="popsend" title="Send just this note to the agent now · ⌘↵" hidden>Send</button></div></div>
 <button class="wordchip glass" id="wordchip" type="button" hidden>Note<span class="key">N</span></button>
 <div class="toast glass" id="toast" hidden></div>
 <div class="areabox" id="areabox"></div>
@@ -788,8 +836,8 @@ function makeScreen(slot) {
   const sc = { slot, wrap, frame: wrap.querySelector('.frame'), screen: wrap.querySelector('.screen'), cap: wrap.querySelector('.cap'), scaler: wrap.querySelector('.scaler'), w: 0, h: 0 };
   sc.tt = wrap.querySelector('.tt'); sc.pins = wrap.querySelector('.pins');
   const cat = wrap.querySelector('.catch');
-  cat.addEventListener('pointerdown', e => picking ? pickFocus(sc, e) : cutting ? cutNote(sc, e) : noteDown(sc, e));
-  cat.addEventListener('pointermove', e => { if (cutting) cutHover(sc, e); });
+  cat.addEventListener('pointerdown', e => marking ? markDown(sc, e) : picking ? pickFocus(sc, e) : cutting ? cutNote(sc, e) : noteDown(sc, e));
+  cat.addEventListener('pointermove', e => { if (cutting && !marking) cutHover(sc, e); });
   cat.addEventListener('pointerleave', () => { cutAt = null; $('cutbox').classList.remove('on'); });
   // the wheel still scrolls the design under the catcher, or under a pin; the outline and picks follow what moved
   sc.screen.addEventListener('wheel', e => { if (!e.ctrlKey && (e.target === cat || e.target.closest('.pins')) && scrollUnder(sc, e)) { e.preventDefault(); e.stopPropagation(); requestAnimationFrame(() => { if (cutting && cutAt) cutHover(cutAt.sc, cutAt.e); placePicks(); }); } }, { passive: false });
@@ -1700,7 +1748,9 @@ addEventListener('wheel', () => { $('wordchip').hidden = true; }, { passive: tru
 
 /* A press in note mode: let go where you pressed and it pins a note there; drag first and it notes the area you drew,
    with every element inside it and their text, as Agentation does. The pin sits on the area's top left corner. */
+let lastPress = null;
 function noteDown(sc, e) {
+  if (texting) { e.preventDefault(); e.stopPropagation(); return textPress(e); }
   e.preventDefault(); e.stopPropagation();
   const x0 = e.clientX, y0 = e.clientY, box = $('areabox'), start = { clientX: x0, clientY: y0, preventDefault() {}, stopPropagation() {} };
   try { e.target.setPointerCapture(e.pointerId); } catch {} // a release over a framed page still ends the drag
@@ -1716,23 +1766,28 @@ function noteDown(sc, e) {
     removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
     box.classList.remove('on');
     if (ev.type === 'pointercancel') return;
-    if (!dragged) return pinNote(sc, start);
+    // a second press on the same spot: edit the words there, in place (the first press's empty note has gone)
+    if (!dragged && lastPress && lastPress.sc === sc && performance.now() - lastPress.t < 450 && Math.hypot(x0 - lastPress.x, y0 - lastPress.y) < 8) { lastPress = null; return textEdit(sc, start); }
+    if (!dragged) { lastPress = { sc, t: performance.now(), x: x0, y: y0 }; pinNote(sc, start); lastPress.id = editing && editing.id; return; }
     const r = sc.screen.getBoundingClientRect(), x1 = clamp(ev.clientX, r.left, r.right), y1 = clamp(ev.clientY, r.top, r.bottom);
     areaNote(sc, start, { left: Math.min(x0, x1), top: Math.min(y0, y1), right: Math.max(x0, x1), bottom: Math.max(y0, y1) });
   };
   addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
+// the outermost elements that sit wholly inside an area on screen, in reading order
+function insideOf(L, a) {
+  const inside = [];
+  if (!L || !L.root) return inside;
+  // a framed page's elements count, read through its frame (one level: the frames a scene makes)
+  const pages = [...L.root.querySelectorAll('iframe')].map(frameDoc).filter(d => d && d.body);
+  const all = [L.root, ...pages.map(d => d.body)].flatMap(r => [...r.querySelectorAll('*')]).filter(el => { if (el.closest('[data-in]:not(.on)')) return false; const b = rectOf(el); return b.width && b.height && b.left >= a.left - 1 && b.top >= a.top - 1 && b.right <= a.right + 1 && b.bottom <= a.bottom + 1; });
+  all.forEach(el => { if (!all.includes(el.parentElement)) inside.push(el); });
+  return inside;
+}
 function areaNote(sc, e, a) {
   if (editing) closeEditor(true);
   const r = sc.screen.getBoundingClientRect(), at = layerAt(sc, { clientX: a.left + 1, clientY: a.top + 1 });
-  // the outermost elements that sit wholly inside the area, in reading order
-  const inside = [];
-  if (at.L && at.L.root) {
-    // a framed page's elements count, read through its frame (one level: the frames a scene makes)
-    const pages = [...at.L.root.querySelectorAll('iframe')].map(frameDoc).filter(d => d && d.body);
-    const all = [at.L.root, ...pages.map(d => d.body)].flatMap(r => [...r.querySelectorAll('*')]).filter(el => { if (el.closest('[data-in]:not(.on)')) return false; const b = rectOf(el); return b.width && b.height && b.left >= a.left - 1 && b.top >= a.top - 1 && b.right <= a.right + 1 && b.bottom <= a.bottom + 1; });
-    all.forEach(el => { if (!all.includes(el.parentElement)) inside.push(el); });
-  }
+  const inside = insideOf(at.L, a);
   const pin = { clientX: a.left, clientY: a.top };
   const note = newNote(sc, pin, { ...at, x: (a.left - r.left) / r.width, y: (a.top - r.top) / r.height }, inside[0] || pickUnder(at.L, (a.left + a.right) / 2, (a.top + a.bottom) / 2));
   const text = inside.map(el => (el.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' · ');
@@ -1741,6 +1796,86 @@ function areaNote(sc, e, a) {
   S.notes.push(note); touch(note); renderNotes(); openEditor(note, a.right, a.top + 12, true, { left: a.left, right: a.right });
   snapNote(note, at.L, (a.left + a.right) / 2, (a.top + a.bottom) / 2);
 }
+
+/* ---------- edit words in place ----------
+   In note mode a double click on words makes them editable right there. Return makes a note with the element and its
+   exact words before and after; Esc puts them back. A click outside keeps the edit, a click inside moves the caret.
+   The new words stay on screen as a preview until the agent's version lands (applyPreviews), as an edited CSS value does. */
+let texting = null;
+// the element whose own words were clicked (not a box that only holds other elements)
+const ownText = el => el && !/^(input|textarea|select|button|img|svg|canvas|iframe)$/i.test(el.tagName) && [...el.childNodes].some(c => c.nodeType === 3 && c.textContent.trim()) ? el : null;
+// where an element is, as child indexes from the design's root (or its framed page's), to find it again after a redraw
+const refOf = (L, el) => { const page = pageOf(L), top = L.root.contains(el) ? L.root : page && page.contains(el) ? page : null;
+  if (!top || el === top) return null; const path = []; for (let n = el; n && n !== top; n = n.parentElement) path.unshift([...n.parentElement.children].indexOf(n)); return { path, ...(top !== L.root && { frame: true }) }; };
+const fromRef = (L, r) => { let el = r && L && L.root && (r.frame ? pageOf(L) : L.root); if (r) for (const i of r.path) el = el && el.children[i]; return el || null; };
+const squash = t => t.replace(/\s+/g, ' ').trim();
+function textEdit(sc, e) {
+  const at = layerAt(sc, e), el = ownText(pickUnder(at.L, e.clientX, e.clientY));
+  if (!el) return pinNote(sc, e); // nothing to type into: a plain note
+  $('notepop').hidden = true; // the first press's note went at once, not with a fade
+  texting = { el, sc, at, e: { clientX: e.clientX, clientY: e.clientY }, old: el.textContent, html: el.innerHTML };
+  el.setAttribute('contenteditable', 'plaintext-only'); el.setAttribute('spellcheck', 'false');
+  el.addEventListener('keydown', textKey); el.addEventListener('blur', textBlur);
+  document.body.classList.add('texting');
+  $('toast').textContent = 'Type the new words · Return to note it · Esc to undo'; $('toast').hidden = false;
+  el.focus({ preventScroll: true });
+  const doc = el.ownerDocument, r = doc.createRange(); r.selectNodeContents(el);
+  const sel = doc.defaultView.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+function textKey(e) {
+  e.stopPropagation(); // the design and the stage keep out of it
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finishText(true); }
+  else if (e.key === 'Escape') { e.preventDefault(); finishText(false); }
+}
+const textBlur = () => setTimeout(() => { if (texting && texting.el.ownerDocument.activeElement !== texting.el && !texting.el.matches(':focus')) finishText(true); });
+// a press while editing: inside the words it moves the caret (the catcher is over them), anywhere else it keeps the edit
+function textPress(e) {
+  const t = texting, r = rectOf(t.el);
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return finishText(true);
+  const doc = t.el.ownerDocument, f = frameOf(t.el), b = f && frameBox(f), x = b ? (e.clientX - b.x) / b.k : e.clientX, y = b ? (e.clientY - b.y) / b.k : e.clientY;
+  const sr = t.el.getRootNode(), pos = doc.caretPositionFromPoint && doc.caretPositionFromPoint(x, y, sr !== doc ? { shadowRoots: [sr] } : undefined);
+  if (pos && t.el.contains(pos.offsetNode)) { const sel = doc.defaultView.getSelection(); sel.collapse(pos.offsetNode, pos.offset); }
+  t.el.focus({ preventScroll: true });
+}
+function finishText(keep) {
+  const t = texting; if (!t) return; texting = null;
+  t.el.removeEventListener('keydown', textKey); t.el.removeEventListener('blur', textBlur);
+  t.el.removeAttribute('contenteditable'); t.el.removeAttribute('spellcheck');
+  t.el.ownerDocument.defaultView.getSelection().removeAllRanges(); t.el.blur();
+  document.body.classList.remove('texting'); toastBack();
+  const now = t.el.textContent;
+  if (!keep || squash(now) === squash(t.old) || !squash(now)) { t.el.innerHTML = t.html; return; } // as it was
+  const note = newNote(t.sc, t.e, t.at, t.el), top = t.at.L.root.contains(t.el) ? t.at.L.root : null;
+  note.edit = { path: cssPath(t.el, top), old: squash(t.old), new: squash(now), ref: refOf(t.at.L, t.el) };
+  previews.set(note.id, { el: t.el, html: t.html, text: true }); // what it goes back to if the note goes
+  S.notes.push(note); touch(note); renderNotes(); openEditor(note, t.e.clientX, t.e.clientY, true, rectOf(t.el));
+  snapNote(note, t.at.L, t.e.clientX, t.e.clientY);
+}
+/* Edits shown on screen until the agent lands them: a note's new words (and, from Edit CSS, its new values) are put
+   back whenever the design redraws, and taken off when the note is deleted or done. */
+const previews = new Map(); // note id → { el, html, css: { prop: inline value before } }
+function applyPreviews() {
+  const want = new Set();
+  for (const n of S.notes) {
+    if (n.done || !(n.edit || n.css || previews.has(n.id))) continue;
+    want.add(n.id);
+    const L = sceneLayer(n), ref = n.edit ? n.edit.ref : n.cssRef, el = L && fromRef(L, ref); if (!el) continue;
+    let p = previews.get(n.id); if (!p || p.el !== el) previews.set(n.id, p = { el, html: el.innerHTML, text: !!n.edit });
+    if (n.edit && squash(el.textContent) !== n.edit.new && squash(el.textContent) === n.edit.old) el.textContent = n.edit.new;
+    if (p.css) for (const prop in p.css) if (!n.css || !(prop in n.css)) { const [v, imp] = p.css[prop]; v ? el.style.setProperty(prop, v, imp) : el.style.removeProperty(prop); delete p.css[prop]; }
+    if (n.css) for (const [prop, [, v]] of Object.entries(n.css)) if (el.style.getPropertyValue(prop) !== v) {
+      p.css ||= {}; if (!(prop in p.css)) p.css[prop] = [el.style.getPropertyValue(prop), el.style.getPropertyPriority(prop)];
+      el.style.setProperty(prop, v, 'important');
+    }
+  }
+  for (const [id, p] of previews) if (!want.has(id) && !(editing && editing.id === id && (editing.edit || editing.css))) { // gone or done: as it was
+    previews.delete(id);
+    const n = noteById(id);
+    if (p.text && (!n || !n.edit || squash(p.el.textContent) === n.edit.new)) p.el.innerHTML = p.html;
+    if (p.css) for (const [prop, [v, imp]] of Object.entries(p.css)) v ? p.el.style.setProperty(prop, v, imp) : p.el.style.removeProperty(prop);
+  }
+}
+setInterval(() => { if (!document.hidden && previews.size + S.notes.filter(n => !n.done && (n.edit || n.css)).length) applyPreviews(); }, 300); // designs that redraw on their own
 
 /* ---------- cut ----------
    X (or Cut) is the power version, as in Cuttings: point at a screen and the element under the pointer is outlined,
@@ -1820,7 +1955,7 @@ function cutMake(picks) {
   if (!picks.length) return;
   const { sc, at, e, el } = picks[picks.length - 1], note = newNote(sc, e, at, el);
   note.cut = cutOf(el, at.L);
-  if (picks.length > 1) note.cuts = picks.map(p => cutOf(p.el, p.at.L));
+  if (picks.length > 1) note.cuts = picks.map(p => cutOf(p.el, p.at.L)); else note.cssRef = refOf(at.L, el); // for Edit CSS
   clearPicks();
   $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
   S.notes.push(note); touch(note); renderNotes(); openEditor(note, e.clientX, e.clientY, true, rectOf(el));
@@ -1909,10 +2044,17 @@ async function frameImage(f) {
 }
 // Cut crop: the element and 24 around it, inside the scene.
 const cutCrop = (b, w, h) => { const x0 = Math.max(0, b[0] - 24), y0 = Math.max(0, b[1] - 24); return [x0, y0, Math.min(w - x0, b[2] + 48), Math.min(h - y0, b[3] + 48)]; };
-async function snapScene(L, px, py, cutBox) {
+// marks: the note's markup in scene pixels ({ t, P }); the crop grows to take them in, and they're drawn on top
+async function snapScene(L, px, py, cutBox, marks = []) {
   const el = L.root, sr = el.getRootNode(), w = el.offsetWidth, h = el.offsetHeight;
   let CW = Math.min(w, 720), CH = Math.min(h, 440), x0 = clamp(px - CW / 2, 0, w - CW), y0 = clamp(py - CH / 2, 0, h - CH);
   if (cutBox) [x0, y0, CW, CH] = cutCrop(cutBox, w, h);
+  const all = marks.flatMap(m => m.P);
+  if (all.length) {
+    const xs = all.map(p => p[0]), ys = all.map(p => p[1]);
+    const x1 = Math.min(w, Math.max(x0 + CW, Math.max(...xs) + 24)), y1 = Math.min(h, Math.max(y0 + CH, Math.max(...ys) + 24));
+    x0 = Math.max(0, Math.min(x0, Math.min(...xs) - 24)); y0 = Math.max(0, Math.min(y0, Math.min(...ys) - 24)); CW = x1 - x0; CH = y1 - y0;
+  }
   const clone = el.cloneNode(true);
   await freeze(el, clone);
   if (snapFonts === null) snapFonts = PROJECT && (PROJECTS.find(x => x.id === PROJECT) || {}).fonts !== false ? await fetch(SCENE_BASE + 'fonts.css').then(r => r.ok ? r.text() : '').then(t => inlineUrls(t, location.origin + SCENE_BASE)).catch(() => '') : '';
@@ -1925,20 +2067,47 @@ async function snapScene(L, px, py, cutBox) {
   const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
   const k = Math.min(2, 1600 / CW), cv = document.createElement('canvas'); cv.width = Math.round(CW * k); cv.height = Math.round(CH * k);
   const g = cv.getContext('2d'); g.fillStyle = '#141414'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+  // a cut that draws as one flat colour (a live frame that wouldn't draw) is no picture at all: say so before outlining it
+  const blank = !!cutBox && flat(g, (cutBox[0] - x0) * k, (cutBox[1] - y0) * k, cutBox[2] * k, cutBox[3] * k);
   const mx = (px - x0) * k, my = (py - y0) * k; // the spot, ringed; a cut element, outlined
   for (const [lw, col] of [[5, 'rgba(0,0,0,.45)'], [2.5, '#4da6ff']]) {
     g.lineWidth = lw * Math.max(k, 1); g.strokeStyle = col; g.beginPath();
     if (cutBox) g.roundRect((cutBox[0] - x0) * k, (cutBox[1] - y0) * k, cutBox[2] * k, cutBox[3] * k, 4 * k); else g.arc(mx, my, 16 * k, 0, Math.PI * 2);
     g.stroke();
   }
-  return cv.toDataURL('image/jpeg', .85);
+  if (marks.length) { // the markup, in the stage's blue with the same dark edge it has on screen
+    const d = marks.map(m => markPath(m.t, m.P.map(([x, y]) => [(x - x0) * k, (y - y0) * k]), 14 * k)).join('');
+    g.lineCap = g.lineJoin = 'round';
+    for (const [lw, col] of [[5, 'rgba(0,0,0,.45)'], [2.5, ACCENT()]]) { g.lineWidth = lw * Math.max(k, 1); g.strokeStyle = col; g.stroke(new Path2D(d)); }
+  }
+  return { data: cv.toDataURL('image/jpeg', .85), blank };
+}
+// one colour all over (to within a few levels): sampled on a grid, so a big picture costs the same as a small one
+function flat(g, x, y, w, h) {
+  x = Math.max(0, Math.floor(x)); y = Math.max(0, Math.floor(y)); w = Math.min(g.canvas.width - x, Math.ceil(w)); h = Math.min(g.canvas.height - y, Math.ceil(h));
+  if (w < 2 || h < 2) return true;
+  const px = g.getImageData(x, y, w, h).data, step = Math.max(1, Math.floor(Math.sqrt(w * h / 4000)));
+  let lo = 255, hi = 0;
+  for (let j = 0; j < h; j += step) for (let i = 0; i < w; i += step) { const o = (j * w + i) * 4, v = (px[o] * 3 + px[o + 1] * 6 + px[o + 2]) / 10; if (v < lo) lo = v; if (v > hi) hi = v; }
+  return hi - lo < 6;
+}
+// a framed page drawn on its own, for a cut of the frame itself when the scene's picture of it came out blank
+async function framePicture(f) {
+  const d = await frameImage(f).catch(() => null); if (!d) return null;
+  const im = new Image(); im.src = d; try { await im.decode(); } catch { return null; }
+  const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const g = cv.getContext('2d'); g.drawImage(im, 0, 0);
+  return flat(g, 0, 0, cv.width, cv.height) ? null : d;
 }
 const snapURL = n => `${SCENE_BASE}notes/${n.snap}?v=${n.snapAt || n.id}`;
 async function snapNote(n, L, cx, cy) {
   if (!L || !L.root || !notesServer || CAPTURE) return;
   try {
-    const rr = L.root.getBoundingClientRect(), k = rr.width / L.root.offsetWidth;
-    const data = await snapScene(L, (cx - rr.left) / k, (cy - rr.top) / k, n.cut && n.cut.box);
+    const rr = L.root.getBoundingClientRect(), k = rr.width / L.root.offsetWidth, sc = screens.find(s => s.layers.includes(L)), sb = sc && sc.screen.getBoundingClientRect();
+    const marks = sb ? (n.marks || []).map(m => ({ t: m.t, P: m.p.map(([x, y]) => [(sb.left + x * sb.width - rr.left) / k, (sb.top + y * sb.height - rr.top) / k]) })) : [];
+    let { data, blank } = await snapScene(L, (cx - rr.left) / k, (cy - rr.top) / k, n.cut && n.cut.box, marks);
+    if (blank) { const el = fromRef(L, n.cssRef); data = el && el.tagName === 'IFRAME' ? await framePicture(el) : null; } // the frame's own page, or none
+    if (!data) { n.snapBlank = true; delete n.snap; if (S.notes.includes(n)) { touch(n); if (editing === n) showSnap(n); } return; }
+    delete n.snapBlank;
     const r = await fetch('/api/snap?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id, data }) });
     if (!r.ok) return;
     n.snap = (await r.json()).file; n.snapAt = Date.now();
@@ -1947,12 +2116,14 @@ async function snapNote(n, L, cx, cy) {
 }
 // Only a cut shows its picture, at its final shape from the start so nothing jumps when it arrives. A quick note keeps
 // its snapshot for the brief and never shows it.
+// A blank one (a frame that wouldn't draw) is left out, so the name stands alone.
 function showSnap(n) {
   const im = $('popsnap'), c = n.cut;
-  im.hidden = !c; $('popcut').hidden = !c;
+  $('popshot').hidden = !c; $('popshot').classList.remove('big');
   if (!c) return;
+  im.hidden = !!n.snapBlank;
   const L = sceneLayer(n), crop = L ? cutCrop(c.box, L.root.offsetWidth, L.root.offsetHeight) : [0, 0, c.box[2] + 48, c.box[3] + 48];
-  im.style.aspectRatio = `${crop[2]} / ${crop[3]}`; im.style.maxHeight = '200px'; im.style.objectFit = 'contain';
+  im.style.aspectRatio = `${crop[2]} / ${crop[3]}`;
   if (n.snap) im.src = snapURL(n); else im.removeAttribute('src');
   $('popcut').textContent = `${c.path.split(' > ').pop().replace(/:nth-of-type\(\d+\)/, '')} · ${c.box[2]} × ${c.box[3]}`;
 }
@@ -1963,6 +2134,12 @@ let pinDragged = false;
 $('frames').addEventListener('pointerdown', e => {
   const p = e.target.closest('.pin'); if (!p) return;
   const n = noteById(p.dataset.id), sc = screens.find(x => x.pins.contains(p)); if (!n || !sc || n.words) return; // a pin on words stays on them
+  // the second press of a double click lands on the pin the first one just made: edit the words under it instead
+  if (noting && lastPress && lastPress.id === n.id && lastPress.sc === sc && performance.now() - lastPress.t < 450 && !$('poptext').value.trim() && !n.marks) {
+    e.preventDefault(); e.stopPropagation();
+    const { x, y } = lastPress; lastPress = null; closeEditor(false);
+    return textEdit(sc, { clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} });
+  }
   const r = sc.screen.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
   try { p.setPointerCapture(e.pointerId); } catch {} // dragged over a framed page, the pin still follows and lets go
   let moved = false;
@@ -1989,11 +2166,11 @@ function renderPins() {
   screens.forEach(sc => {
     const ids = sc.designs.map(d => d.id);
     sc.pins.innerHTML = S.notes.map((n, k) => (editing === n || !n.done && n.step === pinStep) && (n.kind === kindOf(sc.w, sc.h) || n.kind === sc.kind) && ids.includes(n.design)
-      ? (n.area ? `<i class="area${n.sent ? ' sent' : ''}" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
+      ? marksSVG(n, sc) + (n.area ? `<i class="area${n.sent ? ' sent' : ''}" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
         + `<button class="pin${editing === n ? ' open' : ''}${n.sent ? ' sent' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.sent ? 'An agent is on it: ' + n.text : n.text)}">${k + 1}</button>` : '').join('');
   });
   wordsDrawn = ''; placeWords(); // pins were rebuilt: put the ones on words back on their words
-  placeAnchors();
+  placeAnchors(); applyPreviews();
 }
 // A gap of over half an hour starts a new sitting. Newest sitting first, so round five isn't buried under round one;
 // inside a sitting notes keep their order, and every number still matches its pin.
@@ -2104,11 +2281,15 @@ function openEditor(n, x, y, fresh, around) {
   if (editing === n) return; // its own pin: keep what's typed
   if (editing) closeEditor(true); // another note: keep the draft (an empty new one goes)
   setPlaying(false); // the screen holds still while you write about it
-  editing = n; $('popdone').textContent = n.done ? 'Reopen' : 'Resolve'; $('popdone').hidden = !!fresh; renderPins();
+  editing = n; marksAtOpen = JSON.stringify(n.marks || []); markedLast = false; cssAtOpen = JSON.stringify(n.css || {});
+  $('popcssbtn').hidden = !(n.cut && !n.cuts && n.cssRef); cssOpen(false);
+  $('popsend').hidden = !canSendNow(n);
+  $('popdone').textContent = n.done ? 'Reopen' : 'Resolve'; $('popdone').hidden = !!fresh; renderPins();
   $('popn').textContent = S.notes.indexOf(n) + 1;
   $('popmeta').textContent = (n.side ? n.side + ' · ' : '') + noteWhere(n);
   $('poptext').value = n.text; showSnap(n);
   $('popwords').hidden = !n.words; $('popwords').textContent = n.words ? n.words.text : '';
+  $('popedit').hidden = !n.edit; $('popedit').innerHTML = n.edit ? `<s>${esc(n.edit.old)}</s><b>${esc(n.edit.new)}</b>` : '';
   $('popthread').hidden = !(n.replies && n.replies.length) && !n.sent;
   $('popthread').innerHTML = (n.sent ? '<p class="nr working"><i class="agspin"></i>An agent is on it</p>' : '') + (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
   const pop = $('notepop'), was = !pop.hidden && pop.classList.contains('show');
@@ -2130,16 +2311,36 @@ function openEditor(n, x, y, fresh, around) {
 function closeEditor(keep, done) {
   const n = editing; if (!n) return;
   $('popslash').hidden = true;
+  setMarking(''); dictate(false);
+  if (!keep) { n.marks = JSON.parse(marksAtOpen); if (!n.marks.length) delete n.marks; } // Esc takes back what was drawn
+  if (!keep) { n.css = JSON.parse(cssAtOpen); if (!Object.keys(n.css).length) delete n.css; } // and what was restyled
+  cssOpen(false);
+  const redraw = keep && JSON.stringify(n.marks || []) !== marksAtOpen;
   editing = null;
   if (document.activeElement === $('poptext')) $('poptext').blur(); // or the hidden box keeps the keys: Esc, N, Space did nothing
   const pop = $('notepop'); pop.classList.remove('show'); clearTimeout(popHide);
   popHide = setTimeout(() => { if (!editing) pop.hidden = true; }, 160);
-  if (keep) n.text = $('poptext').value.trim();
+  if (keep) n.text = $('poptext').value.trim() || gist(n); // drawn or edited with no words: the note still says what
   if (done !== undefined) n.done = done;
   if (!n.text) dropNote(n);
   touch(n, !n.text); renderNotes();
+  if (redraw && n.text) { const L = sceneLayer(n), sc = L && screens.find(s => s.layers.includes(L)); // the snapshot takes the markup in
+    if (sc) { const r = sc.screen.getBoundingClientRect(), a = n.area; snapNote(n, L, r.left + (a ? a.x + a.w / 2 : n.x) * r.width, r.top + (a ? a.y + a.h / 2 : n.y) * r.height); } }
 }
 $('popsave').onclick = () => closeEditor(true);
+$('popsnap').addEventListener('pointerdown', e => e.preventDefault()); // the caret stays in the note
+$('popsnap').onclick = () => $('popshot').classList.toggle('big');
+/* Send one note now: ⌘Return (or Send) saves it and sends just that note to the agent as its own run, without waiting
+   for Send to agent. Plain Return still only saves. Only where an agent can run (served by serve.py, a scene design). */
+const canSendNow = n => !!(window.Agent && Agent.sendNow) && n.design !== 'url' && !!sceneById(n.design) && !n.done && !n.sent;
+function sendNow() {
+  const n = editing; if (!n) return;
+  if (!canSendNow(n)) return closeEditor(true);
+  closeEditor(true);
+  if (S.notes.includes(n)) Agent.sendNow(n); // an empty note went with the editor: nothing to send
+}
+$('popsend').addEventListener('pointerdown', e => e.preventDefault());
+$('popsend').onclick = sendNow;
 $('popdel').onclick = () => { $('poptext').value = ''; closeEditor(true); };
 $('popdone').onclick = () => closeEditor(true, !editing.done);
 /* Commands in a note. Typing / at the start of a word offers the one there is: /try 3, three takes on just this
@@ -2151,17 +2352,20 @@ const slashTake = () => { const t = $('poptext'), at = t.selectionStart, v = t.v
   const from = at - m[0].length + m[1].length; t.value = v.slice(0, from) + '/try 3 ' + v.slice(at); t.selectionStart = t.selectionEnd = from + 7;
   $('popslash').hidden = true; t.focus(); };
 $('poptext').addEventListener('input', slashOn);
+$('poptext').addEventListener('input', () => { markedLast = false; }); // ⌘Z is the text's again
 $('popslash').addEventListener('pointerdown', e => e.preventDefault()); // keep the caret in the note
 $('popslash').onclick = slashTake;
 $('poptext').addEventListener('keydown', e => {
   if (!$('popslash').hidden && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) { e.preventDefault(); slashTake(); e.stopPropagation(); return; }
   if (!$('popslash').hidden && e.key === 'Escape') { e.preventDefault(); $('popslash').hidden = true; e.stopPropagation(); return; }
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
+  if (marking && e.key === 'Escape') { e.preventDefault(); setMarking(''); e.stopPropagation(); return; } // first Esc puts the tool down
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendNow(); }
+  else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
   else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); }
   e.stopPropagation();
 });
-addEventListener('pointerdown', e => { if (editing && !$('notepop').contains(e.target) && !e.target.closest('.pin')) closeEditor(true); }, { capture: true }); // first, before a drag stops the event
-$('frames').addEventListener('click', e => { const p = e.target.closest('.pin'); if (p && !pinDragged) { const n = noteById(p.dataset.id); const r = p.getBoundingClientRect(); openEditor(n, r.left + r.width / 2, r.top + r.height / 2); } });
+addEventListener('pointerdown', e => { if (editing && !$('notepop').contains(e.target) && !e.target.closest('.pin, .cpick') && !(marking && e.target.classList.contains('catch'))) closeEditor(true); }, { capture: true }); // first, before a drag stops the event
+$('frames').addEventListener('click', e => { const p = e.target.closest('.pin'); if (p && !pinDragged && noteById(p.dataset.id)) { const n = noteById(p.dataset.id); const r = p.getBoundingClientRect(); openEditor(n, r.left + r.width / 2, r.top + r.height / 2); } });
 $('notelist').addEventListener('click', e => {
   const show = e.target.closest('[data-show]');
   if (show) { const [a, b] = show.dataset.show.split('|'); S.shown = [a, b].filter(id => sceneById(id)); S.view = 'side'; S.zoom = 0; S.pos = {}; return apply(); }
@@ -2180,6 +2384,152 @@ $('notelist').addEventListener('click', e => {
 });
 $('noteadd').onclick = () => setNoting(!noting);
 $('noteclear').onclick = () => { if (S.notes.length && confirm(`Delete all ${S.notes.length} notes?`)) { S.notes.forEach(n => touch(n, true)); S.notes = []; renderNotes(); } };
+/* ---------- dictate ----------
+   The mic in the note fills it by voice (the browser's own speech recognition), at the caret, as the words come.
+   Press it again, or close the note, to stop. Hidden where the browser has none. */
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+let hearing = null;
+$('popmic').hidden = !Speech;
+function dictate(on) {
+  if (!on || !Speech) { const h = hearing; hearing = null; $('popmic').setAttribute('aria-pressed', false); if (h) try { h.stop(); } catch {} return; }
+  const t = $('poptext'), rec = new Speech(), head = t.value.slice(0, t.selectionStart), tail = t.value.slice(t.selectionEnd);
+  const sep = head && !/\s$/.test(head) ? ' ' : '';
+  rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || 'en-US';
+  rec.onresult = e => { if (hearing !== rec) return; const said = [...e.results].map(r => r[0].transcript).join('').trim();
+    t.value = head + (said ? sep + said : '') + tail; t.selectionStart = t.selectionEnd = t.value.length - tail.length; markedLast = false; slashOn(); };
+  rec.onend = () => { if (hearing === rec) dictate(false); };
+  rec.onerror = e => { if (hearing === rec && /not-allowed|service-not-allowed/.test(e.error)) UI.say($('popmic'), 'No mic'); };
+  hearing = rec; $('popmic').setAttribute('aria-pressed', true);
+  try { rec.start(); } catch { dictate(false); }
+}
+$('popmic').onclick = () => dictate(!hearing);
+
+/* ---------- Edit CSS ----------
+   On a note that cut one element, Edit CSS opens the common properties under the note. Each change shows at once on
+   that element only (an inline !important value, taken off if the note goes), and the note keeps old → new for the
+   agent. ↑ ↓ step a number (⇧ by 10); a colour opens the colour picker. */
+let cssAtOpen = '{}';
+const CSS_PROPS = [['padding', 'Padding'], ['margin', 'Margin'], ['gap', 'Gap'], ['border-radius', 'Radius'], ['font-size', 'Size'], ['font-weight', 'Weight'], ['color', 'Colour'], ['background-color', 'Fill']];
+const WIDE = ['padding', 'margin']; // up to four values: a whole row each
+const COLOURS = ['color', 'background-color'];
+const toHex = c => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return c; const [r, g, b, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(parseFloat);
+  return '#' + [r, g, b].map(x => Math.round(x).toString(16).padStart(2, '0')).join('') + (a < 1 ? Math.round(a * 255).toString(16).padStart(2, '0') : ''); };
+const cssEl = n => n && n.cssRef && fromRef(sceneLayer(n), n.cssRef);
+// the value before any edit: kept in the note once changed, read off the element otherwise
+const cssWas = (n, el, prop) => n.css && n.css[prop] ? n.css[prop][0] : COLOURS.includes(prop) ? toHex(cssOf(el).getPropertyValue(prop)) : cssOf(el).getPropertyValue(prop) || 'normal';
+function cssOpen(on) {
+  const n = editing, el = on && cssEl(n);
+  if (!el && !$('popcss').hidden && ColorPick.isOpen()) ColorPick.close(); // its swatch is going
+  $('popcss').hidden = !el; $('popcssbtn').setAttribute('aria-pressed', !!el);
+  if (!el) { if (on) UI.say($('popcssbtn'), 'Not on screen'); return; }
+  $('popcss').innerHTML = CSS_PROPS.map(([p, name]) => { const v = n.css && n.css[p] ? n.css[p][1] : cssWas(n, el, p), on = n.css && n.css[p] ? ' on' : '';
+    return COLOURS.includes(p) ? `<div class="cssf${on}" data-p="${p}"><span>${name}</span><button class="swatch" type="button" style="--sw:${esc(v)}" aria-label="${name}"></button></div>`
+      : `<label class="cssf${on}${WIDE.includes(p) ? ' wide' : ''}" data-p="${p}"><span>${name}</span><input value="${esc(v)}" spellcheck="false" aria-label="${name}"></label>`; }).join('');
+  const pop = $('notepop'); pop.style.top = clamp(parseFloat(pop.style.top), 16, Math.max(16, innerHeight - pop.offsetHeight - 16)) + 'px'; // taller now: still on screen
+}
+function cssSet(prop, v) {
+  const n = editing, el = cssEl(n); if (!n || !el) return;
+  const was = cssWas(n, el, prop); v = String(v).trim();
+  n.css ||= {};
+  if (!v || v === was) delete n.css[prop]; else n.css[prop] = [was, v];
+  if (!Object.keys(n.css).length) delete n.css;
+  $('popcss').querySelector(`[data-p="${prop}"]`).classList.toggle('on', !!(n.css && n.css[prop]));
+  touch(n); applyPreviews();
+}
+$('popcssbtn').addEventListener('pointerdown', e => e.preventDefault());
+$('popcssbtn').onclick = () => cssOpen($('popcss').hidden);
+$('popcss').addEventListener('input', e => { const f = e.target.closest('.cssf'); if (f && e.target.tagName === 'INPUT') cssSet(f.dataset.p, e.target.value); });
+$('popcss').addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') { e.preventDefault(); if (e.metaKey || e.ctrlKey) sendNow(); else closeEditor(true); return; }
+  if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); return; }
+  const t = e.target, m = (e.key === 'ArrowUp' || e.key === 'ArrowDown') && t.value.match(/^(-?[\d.]+)([a-z%]*)$/i); if (!m) return;
+  e.preventDefault();
+  const f = t.closest('.cssf'), step = (f.dataset.p === 'font-weight' ? 100 : e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
+  t.value = Math.max(f.dataset.p === 'font-weight' ? 100 : -9999, +(+m[1] + step).toFixed(2)) + m[2]; cssSet(f.dataset.p, t.value);
+});
+$('popcss').addEventListener('click', e => { const sw = e.target.closest('.swatch'); if (!sw) return; const p = sw.closest('.cssf').dataset.p, n = editing;
+  ColorPick.open(sw, n.css && n.css[p] ? n.css[p][1] : cssWas(n, cssEl(n), p), v => { sw.style.setProperty('--sw', v); cssSet(p, v); }); });
+
+/* ---------- markup ----------
+   While a note is open, Pen, Ellipse, Rectangle and Arrow draw on its screen in blue. The marks are kept with the note
+   in fractions of the screen (as its pin is), baked into its snapshot, and named in the brief by what they're on
+   ("Circled <p class="words">", "Arrow from A to B"), so the agent sees what was meant. They show only while the note
+   is open or its pin is pointed at: nothing stays on the design. ⌘Z takes back the last one; Esc puts the tool down. */
+let marking = '', markedLast = false, marksAtOpen = '[]';
+const ACCENT = () => getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim() || '#4da6ff';
+const CUT_TIP = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
+const toastBack = () => { const t = $('toast');
+  if (noting) { t.textContent = NOTE_TIP; t.hidden = false; } else if (cutting) { t.textContent = CUT_TIP; t.hidden = false; } else if (picking || focus) focusLabel(); else t.hidden = true; };
+function setMarking(tool) {
+  marking = tool && editing ? tool : '';
+  document.body.classList.toggle('marking', !!marking);
+  document.querySelectorAll('#poptools [data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === marking));
+  if (marking) { $('cutbox').classList.remove('on'); $('toast').textContent = 'Draw on the screen · ⌘Z to undo'; $('toast').hidden = false; } else toastBack();
+}
+// a mark as one path: in screen pixels for the screen, in picture pixels for the snapshot
+const headOf = (a, b, s) => { const g = Math.atan2(b[1] - a[1], b[0] - a[0]); return [-.45, .45].map(d => [b[0] - s * Math.cos(g + d), b[1] - s * Math.sin(g + d)]); };
+function markPath(t, P, head) {
+  const f = v => +v.toFixed(1), pt = p => `${f(p[0])} ${f(p[1])}`, [a, b] = P;
+  if (t === 'pen') return 'M' + P.map(pt).join('L');
+  if (t === 'rect') return `M${pt(a)}H${f(b[0])}V${f(b[1])}H${f(a[0])}Z`;
+  if (t === 'ellipse') { const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2, rx = f(Math.abs(b[0] - a[0]) / 2), ry = f(Math.abs(b[1] - a[1]) / 2);
+    return `M${f(cx - rx)} ${f(cy)}A${rx} ${ry} 0 1 0 ${f(cx + rx)} ${f(cy)}A${rx} ${ry} 0 1 0 ${f(cx - rx)} ${f(cy)}Z`; }
+  const [h1, h2] = headOf(a, b, head); return `M${pt(a)}L${pt(b)}M${pt(h1)}L${pt(b)}L${pt(h2)}`;
+}
+function marksSVG(n, sc) {
+  const W = sc.screen.offsetWidth, H = sc.screen.offsetHeight; if (!n.marks || !n.marks.length || !W) return '';
+  const d = n.marks.map(m => markPath(m.t, m.p.map(([x, y]) => [x * W, y * H]), 12 / K)).join('');
+  return `<svg class="ink${editing === n ? ' on' : ''}" data-id="${n.id}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path class="halo" d="${d}"/><path d="${d}"/></svg>`;
+}
+const paintMarks = n => screens.forEach(sc => {
+  const old = sc.pins.querySelector(`.ink[data-id="${n.id}"]`), html = marksSVG(n, sc);
+  if (old) old.outerHTML = html; else if (html && sc.pins.querySelector(`.pin[data-id="${n.id}"]`)) sc.pins.insertAdjacentHTML('afterbegin', html);
+});
+// What a mark is on, in the words the brief uses. Read when it's drawn, from what's under it then.
+function markOn(sc, m, r) {
+  const P = m.p.map(([x, y]) => [r.left + x * r.width, r.top + y * r.height]), { L } = layerAt(sc, { clientX: P[0][0], clientY: P[0][1] });
+  const name = el => el ? describe(el) : 'an empty spot', xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+  const box = { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+  if (m.t === 'arrow') return `Arrow from ${name(pickUnder(L, ...P[0]))} to ${name(pickUnder(L, ...P[1]))}`;
+  if (m.t === 'pen') { const seen = [];
+    for (let i = 0; i < P.length; i += Math.max(1, Math.floor(P.length / 8))) { const el = pickUnder(L, ...P[i]); if (el && !seen.includes(el)) seen.push(el); }
+    return `${box.bottom - box.top < 14 && box.right - box.left > 40 ? 'Line under' : 'Drawn over'} ${seen.slice(0, 3).map(name).join('; ') || name(null)}`; }
+  const inside = insideOf(L, box), els = inside.length ? inside.slice(0, 3) : [pickUnder(L, (box.left + box.right) / 2, (box.top + box.bottom) / 2)];
+  return `${m.t === 'ellipse' ? 'Circled' : 'Boxed'} ${els.map(name).join('; ')}`;
+}
+function markDown(sc, e) {
+  e.preventDefault(); e.stopPropagation(); // and the caret stays in the note
+  const n = editing; if (!n || !sc.designs.some(d => d.id === n.design)) return;
+  try { e.target.setPointerCapture(e.pointerId); } catch {} // a release over a framed page still ends the stroke
+  const r = sc.screen.getBoundingClientRect(), at = ev => [+clamp((ev.clientX - r.left) / r.width, 0, 1).toFixed(4), +clamp((ev.clientY - r.top) / r.height, 0, 1).toFixed(4)];
+  const m = { t: marking, p: [at(e), at(e)] }, px = p => [p[0] * r.width, p[1] * r.height];
+  let x = e.clientX, y = e.clientY, run = 0;
+  (n.marks ||= []).push(m); if (m.t === 'pen') m.p.pop();
+  const move = ev => {
+    if (m.t !== 'pen') m.p[1] = at(ev);
+    else if (Math.hypot(ev.clientX - x, ev.clientY - y) >= 2) { run += Math.hypot(ev.clientX - x, ev.clientY - y); x = ev.clientX; y = ev.clientY; m.p.push(at(ev)); }
+    paintMarks(n);
+  };
+  const up = ev => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    const [a, b] = m.p.map(px), tiny = m.t === 'pen' ? run < 6 : Math.hypot(b[0] - a[0], b[1] - a[1]) < 6;
+    if (tiny || ev.type === 'pointercancel') { n.marks.pop(); if (!n.marks.length) delete n.marks; return paintMarks(n); }
+    m.on = markOn(sc, m, r); markedLast = true; touch(n); paintMarks(n);
+  };
+  addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+}
+const undoMark = () => { const n = editing; if (!n || !n.marks || !n.marks.length) return false; n.marks.pop(); if (!n.marks.length) delete n.marks; touch(n); paintMarks(n); return true; };
+// ⌘Z: the last mark, while a tool is in hand or nothing was typed since it was drawn; otherwise the text's own undo
+addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && editing && (marking || markedLast) && undoMark()) { e.preventDefault(); e.stopPropagation(); } }, true);
+$('poptools').addEventListener('pointerdown', e => { if (e.target.closest('.ptool')) e.preventDefault(); }); // keep the caret in the note
+$('poptools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) setMarking(marking === b.dataset.tool ? '' : b.dataset.tool); });
+// pointing at a pin shows its markup
+$('frames').addEventListener('pointerover', e => { const p = e.target.closest('.pin'); if (p) document.querySelectorAll(`.ink[data-id="${p.dataset.id}"]`).forEach(m => m.classList.add('hover')); });
+$('frames').addEventListener('pointerout', e => { const p = e.target.closest('.pin'); if (p) document.querySelectorAll(`.ink[data-id="${p.dataset.id}"]`).forEach(m => m.classList.remove('hover')); });
+// A note with no words of its own still says what it is: what was drawn, edited or restyled.
+const gist = n => n.edit ? `Text: "${n.edit.old}" → "${n.edit.new}"` : n.css && Object.keys(n.css).length ? 'CSS: ' + Object.entries(n.css).map(([p, [a, b]]) => `${p} ${a} → ${b}`).join(', ')
+  : n.marks && n.marks.length ? n.marks.map(m => (m.on || '').split(' ')[0]).filter(Boolean).join(', ').replace(/^./, c => c.toUpperCase()) + ', see markup' : '';
 /* One note as the brief writes it: where it is, what it's on, what it says. Send to agent uses the same lines. */
 function noteLines(n, k) {
   const sc = sceneById(n.design), file = n.design === 'url' ? n.url : `${SCENE_PATH}${sc ? sc.base || sc.id : n.design}.js` + (sc && sc.variant ? `, variant "${sc.version}"` : '');
@@ -2191,6 +2541,11 @@ function noteLines(n, k) {
   else if (n.cut) lines.push(`   Cut: ${n.cut.path}, ${n.cut.box[2]} × ${n.cut.box[3]} at ${n.cut.box[0]}, ${n.cut.box[1]}`, `   Styles: ${n.cut.style}`, `   Markup: ${n.cut.html}`);
   else if (n.on) lines.push(`   Under the pin: ${n.on}`);
   if (n.words) lines.push(`   On the words: "${n.words.text}"`);
+  if (n.css && Object.keys(n.css).length) lines.push(`   CSS edits on ${n.cut ? n.cut.path : 'it'} (shown on screen as a preview): ${Object.entries(n.css).map(([p, [a, b]]) => `${p} ${a} → ${b}`).join('; ')}. Make these values the design's own.`);
+  if (n.edit) lines.push(`   Text edit on ${n.edit.path}: from "${n.edit.old}" to "${n.edit.new}". Change these words exactly.`);
+  if (n.marks && n.marks.length) lines.push('   Markup (drawn in blue on the screen and in the snapshot):', ...n.marks.map((m, i) => {
+    const xs = m.p.map(p => p[0]), ys = m.p.map(p => p[1]);
+    return `     ${i + 1}. ${m.on || m.t}, ${pct(Math.min(...xs))}% to ${pct(Math.max(...xs))}% across, ${pct(Math.min(...ys))}% to ${pct(Math.max(...ys))}% down`; }));
   if (n.snap) lines.push(`   Snapshot: ${SCENE_PATH}notes/${n.snap}`);
   lines.push(`   Note: ${n.text}`);
   return lines;
@@ -2384,6 +2739,7 @@ function onKey(e) {
   // Typing inside a live design (its own shadow root) is the design's: the real target is the first in the path.
   const tgt = e.composedPath?.()[0] || e.target;
   if (tgt.matches?.('input:not([type=range]):not([type=checkbox]), textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey) return;
+  if (e.key === 'Escape' && marking) { setMarking(''); return; }
   if (e.key === 'Escape' && noting) { setNoting(false); return; }
   if (e.key === 'Escape' && cutting && cutPicks.length) { clearPicks(); setCutting(true); return; }
   if (e.key === 'Escape' && cutting) { setCutting(false); return; }

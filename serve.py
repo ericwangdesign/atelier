@@ -19,6 +19,12 @@ Routes:
     /stage.html            the stage (never cached, so a reload always shows the latest edit)
     /p/<project>/<file>    a file from that project's scenes/ folder, and nothing outside it
     /api/projects          GET the projects; POST {"name"} makes a new one from starter/
+    /api/hub               GET the shelf (hub.py): every project with its team, context and counts, and who you are
+    /api/hub/project?id=   GET one project's context, docs, pieces and versions; PUT {name, folder, context, docs, pieces}
+    /api/hub/folder        POST {path} makes a folder on the shelf; {path, to} renames or moves it; {path, remove} takes an empty one away
+    /api/hub/publish?id=   POST a version {title, from, open, run, source, note, by}: the same as `atelier publish`
+    /api/hub/brief?id=&version=  GET the brief Remix copies
+    /h/<project>/<file>    a picture or clip from that project's own folder
     /api/wallpapers        GET which wallpaper pictures (dark, light) are in wallpapers/
     /api/taste?project=    GET the taste profile that applies here; POST {act: add|change|forget|on} edits it, {act: reread} relearns from every design
     /api/notes?project=    GET / PUT the project's notes
@@ -50,6 +56,7 @@ import threading
 import agent
 import critic
 import fixes
+import hub
 import page
 import taste
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -447,6 +454,14 @@ class Handler(SimpleHTTPRequestHandler):
             base = os.path.realpath(os.path.join(project_dir(name), 'exports'))
             target = os.path.realpath(os.path.join(base, sub))
             return target if target.startswith(base + os.sep) else os.path.join(ROOT, '.missing')
+        if clean.startswith('/h/'):  # a picture or clip in a project's own folder (hub.py: a version's picture)
+            name, _, sub = clean[3:].partition('/')
+            entry = hub.shelf(found(), PROJECTS).get(name)
+            if not entry or not sub.lower().endswith(hub.PICTURES):
+                return os.path.join(ROOT, '.missing')
+            base = os.path.realpath(entry[0])
+            target = os.path.realpath(os.path.join(base, sub))
+            return target if target.startswith(base + os.sep) else os.path.join(ROOT, '.missing')
         if clean.startswith('/p/'):
             name, _, sub = clean[3:].partition('/')
             base = scenes_dir(name)
@@ -503,6 +518,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, fixes.listing(parse_qs(urlparse(self.path).query).get('path', [''])[0]))
         if route == '/api/projects':
             return self.send_json(200, [summary(p) for p in projects()])
+        if route.startswith('/api/hub'):
+            return self.hub_get(route)
         if route == '/api/wallpapers':  # the wallpaper pictures that are there, so the page never asks for a missing one
             return self.send_json(200, [n for n in ('dark', 'light') if os.path.isfile(os.path.join(ROOT, 'wallpapers', n + '.jpg'))])
         if route == '/api/taste':
@@ -524,8 +541,68 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, {'state': read_json(files[2], {}), 'version': version(files[2])})
         return super().do_GET()
 
+    def hub_entry(self):
+        """The shelf project named in ?id=, as (id, its folder on disk, group, has scenes, its folder on the shelf), or None."""
+        pid = parse_qs(urlparse(self.path).query).get('id', [''])[0]
+        all_ = hub.shelf(found(), PROJECTS)
+        return (pid, *all_[pid], hub.places(all_)[pid]) if pid in all_ else None
+
+    def hub_get(self, route):
+        """The shelf (hub.py). /api/hub: every project, with what home draws before it loads anything.
+        /api/hub/project?id=: one project's context, docs, pieces and versions. /api/hub/brief?id=&version=: the remix brief."""
+        if route == '/api/hub':
+            out, all_ = [], hub.shelf(found(), PROJECTS)
+            where = hub.places(all_)
+            for pid, (folder, grp, has) in all_.items():
+                card = hub.card(pid, folder, grp, has, where[pid])
+                if has:
+                    s = summary(pid)
+                    card = {**s, **card, 'updated': max(s['updated'], card['updated'])}
+                out.append(card)
+            return self.send_json(200, {'me': hub.me(), 'folders': hub.folders(PROJECTS, all_), 'projects': out})
+        entry = self.hub_entry()
+        if not entry:
+            return self.send_json(404, {'error': 'no such project'})
+        if route == '/api/hub/project':
+            return self.send_json(200, hub.detail(*entry))
+        if route == '/api/hub/brief':
+            text = hub.brief(*entry[:4], parse_qs(urlparse(self.path).query).get('version', [''])[0], entry[4])
+            return self.send_json(200, {'text': text}) if text else self.send_json(404, {'error': 'no such version'})
+        return self.send_json(404, {'error': 'not found'})
+
+    def hub_write(self, route):
+        """PUT /api/hub/project?id= {name, team, context, docs, pieces}; POST /api/hub/publish?id= a version (hub.publish)."""
+        body = self.body()
+        if route == '/api/hub/folder':  # {path} makes one; {path, to} renames or moves it; {path, remove} takes an empty one away
+            all_ = hub.shelf(found(), PROJECTS)
+            try:
+                if body is None:
+                    raise ValueError('send JSON')
+                if body.get('remove'):
+                    hub.folder_remove(PROJECTS, all_, body.get('path'))
+                    return self.send_json(200, {})
+                made = hub.folder_move(PROJECTS, all_, body.get('path'), body['to']) if body.get('to') else hub.folder_make(PROJECTS, all_, body.get('path'))
+                return self.send_json(200, {'path': made})
+            except ValueError as e:
+                return self.send_json(400, {'error': str(e)})
+        entry = self.hub_entry()
+        if not entry or body is None:
+            return self.send_json(404 if not entry else 400, {'error': 'no such project' if not entry else 'send JSON'})
+        pid, folder, grp, has, _ = entry
+        if route == '/api/hub/project':
+            hub.change(folder, body)
+            return self.send_json(200, hub.detail(*self.hub_entry()))
+        if route == '/api/hub/publish':
+            try:
+                return self.send_json(200, {'version': hub.publish(pid, folder, body, has)})
+            except ValueError as e:
+                return self.send_json(400, {'error': str(e)})
+        return self.send_json(404, {'error': 'not found'})
+
     def do_PUT(self):
         with WRITES:
+            if urlparse(self.path).path.startswith('/api/hub/'):
+                return self.hub_write(urlparse(self.path).path)
             return self.put()
 
     def fix(self, method):
@@ -565,6 +642,9 @@ class Handler(SimpleHTTPRequestHandler):
             return self.capture()
         if urlparse(self.path).path == '/api/fixes':
             return self.fix('POST')
+        if urlparse(self.path).path.startswith('/api/hub/'):
+            with WRITES:
+                return self.hub_write(urlparse(self.path).path)
         with WRITES:
             return self.post()
 

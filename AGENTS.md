@@ -75,3 +75,13 @@ scene's new defaults (the control's `value` and the CSS fallback) when asked.
 
 Match the design's existing spacing, type, colour and motion. Keep every step playing. Change what the note asks
 for and nothing else.
+
+## Remix and publish
+
+When someone pastes a brief that starts with `Remix "…"`, it came from Remix on a project's page. Follow its steps:
+work on a copy, never the original. When they say publish, run the `atelier publish` line at the end of the brief
+(`--from` names the version it came from). `atelier shelf <project>` lists a project's versions,
+`atelier context <project> "…"` and `atelier doc <project> "<title>" <link>` set what its page says;
+`atelier folder "Team/Area"` and `atelier move <project> "Team/Area"` file it. Everything is in
+the project's `project.json` (`hub.py` says what each field is); you can also edit that file directly, e.g. `pieces`
+(`[{"title": "Open questions", "items": ["…"]}]`) for short blocks under the docs.

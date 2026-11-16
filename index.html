@@ -6,398 +6,476 @@
 <title>Projects · Atelier</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M12 9v14l11-7z' fill='white'/%3E%3C/svg%3E">
 <!--
-  Home and gallery in one: every project is a row, every design and variant in it a thumbnail.
-  A thumbnail shows its design's last step and plays it on hover; a click opens it on the stage (stage.html).
+  Home is the shelf a team shares (hub.py), as a file browser. Its look is Home v28 (atelier/scenes/home-v28.js),
+  the design Eric picked on Nov 15 after 28 versions. What that settled:
 
-  Built to stay quick with many projects:
-  - serve.py sends each project's names and counts first, so every row is drawn at its final size before anything loads
-    and the page never jumps;
-  - a row loads its scenes only when it scrolls near the screen, one project at a time;
-  - a row shows 8 designs, and Show all for the rest;
-  - the header sticks, turns to glass once the page scrolls, and holds Filter, Recent | Name, the wallpaper and New project;
-  - coming back from the stage (All projects) lands on the project you were in.
+  - Neutral greys: a #0a0a0a ground and white at low strengths over it. No blue tint, no colour, no gradients, no
+    wallpaper, no glow. Depth is one step of grey; only things that float get a shadow.
+  - Nothing here is a screenshot. A project or a design is a card set in type: its name large and tight at the foot,
+    its facts small at the head. A folder is the one object: grey glass over a darker back, with pages standing in it
+    (the names of what's inside) that rise when you point at it.
+  - Geist at 14, the grey lines at 13. The only cursive is the wordmark, top left.
+  - One set of edges: the top bar and the content share a left and a right edge, and every name in a column starts
+    at the same x.
+
+  The logic under it is three levels, each one thing:
+    folder   a place on the shelf, as deep as you like ("Payments/Checkout"). Holds folders and projects.
+    project  one piece of work: its context, its docs, its designs. A card in a folder; opens as a page.
+    design   one screen, flow or prototype. A card on the project's page. Its iterations (v1, v2, a remix) are
+             chips under that one card, never cards of their own: pick a chip, then open it or Remix it.
+
+  The tree at the left is the same folders. Drag a project or a folder onto a folder (in the tree, the grid or the
+  path at the top) to move it; nothing moves on disk. Views are the hash: #/ the top, #/f/<folder path>,
+  #/p/<project>, #/recent, #/mine.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Geist for the tool itself; Inter Tight for the starter design (starter/first.js). -->
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
-<!-- Nothing is drawn until the page has built itself (the #ready marker at the end of the body), so it never shows
-     an empty panel while its scripts and scenes load, and the crossfade from the other page lands on the finished page. -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Nothing is drawn until the page has built itself (the #ready marker at the end of the body). -->
 <link rel="expect" href="#ready" blocking="render">
 <link rel="stylesheet" href="tokens.css">
-<link rel="stylesheet" href="wall.css">
 <link rel="stylesheet" href="ui.css">
 <style>
-  :root { --dim: 0; --shadow: 0 1px 2px rgb(0 0 0 / .45); }   /* the rest is tokens.css */
-  :root[data-wall="light"] { --shadow: 0 1px 3px rgb(0 0 0 / .7), 0 0 12px rgb(0 0 0 / .5); }
+  @font-face { font-family: 'Mrs Saint Delafield'; font-display: block; src: url(fonts/MrsSaintDelafield-latin.woff2) format('woff2'); }
+  /* home's own greys: neutral, where the stage's tokens are tinted for its wallpaper */
+  :root { --bg: #0a0a0a; --panel: rgb(255 255 255 / .04); --hover: rgb(255 255 255 / .06); --on: rgb(255 255 255 / .1); --strong: rgb(255 255 255 / .16);
+    --text: #fff; --text2: rgb(255 255 255 / .8); --text3: rgb(255 255 255 / .58); --text4: rgb(255 255 255 / .38);
+    --folder: #8c8c8c; --glass: 58%; --ease: cubic-bezier(.23, 1, .32, 1); --font: Geist, system-ui, sans-serif; }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; min-height: 100%; }
-  html { scroll-behavior: smooth; }
-  body { background: var(--c-ground); color: var(--c-text); font: var(--c-w-body) var(--c-t-ui)/var(--c-lh-ui) var(--c-font); -webkit-font-smoothing: antialiased; }
+  body { background: var(--bg); color: var(--text); font: 400 14px/20px var(--font); letter-spacing: -.006em; -webkit-font-smoothing: antialiased; }
   a { color: inherit; text-decoration: none; }
-  button, input, select { font: inherit; color: inherit; }
+  button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+  button { border: 0; background: none; padding: 0; cursor: pointer; text-align: left; }
+  b { font-weight: 500; } small { font-size: 13px; color: var(--text3); }
   :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .i { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* Every control is glass, from ui.css: translucent white over a blur, a hairline edge, a soft top highlight. */
-  .ctl { height: 32px; padding: 0 14px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-shadow: none;
-    background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
-  .ctl:hover { background-color: var(--surf-hover); }
-  .ctl svg { width: 10px; height: 10px; }
-  input.ctl { width: 180px; cursor: text; } input.ctl::placeholder { color: var(--c-text-3); }
-  select.ctl { padding-right: 30px;
-    background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 13px center no-repeat; }
-  select.ctl:hover { background-color: var(--surf-hover); }
-  .seg { display: inline-flex; height: 32px; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
-  .pill { height: 28px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); cursor: pointer; }
-  .pill:hover { color: var(--c-text); } .pill[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); box-shadow: var(--surf-edge); }
-  .swatch { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
-  .swatch::-webkit-color-swatch-wrapper { padding: 0; } .swatch::-webkit-color-swatch { border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+  /* the sidebar sits on the ground: no panel of its own */
+  .side { position: fixed; inset: 0 auto 0 0; z-index: 6; width: 244px; padding: 18px 12px 12px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; background: var(--bg); }
+  .side > * { flex: none; }
+  .ws { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 2px 0 8px; }
+  .word { font: 400 26px/1 'Mrs Saint Delafield', cursive; letter-spacing: 0; transform: translateY(2px); margin-right: auto; }
+  .rb { width: 28px; height: 28px; border-radius: 14px; display: grid; place-items: center; color: var(--text3); }
+  .rb:hover { background: var(--hover); color: var(--text); } .rb.o { background: var(--on); color: var(--text2); }
+  .find { height: 32px; width: 100%; padding: 0 10px; border: 0; border-radius: 7px; background: var(--hover); outline-offset: -2px; }
+  .find::placeholder { color: var(--text4); }
+  .nav { display: flex; flex-direction: column; gap: 1px; }
+  .nh { display: flex; align-items: center; height: 28px; padding: 0 8px; color: var(--text4); font-size: 13px; font-weight: 500; }
+  .nr { display: flex; align-items: center; gap: 9px; min-height: 32px; padding: 0 8px; border-radius: 6px; color: var(--text2); font-weight: 500; white-space: nowrap; }
+  .nr .i { color: var(--text3); } .nr span { overflow: hidden; text-overflow: ellipsis; }
+  .nr:hover { background: var(--hover); color: var(--text); }
+  .nr[aria-current="page"] { background: var(--on); color: var(--text); } .nr[aria-current="page"] .i { color: var(--text); }
+  .nr.kid { font-weight: 400; color: var(--text3); }
+  .nr em { flex: none; margin-left: auto; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--on); border-top-color: var(--text2); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  .me { margin-top: auto; display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 8px; color: var(--text2); }
+  .me i { width: 20px; height: 20px; border-radius: 50%; background: var(--on); display: grid; place-items: center; font-style: normal; font-size: 10px; font-weight: 500; }
+  .drop { background: var(--strong) !important; color: var(--text) !important; }
 
-  /* header: sticks to the top; glass appears once something scrolls under it */
-  .top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 16px max(32px, calc((100% - 1360px) / 2 + 32px)); /* lines up with the page's column */ transition: background .25s, box-shadow .25s; }
-  /* a tint, not frost: frost here would hide the wallpaper from the liquid buttons on top of it */
-  .top.scrolled { background: linear-gradient(rgb(10 10 14 / .78), rgb(10 10 14 / .6)); box-shadow: 0 0.5px 0 rgb(255 255 255 / .16); }
-  h1 { margin: 0 auto 0 0; font-size: var(--c-t-title); line-height: var(--c-lh-title); font-weight: var(--c-w-medium); letter-spacing: var(--c-tr-tight); text-shadow: var(--shadow); white-space: nowrap; }
-  h1 span { margin-left: 8px; color: var(--c-text-3); font-size: var(--c-t-lg); font-weight: var(--c-w-body); }
+  /* the content: one inset panel, a step up from the ground */
+  .main { margin: 8px 8px 8px 244px; min-height: calc(100vh - 16px); border-radius: 12px; background: var(--panel); display: flex; flex-direction: column; min-width: 0; }
+  .bar { flex: none; min-height: 52px; display: flex; align-items: center; gap: 6px; padding: 0 28px; }
+  .crumb { display: flex; align-items: center; gap: 6px; margin-right: auto; min-width: 0; font-weight: 500; }
+  .crumb a { color: var(--text3); padding: 3px 6px; margin: 0 -6px; border-radius: 6px; white-space: nowrap; } .crumb a:hover { background: var(--hover); color: var(--text); }
+  .crumb span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 4px; outline-offset: 3px; }
+  .crumb .i { width: 12px; height: 12px; color: var(--text4); }
+  .btn { height: 28px; padding: 0 11px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text2); background: var(--hover); white-space: nowrap; border: 0; cursor: pointer; }
+  .btn:hover { background: var(--on); color: var(--text); }
+  .btn.pri { background: var(--strong); color: var(--text); } .btn.pri:hover { background: rgb(255 255 255 / .22); }
+  .btn .i { width: 14px; height: 14px; }
+  select.btn { appearance: none; -webkit-appearance: none; padding-right: 26px; max-width: 220px;
+    background: var(--hover) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.6' stroke-width='1.3'/%3E%3C/svg%3E") right 10px center no-repeat; }
+  #menubtn { display: none; }
+  .body { flex: 1; padding: 0 28px 40px; display: flex; flex-direction: column; gap: 26px; }
+  .sec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .sh2 { margin: 0; color: var(--text3); font-size: 13px; line-height: 20px; font-weight: 500; }
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .grid.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 20px; }
+  .cap { display: flex; flex-direction: column; min-width: 0; }
+  .cap b, .cap small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* the same wallpaper as the stage, with a soft wash on the left where the names and facts sit, so they read on any wallpaper */
-  .scrim { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgb(5 7 13 / .55) 0, rgb(5 7 13 / .3) 320px, rgb(5 7 13 / .08) 70%); }
-  /* page: 32 in from the sides, 48 between projects; positioned so it paints above the fixed wallpaper */
-  .page { position: relative; max-width: 1360px; margin: 0 auto; padding: 16px 32px 96px; }
-  .proj { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; scroll-margin-top: 88px; }
-  .proj + .proj { margin-top: 48px; }
-  .about { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; text-shadow: var(--shadow); min-width: 0; }
-  .about h2 { margin: 0 0 2px; font-size: var(--c-t-md); line-height: var(--c-lh-md); font-weight: var(--c-w-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .fact { color: var(--c-text-3); line-height: var(--c-lh-ui); }
-  .fact.notes { color: var(--c-text-2); }
-  /* an agent working on one of the project's designs (agent.js): the same blue as on the stage, and only then */
-  .fact.working { display: flex; align-items: center; gap: 6px; color: #4da6ff; }
-  .fact.working i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid rgb(77 166 255 / .3); border-top-color: #4da6ff; animation: wkspin .8s linear infinite; }
-  @keyframes wkspin { to { transform: rotate(1turn); } }
-  @media (prefers-reduced-motion: reduce) { .fact.working i { animation-duration: 2s; } }
-  .about .acts { display: flex; gap: 8px; margin-top: 6px; }
-  .designs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px 16px; }
+  /* a folder: a ground with its name under it; on it the back, the pages standing in it, and a front of grey glass */
+  .fold { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .ground { display: block; padding: 28px 0 16px; border-radius: 8px; background: var(--hover); transition: background .15s; }
+  .fold:hover .ground, .fold.drop .ground { background: var(--on); }
+  .fold.drop { background: none !important; }
+  .obj { position: relative; display: block; width: 200px; height: 150px; margin: 0 auto; }
+  .bk { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .3)) drop-shadow(0 6px 10px rgb(0 0 0 / .2)); }
+  .bk path { fill: color-mix(in srgb, var(--folder), #0a0a0a 52%); }
+  .sh { position: absolute; left: 30px; top: 4px; width: 140px; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 5px; background: #222;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / .12), 0 2px 5px rgb(0 0 0 / .3); transform-origin: 50% 100%; transition: transform .3s var(--ease); }
+  .sh em { position: absolute; left: 10px; right: 10px; top: 9px; font-style: normal; font-size: 11px; line-height: 13px; font-weight: 500; letter-spacing: -.01em; text-wrap: balance; }
+  .s1 { background: #1c1c1c; transform: translate(-14px, 22px) rotate(-4deg); } .s2 { transform: translateY(-4px); } .s3 { background: #262626; transform: translate(14px, 22px) rotate(4deg); }
+  .fold:hover .s1 { transform: translate(-18px, 8px) rotate(-6deg); }
+  .fold:hover .s2 { transform: translateY(-20px); }
+  .fold:hover .s3 { transform: translate(18px, 8px) rotate(6deg); }
+  .fr { position: absolute; left: 6px; right: 6px; top: 62px; bottom: 6px; border-radius: 8px 8px 9px 9px;
+    background: color-mix(in srgb, var(--folder) var(--glass), transparent); -webkit-backdrop-filter: blur(7px) saturate(150%); backdrop-filter: blur(7px) saturate(150%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), inset 0 0 0 1px rgb(255 255 255 / .08); }
 
-  /* a design: its screen at 1440 × 900, scaled to the card; a placeholder holds the same size until it loads */
-  .card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-  .shot { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; border-radius: var(--c-r-md); background: rgb(20 20 20 / .6);
-    box-shadow: 0 0 0 1px rgb(255 255 255 / .12), 0 12px 32px rgb(0 0 20 / .35); transition: box-shadow .2s ease, transform .2s cubic-bezier(.23, 1, .32, 1); }
-  a.card:hover .shot { box-shadow: 0 0 0 1px rgb(255 255 255 / .4), 0 16px 40px rgb(0 0 20 / .45); transform: translateY(-2px); }
-  .card.wait .shot { background: rgb(255 255 255 / .06); animation: wait 1.6s ease-in-out infinite; box-shadow: 0 0 0 1px rgb(255 255 255 / .08); }
-  @keyframes wait { 50% { background: rgb(255 255 255 / .1); } }
-  .card.wait .cap::before { content: ""; width: 96px; height: 10px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .1); }
-  .screen { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; pointer-events: none; }
-  .screen .host { pointer-events: none; } /* again on the host: its :host { all: initial } turns pointer events back on, and a live page in an iframe would take the click */
-  .host { position: absolute; inset: 0; }
-  .cap { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; text-shadow: var(--shadow); }
-  .cap .t { color: rgb(255 255 255 / .92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 60%; }
-  .cap .v { color: var(--c-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cap .n { margin-left: auto; flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--c-r-pill); background: var(--c-line-2); text-align: center; line-height: 20px; font-size: var(--c-t-xs); font-weight: var(--c-w-medium); text-shadow: none; }
-  .cap .k { margin-left: auto; color: var(--c-text-3); white-space: nowrap; flex: none; }
-  .cap .k + .n { margin-left: 4px; }
-  /* a bundle: the older versions show as two sheets behind the card, peeking out above it. Every card keeps the room
-     for them, so cards with and without versions line up. */
-  .pile { position: relative; padding-top: 10px; isolation: isolate; }
-  .card.many .pile::before, .card.many .pile::after { content: ""; position: absolute; top: 5px; left: 5%; right: 5%; height: 40px; border-radius: var(--c-r-md) var(--c-r-md) 0 0;
-    z-index: -1; background: rgb(255 255 255 / .1); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
-  .card.many .pile::before { top: 0; left: 10%; right: 10%; background: rgb(255 255 255 / .05); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
-  /* which version the card shows, while the pointer skims it */
-  .ticks { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 4px; opacity: 0; transition: opacity .2s; }
-  .ticks i { flex: 1; height: 3px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .35); box-shadow: 0 0 3px rgb(0 0 0 / .5); }
-  .ticks i.on { background: #fff; }
-  a.card:hover .ticks { opacity: 1; }
-  .card.none .shot { display: grid; place-items: center; padding: 16px; color: var(--c-text-3); text-align: center; line-height: var(--c-lh-ui); }
+  /* a project or a design: a card set in type. The facts small at the head, the name large and tight at the foot. */
+  .card { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .th { position: relative; display: flex; flex-direction: column; width: 100%; aspect-ratio: 16 / 10; padding: 16px 18px; border-radius: 8px; background: var(--hover); transition: background .15s; min-width: 0; }
+  a.th:hover, .th.can:hover { background: var(--on); } .th.can { cursor: pointer; }
+  .th .top { display: flex; justify-content: space-between; gap: 12px; color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .th .top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .th .top span:last-child { flex: none; }
+  .th em { margin-top: auto; font-style: normal; font-size: 26px; line-height: 1.12; font-weight: 500; letter-spacing: -.03em; text-wrap: balance;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .th .foot { margin-top: 8px; color: var(--text3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .under { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+  .its { display: flex; flex-wrap: wrap; gap: 4px; margin-right: auto; }
+  .it { height: 24px; min-width: 32px; padding: 0 8px; border-radius: 6px; background: var(--hover); color: var(--text3); font-size: 13px; text-align: center; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .it:hover { background: var(--on); color: var(--text); }
+  .it[aria-pressed="true"] { background: var(--strong); color: var(--text); }
 
-  /* the glass tuner: a frosted panel at the right, the same rhythm as the stage's panel (12 between, 6 label to slider) */
-  .ctl[aria-pressed="true"] { background: var(--surf-on); }
-  .tunepanel { position: fixed; top: 72px; right: 16px; z-index: 10; width: 288px; padding: 16px; border-radius: var(--c-r-lg); color: var(--c-text);
-    background: rgb(40 40 46 / .45); -webkit-backdrop-filter: blur(40px) saturate(180%); backdrop-filter: blur(40px) saturate(180%);
-    box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .22), inset 0 1px 0 rgb(255 255 255 / .14), 0 16px 48px rgb(0 0 0 / .35); }
-  .tunepanel .tt { font-size: var(--c-t-sm); line-height: 20px; font-weight: var(--c-w-medium); margin-bottom: 10px; }
-  .tunepanel .lbl { display: flex; justify-content: space-between; color: var(--c-text-2); line-height: var(--c-lh-ui); }
-  .tunepanel .lbl output { color: var(--c-text); font-variant-numeric: tabular-nums; }
-  .tunepanel .lbl:not(:first-child) { margin-top: 12px; }
-  .tunepanel .range { display: block; width: 100%; height: 14px; margin: 6px 0 0; -webkit-appearance: none; appearance: none; background: none; cursor: pointer; }
-  .tunepanel .range::-webkit-slider-runnable-track { height: 4px; border-radius: var(--c-r-pill); background: var(--surf-hover); box-shadow: var(--surf-edge); }
-  .tunepanel .range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
-  .tunepanel .seg { display: flex; margin-top: 6px; } .tunepanel .pill { flex: 1; }
-  .tunepanel .acts { display: flex; gap: 8px; margin-top: 16px; }
-  .tunepanel .btn { flex: 1; height: 30px; border: 0; border-radius: var(--c-r-pill); cursor: pointer; color: var(--c-text); background: var(--surf); box-shadow: var(--surf-edge); }
-  .tunepanel .btn:hover { background: var(--surf-hover); }
-  /* What changed since you last looked (whatsnew.json), once: a line per change, gone after Got it until the next one */
-  .news { max-width: 560px; margin: 0 0 24px; padding: 16px; border-radius: var(--c-r-lg); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text); }
-  .news-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--c-t-sm); line-height: var(--c-lh-sm); font-weight: 500; }
-  .news ul { margin: 8px 0 0; padding: 0 0 0 18px; display: grid; gap: 4px; color: var(--c-text-2); font-size: var(--c-t-sm); line-height: var(--c-lh-sm); }
-  .news code { font: inherit; color: var(--c-text); }
-  .empty { max-width: 380px; margin: 16vh auto 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--c-text-2); text-shadow: var(--shadow); }
-  .empty h2 { margin: 0; color: var(--c-text); font-size: var(--c-t-md); line-height: var(--c-lh-md); font-weight: var(--c-w-medium); }
+  /* a project's page */
+  .pp { max-width: 1160px; gap: 30px; }
+  .head { display: flex; align-items: flex-end; gap: 16px; }
+  .head > div { margin-right: auto; min-width: 0; }
+  .head h1 { margin: 0 0 4px; font-size: 30px; line-height: 34px; font-weight: 500; letter-spacing: -.03em; }
+  .ctx { margin: 0; max-width: 680px; font-size: 16px; line-height: 25px; white-space: pre-wrap; border-radius: 4px; outline-offset: 6px; cursor: text; }
+  .ctx:empty::before { content: attr(data-ph); color: var(--text4); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { height: 28px; padding: 0 11px; border-radius: 7px; background: var(--hover); display: inline-flex; align-items: center; gap: 8px; max-width: 320px; font-weight: 500; color: var(--text2); border: 0; cursor: pointer; }
+  .chip:hover { background: var(--on); color: var(--text); }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip small { font-weight: 400; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .tile { padding: 16px 18px; border-radius: 8px; background: var(--hover); display: flex; flex-direction: column; gap: 8px; }
+  .tile b { font-weight: 500; font-size: 13px; color: var(--text3); }
+  .tile p, .tile ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .start { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  code { font: 13px/20px "Geist Mono", ui-monospace, monospace; padding: 4px 10px; border-radius: 7px; background: var(--hover); overflow-wrap: anywhere; }
+
+  .news { max-width: 620px; padding: 16px 18px; border-radius: 8px; background: var(--hover); }
+  .news-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 500; }
+  .news ul { margin: 10px 0 0; padding: 0 0 0 18px; display: grid; gap: 4px; color: var(--text2); }
+  .news code { font: inherit; padding: 0; background: none; color: var(--text); }
+  .empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; color: var(--text3); }
+  .empty h2 { margin: 0; color: var(--text); font-size: 14px; line-height: 20px; font-weight: 500; }
   .empty p { margin: 0; }
-  code { font: var(--c-t-ui) var(--c-mono); padding: 2px 6px; border-radius: var(--c-r-xs); background: var(--c-fill); color: var(--c-text); text-shadow: none; }
+  .shade { display: none; }
 
-  @media (max-width: 900px) { .top { flex-wrap: wrap; padding: 12px 16px; } h1 { flex-basis: 100%; } input.ctl { flex: 1; width: auto; min-width: 120px; }
-    .page { padding: 8px 16px 64px; } .proj { grid-template-columns: 1fr; gap: 16px; } .designs { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .shot, .top { transition: none; } a.card:hover .shot { transform: none; } .card.wait .shot { animation: none; } }
+  @media (max-width: 1180px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .grid.g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  /* a phone: the sidebar is a sheet behind Menu; one card across, two folders across */
+  @media (max-width: 900px) {
+    .main { margin: 0; min-height: 100vh; border-radius: 0; }
+    .bar { flex-wrap: wrap; padding: 12px 16px 8px; row-gap: 10px; } .crumb { flex-basis: 100%; flex-wrap: wrap; } #menubtn { display: inline-flex; }
+    .btn { height: 36px; padding: 0 14px; } .rb { width: 36px; height: 36px; border-radius: 18px; }
+    .body { padding: 4px 16px 48px; }
+    .side { width: min(300px, calc(100% - 48px)); transform: translateX(-100%); visibility: hidden; transition: transform .3s var(--ease), visibility 0s .3s; }
+    body.menu .side { transform: none; visibility: visible; transition-delay: 0s; } body.menu .shade { display: block; position: fixed; inset: 0; z-index: 5; background: rgb(0 0 0 / .6); }
+    .nr { min-height: 44px; } .find { height: 44px; font-size: 16px; }
+    .grid, .grid.g3 { grid-template-columns: 1fr; gap: 12px; } .grid.folders { grid-template-columns: 1fr 1fr; }
+    .obj { zoom: .74; } .ground { padding: 20px 0 10px; }
+    .th { aspect-ratio: auto; min-height: 150px; } .th em { font-size: 24px; }
+    .it { height: 32px; min-width: 40px; }
+    .head { flex-direction: column; align-items: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sh, .side { transition: none; } .nr em { animation-duration: 2s; } }
 </style>
 </head>
 <body>
-<div class="wall" id="wall"></div>
-<div class="scrim"></div>
-<aside class="tunepanel" id="tunepanel" hidden aria-label="Liquid glass"><div class="tt">Liquid glass</div><div class="stack" id="tuner"></div></aside>
-<header class="top" id="top">
-  <h1>Projects<span id="count"></span></h1>
-  <input class="ctl" id="filter" type="search" placeholder="Filter" aria-label="Filter projects" hidden>
-  <span class="seg" id="sort" role="group" aria-label="Sort" hidden><button class="pill" data-v="recent">Recent</button><button class="pill" data-v="name">Name</button></span>
-  <select class="ctl" id="wallsel" aria-label="Wallpaper"></select>
-  <input class="swatch" type="color" id="color" aria-label="Wallpaper colour" hidden>
-  <input type="file" id="file" accept="image/*" hidden>
-  <button class="ctl" id="glassbtn" aria-pressed="false">Glass</button>
-  <button class="ctl" id="new" hidden><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5 1v8M1 5h8"/></svg>New project</button>
-</header>
-<main class="page">
-  <section class="news" id="news" hidden aria-label="New in Atelier"><div class="news-head"><span id="newshead">New</span><button class="ctl" id="newsok">Got it</button></div><ul id="newslist"></ul></section>
-  <div id="list"></div>
-  <div class="empty" id="nomatch" hidden><h2>No projects match</h2><p>Try another word, or clear the filter.</p></div>
-  <div class="empty" id="none" hidden><h2>No projects yet</h2><p>A project is a folder next to the atelier folder with a scenes/ folder in it. New project makes one with a starter scene.</p></div>
-  <div class="empty" id="offline" hidden><h2>The Atelier server isn't running</h2><p>Start it in Terminal, then reload:</p><code>atelier</code><p><a class="ctl" href="stage.html">Open the starter stage</a></p></div>
-</main>
+<aside class="side" id="side" aria-label="Shelf">
+  <div class="ws"><a class="word" href="#/">Atelier</a>
+    <button class="rb" id="findbtn" aria-label="Search"><svg class="i" viewBox="0 0 16 16"><path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10zM10.800 10.800L14 14"/></svg></button>
+    <button class="rb o" id="new2" aria-label="New project"><svg class="i" viewBox="0 0 16 16"><path d="M8 3.200v9.600M3.200 8h9.600"/></svg></button></div>
+  <input class="find" id="filter" type="search" placeholder="Search" aria-label="Search the shelf" hidden>
+  <nav class="nav" id="views"></nav>
+  <nav class="nav" id="tree" aria-label="Folders"></nav>
+  <div class="me"><i id="mei"></i><span id="who"></span></div>
+</aside>
+<div class="shade" id="shade"></div>
+<div class="main">
+  <header class="bar">
+    <div class="crumb" id="crumbs"></div>
+    <button class="btn" id="menubtn">Menu</button>
+    <span id="acts" style="display:contents"></span>
+    <button class="btn" id="newfolder" hidden>New folder</button>
+    <button class="btn pri" id="new" hidden><svg class="i" viewBox="0 0 16 16"><path d="M8 3.200v9.600M3.200 8h9.600"/></svg>New project</button>
+  </header>
+  <main class="body" id="page"></main>
+  <main class="body" id="off" hidden><div class="empty"><h2>The Atelier server isn't running</h2><p>Start it in Terminal, then reload:</p><code>atelier</code><a class="btn" href="stage.html">Open the starter stage</a></div></main>
+</div>
 
-<script src="engine.js"></script>
-<script src="wall.js"></script>
-<script src="liquid.js"></script>
 <script src="ui.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = x => String(x).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
-const enc = encodeURIComponent;
-const SHOW = 8; // designs a row shows before Show all
-
-/* ---------- wallpaper: the stage's own setting, so moving between home and the stage is seamless ---------- */
-let stage = {};
-try { stage = JSON.parse(localStorage.getItem('workspace') || '{}'); } catch {}
-const saveStage = () => { try { const now = JSON.parse(localStorage.getItem('workspace') || '{}'); localStorage.setItem('workspace', JSON.stringify({ ...now, wall: stage.wall, color: stage.color })); } catch {} };
-function paintWall() {
-  stage.wall = Wall.apply($('wall'), stage);
-  $('wallsel').value = stage.wall; $('color').hidden = stage.wall !== 'color'; $('color').value = stage.color || '#1b1b22';
-}
-$('wallsel').innerHTML = Wall.OPTIONS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
-$('wallsel').onchange = e => { if (e.target.value === 'image') return $('file').click(), paintWall(); stage.wall = e.target.value; if (stage.wall === 'color') stage.color ||= '#1b1b22'; saveStage(); paintWall(); };
-$('file').onchange = async e => { if (await Wall.save(e.target.files[0])) { stage.wall = 'image'; saveStage(); } e.target.value = ''; paintWall(); }; // cleared, so the same file can be picked again
-$('color').oninput = e => { stage.color = e.target.value; stage.wall = 'color'; saveStage(); paintWall(); };
-paintWall();
-addEventListener('pageshow', e => { if (!e.persisted) return; try { stage = JSON.parse(localStorage.getItem('workspace') || '{}'); } catch {} paintWall(); });
-
-/* ---------- header turns to glass once the page scrolls ---------- */
-addEventListener('scroll', () => $('top').classList.toggle('scrolled', scrollY > 4), { passive: true });
-
-/* ---------- small helpers ---------- */
-const ago = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const enc = encodeURIComponent, encPath = p => p.split('/').map(enc).join('/');
+const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+const day = ms => { if (!ms) return ''; const d = new Date(ms), now = new Date(); return d.toDateString() === now.toDateString() ? 'Today' : d.toLocaleDateString('en-US', d.getFullYear() === now.getFullYear() ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' }); };
 const getJSON = async url => { try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; } };
-const addScript = src => new Promise(done => { const s = document.createElement('script'); s.src = src; s.onload = s.onerror = done; document.head.append(s); });
-let home = { sort: 'recent' };
-try { Object.assign(home, JSON.parse(localStorage.getItem('workspace.home') || '{}')); } catch {}
+const send = (url, method, body) => fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(async r => ({ ok: r.ok, ...(await r.json().catch(() => ({}))) }), () => ({ ok: false, error: 'The Atelier server is not running.' }));
+const host = url => { try { return new URL(url).host.replace(/^www\./, ''); } catch { return ''; } };
+const leaf = path => path.split('/').pop(), parent = path => path.split('/').slice(0, -1).join('/');
+const I = d => `<svg class="i" viewBox="0 0 16 16"><path d="${d}"/></svg>`;
+const ICON = { all: I('M2.500 2.500h4.500v4.500H2.500zM9 2.500h4.500v4.500H9zM2.500 9h4.500v4.500H2.500zM9 9h4.500v4.500H9z'), recent: I('M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12zM8 4.800V8l2.200 1.400'),
+  mine: I('M8 8a2.600 2.600 0 1 0 0-5.200A2.600 2.600 0 0 0 8 8zM3 13.500c.500-2.300 2.500-3.600 5-3.600s4.500 1.300 5 3.600'), chev: I('M6 4l4 4-4 4'),
+  folder: I('M2 5a1.500 1.500 0 0 1 1.500-1.500h2.600l1.500 1.600h4.900A1.500 1.500 0 0 1 14 6.600v4.900a1.500 1.500 0 0 1-1.500 1.500h-9A1.500 1.500 0 0 1 2 11.500z') };
+// the folder's back, with its tab, in a 200 x 150 box
+const BACK = 'M6 22q0-9 9-9h46q6 0 9.400 4.800l4.400 6.200q3.400 4.800 9.400 4.800h101.800q9 0 9 9v94.200q0 9-9 9h-171q-9 0-9-9z';
 
-/* A project's scenes, loaded one after another so each scene file sees the ones before it (a v2 can build on v1). */
-async function loadScenes(id) {
-  window.SCENES = []; let names = [], libs = [];
-  window.scenes = (list, helpers = []) => { names = list; libs = helpers; };
-  await addScript(`/p/${enc(id)}/index.js`);
-  for (const n of [...libs, ...names]) await addScript(`/p/${enc(id)}/${enc(n)}.js`); // helper scripts first
-  // The project's own typefaces (scenes/fonts.css), loaded in this document since a shadow root ignores @font-face.
-  const fonts = `/p/${enc(id)}/fonts.css`;
-  if (all.some(p => p.id === id && p.fonts !== false) && !document.querySelector(`link[href="${fonts}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = fonts; document.head.append(l); }
-  return window.SCENES.slice();
+/* ---------- the shelf: folders and the projects in them ---------- */
+let all = [], folders = [], me = '';
+const inFolder = path => all.filter(p => p.folder === path).sort((a, b) => a.name.localeCompare(b.name));
+const subFolders = path => folders.filter(f => parent(f) === path && f !== path);
+const under = path => all.filter(p => p.folder === path || p.folder.startsWith(path + '/'));
+let open = new Set();
+try { open = new Set(JSON.parse(localStorage.getItem('atelier.open') || '[]')); } catch {}
+const keepOpen = () => { try { localStorage.setItem('atelier.open', JSON.stringify([...open])); } catch {} };
+
+async function load() {
+  const hub = await getJSON('/api/hub');
+  if (!hub) return false;
+  me = hub.me; all = hub.projects; folders = hub.folders;
+  return true;
 }
 
-/* A project, as one card: its designs bundled, each shown by its newest version, the first design on top and the
-   others stacked behind it. Moving the pointer across it skims the designs, the first at the left edge, and plays the
-   one under the pointer from the start; a click opens that design. Home has one level per thing: a row is a client,
-   a card is a project, and a design's versions only show on the stage.
-   vers: [{ sc, vals, id, name (the design's title), open }], one per design, in list order. */
-function bundle(p, vers) {
-  const a = document.createElement('a'), many = vers.length > 1, total = vers.reduce((n, v) => n + v.open, 0);
-  a.className = 'card' + (many ? ' many' : '');
-  a.addEventListener('click', () => a.querySelector('.shot').style.viewTransitionName = 'screen'); // grows into the stage's screen
-  a.innerHTML = `<div class="pile"><div class="shot"><div class="screen"></div>${many ? `<div class="ticks">${vers.map(() => '<i></i>').join('')}</div>` : ''}</div></div>`
-    + `<div class="cap"><span class="t">${esc(p.name)}</span><span class="v"></span>`
-    + `<span class="k">${plural(vers.length, 'design', 'designs')}</span>`
-    + (total ? `<span class="n" title="${plural(total, 'open note', 'open notes')}">${plural(total, 'note', 'notes')}</span>` : '') + `</div>`;
-  const shot = a.querySelector('.shot'), screen = a.querySelector('.screen'), ticks = [...a.querySelectorAll('.ticks i')];
-  const layers = vers.map(v => {
-    const host = document.createElement('div'); host.className = 'host'; screen.append(host);
-    const L = Engine.mount(host, v.sc); Engine.controls(L, v.vals); Engine.drive(L, v.sc.steps.length - 0.001);
-    return L;
+/* The hash is the view. Back from the stage (#p-<project>) is that project's page. */
+function where() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith('/p/') && all.some(p => p.id === h.slice(3))) return { kind: 'project', id: h.slice(3) };
+  if (h.startsWith('p-') && all.some(p => p.id === h.slice(2))) return { kind: 'project', id: h.slice(2) };
+  if (h.startsWith('/f/') && folders.includes(h.slice(3))) return { kind: 'folder', path: h.slice(3) };
+  if (h === '/recent') return { kind: 'recent' };
+  if (h === '/mine') return { kind: 'mine' };
+  return { kind: 'folder', path: '' };
+}
+const folderHref = path => path ? '#/f/' + encPath(path) : '#/';
+const drag = what => `draggable="true" data-drag='${esc(JSON.stringify(what))}'`;
+
+/* ---------- the tree ---------- */
+function tree(at) {
+  const cur = on => on ? ' aria-current="page"' : '';
+  $('views').innerHTML = `<a class="nr" href="#/"${cur(at.kind === 'folder' && !at.path)}>${ICON.all}<span>All projects</span></a>`
+    + `<a class="nr" href="#/recent"${cur(at.kind === 'recent')}>${ICON.recent}<span>Recent</span></a><a class="nr" href="#/mine"${cur(at.kind === 'mine')}>${ICON.mine}<span>Mine</span></a>`;
+  const here = at.kind === 'project' ? all.find(p => p.id === at.id).folder : at.kind === 'folder' ? at.path : '';
+  const onPath = f => here === f || here.startsWith(f + '/'); // a folder shows what's in it while you are in it
+  const pad = d => `style="padding-left:${8 + d * 16}px"`;
+  const level = (path, d) => subFolders(path).map(f => `<a class="nr" href="${folderHref(f)}" ${pad(d)} data-folder="${esc(f)}" ${drag({ folder: f })}${cur(at.kind === 'folder' && at.path === f)}>${ICON.folder}<span>${esc(leaf(f))}</span></a>`
+      + (onPath(f) || open.has(f) ? level(f, d + 1) + inFolder(f).map(p => `<a class="nr kid" href="#/p/${enc(p.id)}" style="padding-left:${33 + d * 16}px" ${drag({ project: p.id })}${cur(at.kind === 'project' && at.id === p.id)}><span>${esc(p.name)}</span>${p.working ? '<em title="An agent is working"></em>' : ''}</a>`).join('') : '')).join('');
+  $('tree').innerHTML = `<div class="nh">Folders</div>` + level('', 0)
+    + inFolder('').map(p => `<a class="nr kid" href="#/p/${enc(p.id)}" style="padding-left:33px" ${drag({ project: p.id })}${cur(at.kind === 'project' && at.id === p.id)}><span>${esc(p.name)}</span>${p.working ? '<em title="An agent is working"></em>' : ''}</a>`).join('');
+}
+
+/* ---------- the path at the top ---------- */
+function crumbs(at) {
+  const proj = at.kind === 'project' && all.find(p => p.id === at.id);
+  const path = proj ? proj.folder : at.kind === 'folder' ? at.path : '', parts = path ? path.split('/') : [];
+  const top = at.kind === 'recent' ? 'Recent' : at.kind === 'mine' ? 'Mine' : 'Projects';
+  let out = !parts.length && !proj ? `<span>${top}</span>` : `<a href="#/" data-folder="">Projects</a>`;
+  parts.forEach((name, i) => {
+    const f = parts.slice(0, i + 1).join('/'), here = i === parts.length - 1 && !proj;
+    out += ICON.chev + (here ? `<span id="rename" data-path="${esc(f)}" title="Double-click to rename">${esc(name)}</span>` : `<a href="${folderHref(f)}" data-folder="${esc(f)}">${esc(name)}</a>`);
   });
-  let cur = -1, raf = 0, t0 = 0;
-  const show = (i, play) => {
-    if (i !== cur) {
-      if (cur >= 0) Engine.drive(layers[cur], vers[cur].sc.steps.length - 0.001);
-      cur = i; layers.forEach((L, k) => L.host.hidden = k !== i);
-      ticks.forEach((t, k) => t.classList.toggle('on', k === i));
-      a.href = `stage.html?project=${enc(p.id)}&design=${enc(vers[i].id)}`;
-      a.querySelector('.v').textContent = vers[i].name === p.name ? '' : vers[i].name; // the design under the pointer
-      t0 = performance.now();
-    }
-    cancelAnimationFrame(raf);
-    const L = layers[i], steps = vers[i].sc.steps, D = Engine.duration(steps);
-    const loop = now => { Engine.drive(L, Engine.posAt(steps, ((now - t0) / 1000) % D)); raf = requestAnimationFrame(loop); };
-    if (play) raf = requestAnimationFrame(loop); else Engine.drive(L, steps.length - 0.001);
+  if (proj) out += ICON.chev + `<span>${esc(proj.name)}</span>`;
+  $('crumbs').innerHTML = out;
+  const r = $('rename');
+  if (r) r.ondblclick = () => {
+    r.contentEditable = 'plaintext-only'; r.focus(); document.getSelection().selectAllChildren(r);
+    const done = async keep => {
+      r.onblur = r.onkeydown = null; r.contentEditable = 'false';
+      const name = r.textContent.replace(/\//g, ' ').trim(), from = r.dataset.path, to = [parent(from), name].filter(Boolean).join('/');
+      if (!keep || !name || to === from) return route();
+      const d = await send('/api/hub/folder', 'POST', { path: from, to });
+      if (!d.ok) alert(d.error);
+      await load(); if (d.ok) history.replaceState(null, '', folderHref(to)); route();
+    };
+    r.onblur = () => done(true);
+    r.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); r.blur(); } if (e.key === 'Escape') done(false); };
   };
-  const under = e => { const r = shot.getBoundingClientRect(); return Math.min(vers.length - 1, Math.max(0, Math.floor((e.clientX - r.left) / r.width * vers.length))); };
-  a.addEventListener('pointerenter', e => show(under(e), true));
-  a.addEventListener('pointermove', e => { const i = under(e); if (i !== cur) show(i, true); });
-  a.addEventListener('pointerleave', () => show(0, false));
-  show(0, false);
-  new ResizeObserver(() => screen.style.transform = `scale(${shot.clientWidth / 1440})`).observe(shot);
-  return a;
 }
-const placeholder = () => { const d = document.createElement('div'); d.className = 'card wait'; d.innerHTML = '<div class="pile"><div class="shot"></div></div><div class="cap"></div>'; return d; };
 
-/* ---------- rows: drawn at full size from the summary, filled in when they scroll near ---------- */
-/* A row is a client (a folder next to atelier/), its cards its projects (each scenes/ folder in it): acme has
-   acme-checkout and acme-modals. A folder's own scenes/ is its one project, named after it. */
-let projects = [], all = []; // projects: the rows; all: every project the server found
-function grouped(list) {
-  const by = new Map();
-  for (const p of list) { const g = p.group || p.id; if (!by.has(g)) by.set(g, []); by.get(g).push(p); }
-  return [...by.entries()].map(([id, ms]) => {
-    ms.sort((a, b) => (b.id === id) - (a.id === id) || a.name.localeCompare(b.name));
-    const sum = k => ms.reduce((n, m) => n + (m[k] || 0), 0);
-    return { id, name: ms[0].client || ms[0].name, members: ms, scenes: ms.flatMap(m => m.scenes),
-      open: sum('open'), working: sum('working'), updated: Math.max(...ms.map(m => m.updated)) };
-  });
+/* ---------- a folder's contents ---------- */
+/* a folder: the object, with the names of the first three things in it on the pages standing inside */
+function folderTile(f) {
+  const inside = [...inFolder(f).map(p => p.name), ...subFolders(f).map(leaf)].slice(0, 3), n = under(f).length;
+  return `<a class="fold" href="${folderHref(f)}" data-folder="${esc(f)}" ${drag({ folder: f })}>
+    <span class="ground"><span class="obj"><svg class="bk" viewBox="0 0 200 150"><path d="${BACK}"/></svg>${inside.map((name, k) => `<span class="sh s${inside.length === 1 ? 2 : k + 1}"><em>${esc(name)}</em></span>`).join('')}<span class="fr"></span></span></span>
+    <span class="cap"><b>${esc(leaf(f))}</b><small>${plural(n, 'project')}</small></span></a>`;
 }
-function row(p) {
-  const total = p.members.length;
-  const el = document.createElement('section');
-  el.className = 'proj'; el.id = 'p-' + p.id; el._p = p;
-  el.innerHTML = `<div class="about"><h2 title="${esc(p.name)}">${esc(p.name)}</h2>`
-    + `<div class="fact">${plural(total, 'project', 'projects')}</div>`
-    + (p.open ? `<div class="fact notes">${plural(p.open, 'open note', 'open notes')}</div>` : '')
-    + (p.working ? `<div class="fact working"><i></i>${p.working === 1 ? 'An agent is working' : `${p.working} agents working`}</div>` : '')
-    + `<div class="fact">Edited ${ago(p.updated)}</div>`
-    + `<div class="acts"><button class="ctl more" hidden>Show all ${total}</button></div></div><div class="designs"></div>`;
-  const grid = el.querySelector('.designs');
-  for (let i = 0; i < Math.min(total, SHOW); i++) grid.append(placeholder());
+/* a project: a card set in type */
+const projectCard = (p, where = true) => `<a class="th" href="#/p/${enc(p.id)}" ${drag({ project: p.id })}><span class="top"><span>${esc(where ? p.folder ? leaf(p.folder) : '' : '')}</span><span>${day(p.updated)}</span></span><em>${esc(p.name)}</em><span class="foot">${plural(p.designs, 'design')}${p.working ? ' · an agent is working' : ''}</span></a>`;
+const section = (label, cls, html) => `<section class="sec">${label ? `<h2 class="sh2">${label}</h2>` : ''}<div class="${cls}">${html}</div></section>`;
+
+function showFolder(at) {
+  const page = $('page'), q = $('filter').value.trim().toLowerCase();
+  page.className = 'body'; page.dataset.id = '';
+  let fs = [], ps = [], out = '', label = 'Projects', mixed = true;
+  if (q) { fs = folders.filter(f => leaf(f).toLowerCase().includes(q)); ps = all.filter(p => (p.name + ' ' + p.context + ' ' + (p.scenes || []).join(' ')).toLowerCase().includes(q)); }
+  else if (at.kind === 'recent') { ps = [...all].sort((a, b) => b.updated - a.updated); label = ''; }
+  else if (at.kind === 'mine') { ps = all.filter(p => (p.people || []).includes(me)).sort((a, b) => b.updated - a.updated); label = ''; }
+  else { fs = subFolders(at.path); ps = inFolder(at.path); mixed = false; }
+  if (fs.length) out += section('Folders', 'grid folders', fs.map(folderTile).join(''));
+  if (ps.length) out += section(fs.length || !at.path ? label : '', 'grid', ps.map(p => projectCard(p, mixed)).join(''));
+  if (!q && at.kind === 'folder' && !at.path) { // the top also shows what was touched last, wherever it lives
+    const recent = [...all].filter(p => p.folder).sort((a, b) => b.updated - a.updated).slice(0, 4);
+    if (recent.length) out += section('Recent', 'grid', recent.map(p => projectCard(p)).join(''));
+  }
+  if (!fs.length && !ps.length) out = `<div class="empty"><h2>${q ? 'Nothing matches' : 'Nothing here yet'}</h2>${!q && at.kind === 'folder' && at.path ? '<button class="btn" id="delfolder">Delete folder</button>' : ''}</div>`;
+  page.innerHTML = out;
+  if (!news.hidden) page.prepend(news);
+  const del = $('delfolder');
+  if (del) del.onclick = async () => { const r = await send('/api/hub/folder', 'POST', { path: at.path, remove: true }); if (!r.ok) return alert(r.error); await load(); location.hash = folderHref(parent(at.path)); route(); };
+}
+
+/* ---------- a project's page ---------- */
+/* Its context (click to write; saved when you leave it), its docs, any pieces an agent wrote into project.json, and
+   its designs: one card each, its iterations as chips under it. */
+let showing = 0;
+async function showProject(p) {
+  const page = $('page');
+  if (page.dataset.id === p.id) return;
+  page.className = 'body pp'; page.replaceChildren(); page.dataset.id = p.id; scrollTo(0, 0);
+  const turn = ++showing, d = await getJSON(`/api/hub/project?id=${enc(p.id)}`);
+  if (turn !== showing || !d) return;
+  const facts = [plural(d.designs, 'design'), d.people.join(', '), d.updated ? 'changed ' + day(d.updated) : ''].filter(Boolean).join(' · ');
+  page.innerHTML = `<header class="head"><div><h1>${esc(d.name)}</h1><small>${esc(facts)}</small></div>`
+    + `<select class="btn" id="move" aria-label="Folder"><option value="">Top level</option>${folders.map(f => `<option${f === d.folder ? ' selected' : ''}>${esc(f)}</option>`).join('')}</select></header>`
+    + `<section class="sec"><h2 class="sh2">Context</h2><p class="ctx" contenteditable="plaintext-only" spellcheck="false" data-ph="What this is, who it's for, what's decided.">${esc(d.context)}</p></section>`
+    + `<section class="sec"><h2 class="sh2">Docs</h2><div class="chips">${d.docs.map(x => `<a class="chip" href="${esc(x.url)}" target="_blank" rel="noopener"><span>${esc(x.title || host(x.url))}</span><small>${esc(host(x.url))}</small></a>`).join('')}<button class="chip" id="adddoc">Add</button></div></section>`
+    + (d.pieces.length ? `<section class="sec"><div class="tiles">${d.pieces.map(x => `<div class="tile"><b>${esc(x.title)}</b>${x.text ? `<p>${esc(x.text)}</p>` : ''}${Array.isArray(x.items) ? `<ul>${x.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}</div>`).join('')}</div></section>` : '');
+  const put = body => send(`/api/hub/project?id=${enc(p.id)}`, 'PUT', body);
+  $('move').onchange = async e => { await put({ folder: e.target.value }); await load(); route(); };
+  const ctx = page.querySelector('.ctx');
+  ctx.onblur = async () => { const text = ctx.textContent.trim(); if (text === d.context) return; d.context = text; p.context = text; await put({ context: text }); };
+  ctx.onkeydown = e => { if (e.key === 'Escape') { ctx.textContent = d.context; ctx.blur(); } };
+  $('adddoc').onclick = async () => {
+    const url = (prompt('Link to the doc') || '').trim(); if (!/^https?:\/\//.test(url)) return;
+    const title = (prompt('Its name', host(url)) || '').trim();
+    await put({ docs: [...d.docs, { title, url }] }); page.dataset.id = ''; route();
+  };
+  const sec = document.createElement('section'); sec.className = 'sec'; sec.innerHTML = `<h2 class="sh2">Designs</h2>`;
+  if (!d.versions.length) {
+    const cmd = `atelier publish "${p.id}" --title "First take" --open http://localhost:3000`;
+    sec.insertAdjacentHTML('beforeend', `<div class="start"><code>${esc(cmd)}</code><button class="btn">Copy</button></div>`);
+    sec.querySelector('button').onclick = e => copy(e.currentTarget, cmd);
+    return page.append(sec);
+  }
+  // a design's iterations, each right after the one it came from
+  const kids = new Map(), designs = new Map();
+  for (const v of d.versions) if (v.from) { if (!kids.has(v.from)) kids.set(v.from, []); kids.get(v.from).push(v); }
+  const walk = (v, out) => { out.push(v); (kids.get(v.id) || []).forEach(k => walk(k, out)); };
+  for (const v of d.versions) if (!v.from) { if (!designs.has(v.design)) designs.set(v.design, []); walk(v, designs.get(v.design)); }
+  const grid = document.createElement('div'); grid.className = 'grid g3';
+  grid.append(...[...designs].map(([name, vs]) => designCard(p, name, vs)));
+  sec.append(grid); page.append(sec);
+}
+async function copy(btn, text) {
+  const was = UI.label(btn);
+  try { await navigator.clipboard.writeText(text); UI.say(btn, 'Copied'); } catch { UI.say(btn, 'Not copied'); }
+  setTimeout(() => UI.say(btn, was, -1), 1600);
+}
+/* One design, one card set in type. Its iterations are chips under it; the chosen one (the newest, to start) is what
+   the card's facts, a click on the card and Remix are about. */
+function designCard(p, name, vs) {
+  const el = document.createElement('div'), byId = new Map(vs.map(v => [v.id, v]));
+  const label = (v, i = vs.indexOf(v)) => v.title !== name ? v.title : v.label || String(i + 1);
+  el.className = 'card';
+  el.innerHTML = `<div class="th" tabindex="0" role="link"><span class="top"><span></span><span></span></span><em>${esc(name)}</em><span class="foot"></span></div>`
+    + `<div class="under">${vs.length > 1 ? `<div class="its" role="group" aria-label="Iterations">${vs.map((v, i) => `<button class="it" data-i="${i}">${esc(label(v, i))}</button>`).join('')}</div>` : '<span class="its"></span>'}<button class="btn remix">Remix</button></div>`;
+  const th = el.querySelector('.th'), [a, b] = el.querySelectorAll('.top span'); let cur = null;
+  const hrefOf = v => v.open && (v.scene ? `stage.html?project=${enc(p.id)}&design=${enc(v.id)}` : v.open);
+  const pick = v => {
+    cur = v;
+    el.querySelectorAll('.it').forEach((x, i) => x.setAttribute('aria-pressed', vs[i] === v));
+    const from = v.from && byId.get(v.from);
+    a.textContent = [vs.length > 1 || v.label ? label(v) : '', v.scene ? '' : host(v.open)].filter(Boolean).join(' · ');
+    b.textContent = day(v.at);
+    el.querySelector('.foot').textContent = [v.by, from ? 'from ' + label(from) + (from.by && from.by !== v.by ? ' by ' + from.by : '') : '', v.note].filter(Boolean).join(' · ') || plural(vs.length, 'iteration');
+    th.title = v.note || ''; th.classList.toggle('can', !!hrefOf(v));
+  };
+  pick(vs.reduce((x, y) => y.at > x.at ? y : x)); // the newest
+  el.querySelector('.its').addEventListener('click', e => { const x = e.target.closest('.it'); if (x) pick(vs[+x.dataset.i]); });
+  const go = () => { const href = hrefOf(cur); if (!href) return; if (cur.scene) location.href = href; else window.open(href, '_blank', 'noopener'); };
+  th.onclick = go; th.onkeydown = e => { if (e.key === 'Enter') go(); };
+  el.querySelector('.remix').onclick = async e => { const btn = e.currentTarget, r = await getJSON(`/api/hub/brief?id=${enc(p.id)}&version=${enc(cur.id)}`); if (r) copy(btn, r.text); };
   return el;
 }
-async function fill(el) {
-  const cards = [], titles = [];
-  for (const m of el._p.members) {
-    const c = await cardsFor(m); titles.push(m.name.toLowerCase(), c.titles);
-    if (!c.groups.length) {
-      cards.push(() => { const d = document.createElement('a'); d.className = 'card none'; d.href = `stage.html?project=${enc(m.id)}`;
-        d.innerHTML = `<div class="shot">No designs yet. Add one to ${esc(m.path || m.id + '/scenes/')}index.js</div><div class="cap"><span class="t">${esc(m.name)}</span></div>`; return d; });
-      continue;
-    }
-    // a design's newest version stands for it, with the open notes of all its versions
-    cards.push(() => bundle(m, c.groups.map(g => ({ ...g[g.length - 1], name: g[0].sc.title, open: g.reduce((n, v) => n + v.open, 0) }))));
-  }
-  el._titles = titles.join(' ');
-  const grid = el.querySelector('.designs'), more = el.querySelector('.more');
-  if (!cards.length) return;
-  grid.replaceChildren(...cards.slice(0, SHOW).map(f => f()));
-  if (cards.length > SHOW) {
-    more.hidden = false;
-    more.onclick = () => { grid.append(...cards.slice(SHOW).map(f => f())); more.hidden = true; };
-  }
-}
-async function cardsFor(p) {
-  const scenes = await loadScenes(p.id);
-  const state = (await getJSON(`/api/state?project=${enc(p.id)}`) || {}).state || {};
-  const notes = ((await getJSON(`/api/notes?project=${enc(p.id)}`) || {}).notes || []).filter(n => !n.done && n.text);
-  const variants = (state.variants || []).filter(v => scenes.some(s => s.id === v.base)), ctl = state.ctl || {};
-  const openOn = id => notes.filter(n => n.design === id).length;
-  // scenes with one title are versions of one design; a saved variant joins its scene's design, right after it
-  const groups = new Map();
-  for (const sc of scenes) {
-    if (!groups.has(sc.title)) groups.set(sc.title, []);
-    groups.get(sc.title).push({ sc, vals: ctl[sc.id], id: sc.id, name: sc.version || '', open: openOn(sc.id) },
-      ...variants.filter(v => v.base === sc.id).map(v => ({ sc, vals: ctl[v.id], id: v.id, name: v.name, open: openOn(v.id) })));
-  }
-  return { groups: [...groups.values()],
-    titles: scenes.map(s => s.title + ' ' + (s.version || '')).join(' ').toLowerCase() };
-}
-/* one project loads at a time, in the order they come into view */
-let chain = Promise.resolve();
-const io = new IntersectionObserver(entries => entries.forEach(e => {
-  if (!e.isIntersecting) return;
-  io.unobserve(e.target); const el = e.target;
-  chain = chain.then(() => fill(el)).catch(() => {
-    const d = document.createElement('div'); d.className = 'card none';
-    d.innerHTML = `<div class="shot">Couldn't load ${esc(el._p.id)}. Check its scene files.</div><div class="cap"></div>`;
-    el.querySelector('.designs').replaceChildren(d);
-  });
-}), { rootMargin: '800px 0px' });
 
-function order() {
-  const list = [...projects].sort(home.sort === 'name' ? (a, b) => a.name.localeCompare(b.name) : (a, b) => b.updated - a.updated);
-  $('list').append(...list.map(p => p._row)); // moving rows keeps them, loaded or not
-  $('sort').querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === home.sort));
-}
-function filter() {
-  const q = $('filter').value.trim().toLowerCase();
-  let shown = 0;
-  for (const p of projects) {
-    const hit = !q || p.name.toLowerCase().includes(q) || p.members.some(m => m.id.includes(q)) || p.scenes.join(' ').toLowerCase().includes(q) || (p._row._titles || '').includes(q);
-    p._row.hidden = !hit; shown += hit;
-  }
-  $('nomatch').hidden = !!shown;
-  $('count').textContent = q ? `${shown} of ${projects.length}` : ''; // a count only while filtering
-}
-$('sort').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; home.sort = b.dataset.v; try { localStorage.setItem('workspace.home', JSON.stringify(home)); } catch {} order(); };
-$('filter').oninput = filter;
-addEventListener('keydown', e => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === '/' && document.activeElement !== $('filter') && !$('filter').hidden) { e.preventDefault(); $('filter').focus(); }
-  if (e.key === 'Escape' && document.activeElement === $('filter')) { $('filter').value = ''; filter(); $('filter').blur(); }
+/* ---------- moving things: drag a project or a folder onto a folder ---------- */
+let dragging = null;
+addEventListener('dragstart', e => { const el = e.target.closest?.('[data-drag]'); if (!el) return; dragging = JSON.parse(el.dataset.drag); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', el.dataset.drag); });
+addEventListener('dragend', () => { dragging = null; document.querySelectorAll('.drop').forEach(x => x.classList.remove('drop')); });
+const target = e => {
+  const el = dragging && e.target.closest?.('[data-folder]'); if (!el) return null;
+  const to = el.dataset.folder;
+  if (dragging.folder && (to === dragging.folder || (to + '/').startsWith(dragging.folder + '/') || to === parent(dragging.folder))) return null;
+  if (dragging.project && all.find(p => p.id === dragging.project)?.folder === to) return null;
+  return el;
+};
+addEventListener('dragover', e => { const el = target(e); document.querySelectorAll('.drop').forEach(x => x !== el && x.classList.remove('drop')); if (el) { e.preventDefault(); el.classList.add('drop'); } });
+addEventListener('drop', async e => {
+  const el = target(e); if (!el) return;
+  e.preventDefault(); const to = el.dataset.folder, d = dragging;
+  const r = d.project ? await send(`/api/hub/project?id=${enc(d.project)}`, 'PUT', { folder: to }) : await send('/api/hub/folder', 'POST', { path: d.folder, to: [to, leaf(d.folder)].filter(Boolean).join('/') });
+  if (!r.ok) alert(r.error);
+  if (to) { open.add(to); keepOpen(); }
+  await load(); if (where().kind === 'folder' && !folders.includes(where().path || '') && where().path) history.replaceState(null, '', '#/'); route();
 });
 
-// whatsnew.json, newest first: every change not seen yet, once. Seen means Got it was pressed after it (this browser).
-async function showNews() {
-  const all = await getJSON('whatsnew.json');
-  let seen = ''; try { seen = localStorage.getItem('atelier.newsSeen') || ''; } catch {}
-  const fresh = (all || []).filter(e => e && e.at > seen);
-  if (!fresh.length) return;
-  const md = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/`([^`]+)`/g, '<code>$1</code>');
-  const d = new Date(fresh[0].at + 'T12:00:00');
-  $('newshead').textContent = 'New · ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  $('newslist').innerHTML = fresh.flatMap(e => e.lines).map(l => '<li>' + md(l) + '</li>').join('');
-  $('news').hidden = false;
-  $('newsok').onclick = () => { try { localStorage.setItem('atelier.newsSeen', fresh[0].at); } catch {} $('news').hidden = true; };
-}
-
-async function start() {
-  const list = await getJSON('/api/projects');
-  if (!list) { $('offline').hidden = false; return; }
-  showNews();
-  $('new').hidden = false;
-  all = list; projects = grouped(list);
-  if (!projects.length) { $('none').hidden = false; return; }
-  $('filter').hidden = $('sort').hidden = projects.length < 2; // filter and sort only once there is something to sort
-  projects.forEach(p => { p._row = row(p); io.observe(p._row); });
-  order(); filter();
-  // back from the stage: land on the project you were in (rows already have their final size, so this is exact)
-  const from = location.hash && decodeURIComponent(location.hash.slice(1)), mine = all.find(p => 'p-' + p.id === from);
-  const back = from && document.getElementById(mine ? 'p-' + (mine.group || mine.id) : from);
-  if (back) { back.scrollIntoView({ block: 'start', behavior: 'instant' }); history.replaceState(null, '', location.pathname); }
-}
-
-$('new').onclick = async () => {
+/* ---------- new things ---------- */
+$('newfolder').onclick = async () => {
+  const at = where(), base = at.kind === 'folder' ? at.path : '';
+  const name = (prompt('Folder name') || '').replace(/\//g, ' ').trim(); if (!name) return;
+  const d = await send('/api/hub/folder', 'POST', { path: [base, name].filter(Boolean).join('/') });
+  if (!d.ok) return alert(d.error);
+  await load(); route();
+};
+$('new').onclick = $('new2').onclick = async () => {
+  const at = where(), base = at.kind === 'folder' ? at.path : '';
   const name = prompt('Project name. It becomes a folder next to the atelier folder, with a starter scene in it.');
   if (!name || !name.trim()) return;
-  try {
-    const d = await (await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })).json();
-    if (d.id) location.href = `stage.html?project=${enc(d.id)}`; else alert(d.error);
-  } catch { alert('The Atelier server is not running.'); }
+  const d = await send('/api/projects', 'POST', { name });
+  if (!d.id) return alert(d.error);
+  if (base) await send(`/api/hub/project?id=${enc(d.id)}`, 'PUT', { folder: base });
+  await load(); location.hash = '#/p/' + enc(d.id); route();
 };
-start();
-Liquid.watch('.ctl, .seg', g => g.look === 'flat' ? null : ({ bezel: g.reach, bend: g.bend, split: g.split, frost: `blur(${g.blur}px)` })); // liquid glass on every control (none when Flat)
-/* the glass tuner: the same sliders as the stage's Stage › Liquid glass, in a floating panel (Glass, or G) */
-Liquid.tuner($('tuner'));
-const showTuner = on => { $('tunepanel').hidden = !on; $('glassbtn').setAttribute('aria-pressed', on); };
-$('glassbtn').onclick = () => showTuner($('tunepanel').hidden);
-addEventListener('keydown', e => { if ((e.key === 'g' || e.key === 'G') && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.matches?.('input, select, textarea')) showTuner($('tunepanel').hidden); });
+
+/* ---------- whatsnew.json, newest first: every change not seen yet, once ---------- */
+const news = document.createElement('section'); news.className = 'news'; news.hidden = true; news.setAttribute('aria-label', 'New in Atelier');
+async function showNews() {
+  const list = await getJSON('whatsnew.json');
+  let seen = ''; try { seen = localStorage.getItem('atelier.newsSeen') || ''; } catch {}
+  const fresh = (list || []).filter(e => e && e.at > seen);
+  if (!fresh.length) return;
+  const md = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/`([^`]+)`/g, '<code>$1</code>');
+  const on = new Date(fresh[0].at + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  news.innerHTML = `<div class="news-head"><span>New · ${on}</span><button class="btn">Got it</button></div><ul>${fresh.flatMap(e => e.lines).map(l => '<li>' + md(l) + '</li>').join('')}</ul>`;
+  news.hidden = false;
+  news.querySelector('button').onclick = () => { try { localStorage.setItem('atelier.newsSeen', fresh[0].at); } catch {} news.hidden = true; news.remove(); };
+  route();
+}
+
+/* ---------- the view ---------- */
+function route() {
+  const at = where(), q = $('filter').value.trim();
+  document.body.classList.remove('menu');
+  tree(at); crumbs(at);
+  $('newfolder').hidden = $('new').hidden = at.kind !== 'folder' || !!q;
+  if (at.kind === 'project' && !q) { const p = all.find(x => x.id === at.id); document.title = `${p.name} · Atelier`; showProject(p); }
+  else { document.title = (at.path ? leaf(at.path) : 'Projects') + ' · Atelier'; showFolder(at); }
+}
+addEventListener('hashchange', route);
+const search = on => { $('filter').hidden = !on; if (on) $('filter').focus(); else { $('filter').value = ''; route(); } };
+$('findbtn').onclick = () => search($('filter').hidden);
+$('filter').oninput = () => { const keep = document.body.classList.contains('menu'); route(); document.body.classList.toggle('menu', keep); };
+$('menubtn').onclick = () => document.body.classList.add('menu');
+$('shade').onclick = () => document.body.classList.remove('menu');
+addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === '/' && !e.target.matches?.('input, textarea, [contenteditable]')) { e.preventDefault(); search(true); }
+  if (e.key === 'Escape' && document.activeElement === $('filter')) search(false);
+  if (e.key === 'Escape') document.body.classList.remove('menu');
+});
+
+(async () => {
+  if (!await load()) { $('page').hidden = true; $('off').hidden = false; $('side').hidden = true; return; }
+  $('who').textContent = me; $('mei').textContent = me.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  route(); showNews();
+})();
 </script>
 <div id="ready" hidden></div>
 

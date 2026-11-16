@@ -80,6 +80,16 @@ On the screen, a grey numbered dot is a pinned note and a box is an area note. T
 
 Click a pin to edit, resolve or delete it; drag a pin to move it and it re-reads what's under it. Notes group into sittings: a gap over half an hour starts a new one. Everything is saved to `<project>/scenes/notes/`.
 
+**Draw on a note.** While a note is open, the pen, ellipse, rectangle and arrow under its text draw on the screen in blue. ⌘Z takes back the last mark; Esc puts the tool down. The drawing is kept with the note, goes into its snapshot, and the brief names what it's on ("Circled …", "Arrow from … to …"). It only shows while the note is open or you point at its pin.
+
+**Edit words in place.** In note mode, double-click words on a screen and type over them. Return makes a note with the exact old and new words (the agent changes them word for word); Esc puts them back. The new words stay on screen until the agent's version lands, and go if you delete the note.
+
+**Edit CSS.** On a note that cut one element, **Edit CSS** opens its gap, padding, margin, radius, size, weight, colour and fill. A change shows on that element at once; ↑ ↓ step a number (⇧ by 10), a colour opens the colour picker. The note keeps each value as old → new for the agent, and the change stays on screen until its version lands. Esc takes the changes back.
+
+**Dictate.** The mic in an open note fills it by voice, at the caret, as you speak. Press it again (or close the note) to stop. It only shows in browsers that can hear you (Chrome, Safari).
+
+**Send one note now.** ⌘Return in a note (or **Send** in it) saves it and sends just that note to the agent as its own run, without waiting for Send to agent. Return alone only saves.
+
 **`/try` in a note.** Type `/` in a note and it offers `/try 3`: Tab takes it.
 
 ![Typing / in a note offers /try 3](img/slash.jpg)
@@ -154,7 +164,7 @@ Wallpaper (Dark, Light, Glow, Colour, or drop any image on the page), Dim, glass
 
 ## Keys
 
-Space play · ← → step · `,` `.` frame · R restart · 0 fit · 1 100% · C compare · V view · N note · X cut · F focus · `\` panel · H screens only · ⌥N a note on Atelier itself · Esc leaves any mode.
+Space play · ← → step · `,` `.` frame · R restart · 0 fit · 1 100% · C compare · V view · N note · X cut · F focus · ⌘Return send one note now · `\` panel · H screens only · ⌥N a note on Atelier itself · Esc leaves any mode.
 
 **A note on Atelier itself:** ⌥N, then click a spot or drag an area of the tool (a button, the panel, a card) and say what's wrong. It goes to your agent to fix in Atelier, not to a design, and stays pinned there with its answer until you clear it. The same works on every vault page.
 
