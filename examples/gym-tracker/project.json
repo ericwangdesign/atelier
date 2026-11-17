@@ -1,0 +1,16 @@
+{
+  "name": "Gym Tracker",
+  "by": "Eric Wang",
+  "context": "An iPhone app for the gym: see today's workout, log each set in a tap, rest with the countdown in front of you, get an achievable number for next time. Black ground, colour glowing down from the top, dot numbers.",
+  "pieces": [
+    {
+      "title": "Decided",
+      "items": [
+        "Three spacings, one corner radius, four type sizes",
+        "One card per screen; the rest sits on the ground",
+        "Controls are white or dark, never coloured",
+        "Log first, rate the set while resting"
+      ]
+    }
+  ]
+}

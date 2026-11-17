@@ -27,7 +27,9 @@ npm install          # only for exporting PNG, GIF and MP4
 python3 serve.py
 ```
 
-Open http://localhost:4321. The **Sample** project is a coffee order in two versions. Press Space to play it.
+Open http://localhost:4321. Two example projects are there until you make your own: **Sample**, a coffee order in two
+versions, and **Gym Tracker**, an iPhone app for the gym in ten versions that you can tap through like the real thing.
+Press Space to play one; shift-click a second version in the Designs list to see them side by side.
 
 **[The manual](docs/manual.md)** shows every part of it, with pictures.
 
