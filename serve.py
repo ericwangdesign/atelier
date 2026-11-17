@@ -11,8 +11,7 @@ the designs live with their project:
     <project>/scenes/workspace.json    variants and control values picked in the panel (worth committing)
     <project>/scenes/notes/notes.json  every note (an agent can edit it: set "done": true, change "text")
     <project>/scenes/notes/brief.md    the open notes as a brief, the same text as Copy brief
-    <project>/scenes/notes/agent.json  every agent run: what it worked on, what it's doing now, how it ended
-    <project>/scenes/trail.json        why each version exists: its parent, the notes or prompt, the pick (worth committing)
+    <project>/scenes/trail.json        why each version exists: its parent and the notes behind it (worth committing)
 
 Routes:
     /                      the gallery: every project and its designs (index.html)
@@ -26,19 +25,14 @@ Routes:
     /api/hub/brief?id=&version=  GET the brief Remix copies
     /h/<project>/<file>    a picture or clip from that project's own folder
     /api/wallpapers        GET which wallpaper pictures (dark, light) are in wallpapers/
-    /api/taste?project=    GET the taste profile that applies here; POST {act: add|change|forget|on} edits it, {act: reread} relearns from every design
+    /api/taste?project=    GET the taste profile that applies here; POST {act: add|change|forget|on} edits it
     /api/notes?project=    GET / PUT the project's notes
     /api/state?project=    GET / PUT the project's variants and control values
     /api/capture?project=  POST {"format": png|gif|mp4, "t", "names", "storage"} exports each screen with capture.mjs
                            into <project>/exports/ (served at /x/<project>/<file>)
     /api/duplicate?project= POST {"id"} copies that scene's file as the next version, listed after its family
     /api/snap?project=     POST {"id", "data"} keeps a note's snapshot (a JPEG data URL) as scenes/notes/snaps/<id>.jpg
-    /api/agent?project=    GET the agent runs; POST {"design", "notes": [{id, n}], "briefs": {id: lines}} sends notes:
-                           plain ones are done in one copy, then each note with /try N gets N takes on top of it
-    /api/agent/stop?project= POST {"id"} stops a run
-    /api/agent/redirect?project= POST {"id", "text"} stops one run and starts it again on its copy with that line
-    /api/critic?project=   POST {"group", "pictures": {id: file in exports/}} ranks the takes on one note (critic.py)
-    /api/trail?project=    GET the trail; /api/pick POST {"group", "id", "reason"} keeps one take; the round moves on
+    /api/trail?project=    GET the trail (an agent session outside adds to trail.json; AGENTS.md says how)
     /api/open?project=     POST {"design", "find"} opens the scene file in your editor, at the line that has <find>
     /api/page?project=     POST {"id", "before", "after", "pins"} writes a before and after page into exports/
 
@@ -53,14 +47,12 @@ import shutil
 import sys
 import tempfile
 import threading
-import agent
-import critic
 import fixes
 import hub
 import page
 import taste
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, quote, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECTS = os.environ.get('ATELIER_PROJECTS') or os.environ.get('WORKSPACE_PROJECTS') or os.path.dirname(ROOT)
@@ -178,8 +170,7 @@ def summary(name):
             'designs': len({title(base, n) for n in scenes}),
             'open': sum(1 for n in notes if isinstance(n, dict) and not n.get('done') and n.get('text')),
             'fonts': os.path.isfile(os.path.join(base, 'fonts.css')),
-            'path': os.path.relpath(base, PROJECTS).replace(os.sep, '/') + '/',
-            'working': sum(1 for r in agent.runs_for(name, base) if r.get('status') in ('starting', 'working'))}
+            'path': os.path.relpath(base, PROJECTS).replace(os.sep, '/') + '/'}
 
 
 def title(base, name):
@@ -243,173 +234,6 @@ def duplicate(base, src, file=''):
     return new, None
 
 
-RUNNER = None  # made once write_atomic and read_json exist, below
-
-
-TRY = re.compile(r'(?i)(?:^|\s)/try(?:\s+(\d))?\b')
-
-
-def try_count(text):
-    """How many takes a note asks for: '/try 3' is 3, a bare '/try' is 3, no /try is 0. Between 2 and 4."""
-    m = TRY.search(str(text or ''))
-    return max(2, min(4, int(m.group(1) or 3))) if m else 0
-
-
-def rounds_change(base, change):
-    """notes/rounds.json: one entry per Send. A round does its plain notes first, then the /try notes one at a time,
-    each from the version the one before ended on. Kept on disk so a pick after a restart still moves it on."""
-    path = os.path.join(base, 'notes', 'rounds.json')
-    with WRITES:
-        rounds = read_json(path, [])
-        out = change(rounds)
-        write_atomic(path, json.dumps(rounds[-40:], indent=2, ensure_ascii=False) + '\n')
-    threading.Thread(target=publish_waiting, daemon=True).start()
-    return out
-
-
-WAITING = os.path.join(fixes.VAULT, '_machines', 'atelier.json')
-
-
-def publish_waiting():
-    """Takes waiting for a pick, for the vault's Today (vault/_machines/atelier.json, read by today.js), so a round
-    left while the takes ran shows up under Needs you, on the phone too. Written only when it changed."""
-    if not os.path.isdir(os.path.dirname(os.path.dirname(WAITING))):
-        return
-    out = []
-    for name in projects():
-        base = scenes_dir(name)
-        if not base:
-            continue
-        trail = read_json(os.path.join(base, 'trail.json'), [])
-        for r in read_json(os.path.join(base, 'notes', 'rounds.json'), []):
-            if r.get('status') != 'working' or not r.get('group') or not r.get('queue'):
-                continue
-            takes = [e for e in trail if isinstance(e, dict) and e.get('group') == r['group']]
-            if not takes or any(e.get('status') in ('starting', 'working') for e in takes) or any(e.get('picked') for e in takes):
-                continue
-            done = [e for e in takes if e.get('status') == 'done']
-            if len(done) < 2:
-                continue
-            note = r['queue'][0]
-            at = max((e.get('at') for e in takes if e.get('at')), default='', key=str)
-            if isinstance(at, (int, float)) or str(at).isdigit():  # agent.now() is epoch ms
-                at = datetime.datetime.fromtimestamp(int(at) / 1000, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-            out.append({'id': r['group'], 'project': name, 'design': r.get('design', ''), 'note': note.get('n'), 'takes': len(done),
-                        'at': str(at), 'url': f"http://localhost:{PORT}/stage.html?project={quote(name)}"})
-    text = json.dumps({'waiting': sorted(out, key=lambda w: w['at'])}, indent=2) + '\n'
-    try:
-        with open(WAITING, encoding='utf-8') as f:
-            if f.read() == text:
-                return
-    except OSError:
-        pass
-    os.makedirs(os.path.dirname(WAITING), exist_ok=True)
-    write_atomic(WAITING, text)
-
-
-def agent_post(name, base, body):
-    """Send notes. Plain notes are done together in one new version; each /try note then gets its takes, on top of
-    that version, with nothing else on screen changing. Every run works on a fresh copy, so nothing is overwritten."""
-    design = str(body.get('design', ''))
-    if design not in listed(base)[0]:
-        return 400, {'error': 'no such design'}
-    briefs = body.get('briefs') if isinstance(body.get('briefs'), dict) else {}
-    notes = [n for n in body.get('notes', []) if isinstance(n, dict) and isinstance(n.get('id'), int)]
-    if not notes:
-        return 400, {'error': 'no open notes on this design'}
-    stored = {x.get('id'): x for x in read_json(os.path.join(base, 'notes', 'notes.json'), []) if isinstance(x, dict)}
-    for n in notes:
-        n['try'] = try_count(stored.get(n['id'], {}).get('text', ''))
-        n['brief'] = str(briefs.get(str(n['id']), ''))[:6000]
-    plain, tries = [n for n in notes if not n['try']], [n for n in notes if n['try']]
-    at = agent.now()
-    rnd = {'id': f'q{at}', 'project': name, 'design': design, 'base': design, 'at': at, 'status': 'working',
-           'queue': [{'id': n['id'], 'n': n.get('n'), 'try': n['try'], 'brief': n['brief']} for n in tries], 'group': '', 'wait': ''}
-    if tries:  # the /try notes show as waiting until their takes land and one is picked
-        RUNNER.notes_change(base, lambda ns: [x.__setitem__('sent', rnd['id']) for x in ns if isinstance(x, dict) and x.get('id') in [t['id'] for t in tries]])
-    runs, scenes = [], []
-    if plain:
-        run = start_notes(name, base, design, plain, rnd['id'] if tries else '')  # a round id says takes come next
-        if run.get('status') == 'failed':
-            rounds_change(base, lambda rs: rs.append({**rnd, 'status': 'failed'}))
-            reopen_round(base, rnd['id'])
-            return 400, {'error': run.get('error') or 'Could not start'}
-        rnd['wait'] = run['id']
-        runs.append(agent.public(run)); scenes.append(run['scene'])
-    rounds_change(base, lambda rs: rs.append(rnd))
-    if not plain:
-        made = start_takes(name, base, rnd['id'])
-        runs += made; scenes += [r['scene'] for r in made]
-    return 200, {'runs': runs, 'scenes': scenes, 'round': rnd['id']}
-
-
-def start_notes(name, base, design, notes, round_id=''):
-    """One agent for every plain note on a design, in one new version."""
-    new, err = duplicate(base, design)
-    if not new:
-        return {'status': 'failed', 'error': err}
-    ids, numbers = [n['id'] for n in notes], {str(n['id']): n.get('n') for n in notes}
-    stored = read_json(os.path.join(base, 'notes', 'notes.json'), [])
-    texts = [{'n': numbers[str(x['id'])], 'text': x.get('text', '')} for x in stored if isinstance(x, dict) and x.get('id') in ids]
-    RUNNER.trail_add(base, {'id': new, 'from': design, 'kind': 'notes', 'at': agent.now(), 'notes': texts, 'status': 'working'})
-    prompt = agent.notes_prompt(new, design, [n.get('n') for n in notes], '\n\n'.join(n['brief'] for n in notes), TASTE.brief(name))
-
-    def sent(run):
-        RUNNER.notes_change(base, lambda ns: [n.__setitem__('sent', run['id']) for n in ns if isinstance(n, dict) and n.get('id') in ids])
-    run = RUNNER.start(name, base, kind='notes', scene=new, parent=design, prompt=prompt, notes=ids, numbers=numbers,
-                       label=f"{len(ids)} note{'s' if len(ids) > 1 else ''}", prepare=sent, round=round_id)
-    return run
-
-
-def start_takes(name, base, round_id):
-    """The takes on the next /try note in a round, from the version the round is on. Ends the round when none are left."""
-    rnd = next((r for r in read_json(os.path.join(base, 'notes', 'rounds.json'), []) if r.get('id') == round_id), None)
-    if not rnd or rnd.get('status') != 'working' or rnd.get('group'):  # takes already going for this round
-        return []
-    if not rnd['queue']:
-        rounds_change(base, lambda rs: [r.update(status='done', group='') for r in rs if r.get('id') == round_id])
-        return []
-    note, src = rnd['queue'][0], rnd['base']
-    if src not in listed(base)[0]:
-        src = rnd['design']
-    group, at, runs = f'g{agent.now()}', agent.now(), []
-    text = re.sub(r'\s+', ' ', TRY.sub(' ', next((x.get('text', '') for x in read_json(os.path.join(base, 'notes', 'notes.json'), [])
-                                               if isinstance(x, dict) and x.get('id') == note['id']), ''))).strip()
-    for k in range(note['try']):
-        new, err = duplicate(base, src)
-        if not new:
-            break
-        RUNNER.trail_add(base, {'id': new, 'from': src, 'kind': 'try', 'at': at, 'group': group, 'prompt': text,
-                                'note': note.get('n'), 'noteId': note['id'], 'angle': f'Take {k + 1}', 'status': 'working'})
-        prompt = agent.try_prompt(new, src, note['brief'], k + 1, note['try'], TASTE.brief(name, lean=k == 0))
-        run = RUNNER.start(name, base, kind='try', scene=new, parent=src, prompt=prompt, group=group,
-                           notes=[note['id']], numbers={str(note['id']): note.get('n')}, angle=f'Take {k + 1}', label=f'Take {k + 1}', round=round_id)
-        runs.append(agent.public(run))
-    rounds_change(base, lambda rs: [r.update(group=group, base=src) for r in rs if r.get('id') == round_id])
-    return runs
-
-
-def reopen_round(base, round_id):
-    """A round that can't go on leaves its /try notes open, so they can be sent again."""
-    RUNNER.notes_change(base, lambda ns: [n.pop('sent', None) for n in ns if isinstance(n, dict) and n.get('sent') == round_id])
-
-
-def round_picked(name, base, group, pick, summary):
-    """A take was picked: its note is answered, the round moves to that version, and the next /try note starts."""
-    rnd = next((r for r in read_json(os.path.join(base, 'notes', 'rounds.json'), []) if r.get('group') == group and r.get('status') == 'working'), None)
-    if not rnd or not rnd['queue']:
-        return
-    note = rnd['queue'][0]
-
-    def answer(notes):
-        for n in notes:
-            if isinstance(n, dict) and n.get('id') == note['id']:
-                n.setdefault('replies', []).append({'who': 'You', 'text': f'Picked: {summary}' if summary else 'Picked', 'at': agent.now(), 'made': pick})
-                n['done'] = True
-                n.pop('sent', None)
-    RUNNER.notes_change(base, answer)
-    rounds_change(base, lambda rs: [r.update(base=pick, queue=r['queue'][1:], group='') for r in rs if r.get('id') == rnd['id']])
-    start_takes(name, base, rnd['id'])
 
 
 def open_in_editor(path, find):
@@ -524,13 +348,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, [n for n in ('dark', 'light') if os.path.isfile(os.path.join(ROOT, 'wallpapers', n + '.jpg'))])
         if route == '/api/taste':
             return self.send_json(200, TASTE.view(parse_qs(urlparse(self.path).query).get('project', [''])[0]))
-        if route in ('/api/agent', '/api/trail'):
+        if route == '/api/trail':
             files = self.project_files()
             if not files:
                 return self.send_json(404, {'error': 'no such project'})
             base, name = os.path.dirname(files[2]), parse_qs(urlparse(self.path).query).get('project', [''])[0]
-            if route == '/api/agent':
-                return self.send_json(200, {'runs': agent.runs_for(name, base), 'critic': critic.load(base)})
             return self.send_json(200, {'trail': read_json(os.path.join(base, 'trail.json'), [])})
         if route in ('/api/notes', '/api/state'):
             files = self.project_files()
@@ -724,34 +546,12 @@ class Handler(SimpleHTTPRequestHandler):
             body = self.body() or {}
             if body.get('scope') == 'project':  # "this project" is stored as the project's name
                 body['scope'] = parse_qs(urlparse(self.path).query).get('project', [''])[0] or 'all'
-            if body.get('act') == 'reread':  # every design with a history, in every project, oldest first
-                return self.send_json(200, {'started': TASTE.reread(all_journeys())})
             return self.send_json(*TASTE.edit(body))
-        if route in ('/api/agent', '/api/agent/stop', '/api/agent/redirect', '/api/critic', '/api/pick', '/api/open', '/api/page'):
+        if route in ('/api/open', '/api/page'):
             files, body = self.project_files(), self.body()
             if not files or body is None:
                 return self.send_json(404, {'error': 'no such project'})
             base, name = os.path.dirname(files[2]), parse_qs(urlparse(self.path).query).get('project', [''])[0]
-            if route == '/api/agent':
-                return self.send_json(*agent_post(name, base, body))
-            if route == '/api/agent/stop':
-                return self.send_json(200, {'stopped': RUNNER.stop(str(body.get('id', '')))})
-            if route == '/api/critic':
-                pics = body.get('pictures') if isinstance(body.get('pictures'), dict) else {}
-                pics = {str(k): str(v) for k, v in pics.items() if isinstance(v, str)}
-                return self.send_json(200, {'started': CRITIC.start(base, str(body.get('group', '')), pics, TASTE.brief(name))})
-            if route == '/api/agent/redirect':
-                return self.send_json(200, {'redirected': RUNNER.redirect(str(body.get('id', '')), body.get('text', ''))})
-            if route == '/api/pick':
-                group, pick, reason = str(body.get('group', '')), str(body.get('id', '')), str(body.get('reason', ''))[:300]
-                RUNNER.trail_update(base, lambda e: e.get('group') == group,
-                                    lambda e: e.update(picked=e.get('id') == pick, reason=reason if e.get('id') == pick else e.get('reason', ''), pickedAt=agent.now()))
-                mine = [e for e in read_json(os.path.join(base, 'trail.json'), []) if isinstance(e, dict) and e.get('group') == group]
-                chosen = next((e for e in mine if e.get('id') == pick), None)
-                if chosen:  # a pick, and why, joins the design's journey: taste rereads it
-                    learn_journey(name, base, pick)
-                    round_picked(name, base, group, pick, chosen.get('name') or chosen.get('summary', ''))
-                return self.send_json(200, {'trail': read_json(os.path.join(base, 'trail.json'), [])})
             if route == '/api/open':
                 design = str(body.get('design', ''))
                 if design not in listed(base)[0]:
@@ -784,8 +584,6 @@ class Handler(SimpleHTTPRequestHandler):
             body = self.body() or {}
             if not files:
                 return self.send_json(404, {'error': 'no such project'})
-            if agent.busy(parse_qs(urlparse(self.path).query).get('project', [''])[0], str(body.get('id', ''))):
-                return self.send_json(409, {'error': 'An agent is working on this design. Duplicate it when it lands.'})
             new, err = duplicate(os.path.dirname(files[2]), str(body.get('id', '')), str(body.get('file', '')))
             return self.send_json(200, {'id': new}) if new else self.send_json(400, {'error': err})
         if urlparse(self.path).path != '/api/projects':
@@ -807,74 +605,7 @@ class Handler(SimpleHTTPRequestHandler):
             super().log_message(fmt, *args)
 
 
-RUNNER = agent.Runner(write_atomic, read_json, WRITES)
-CRITIC = critic.Critic(write_atomic, read_json, WRITES)
 TASTE = taste.Taste(os.path.join(ROOT, 'taste.json'), write_atomic, read_json)
-
-
-def learn_journey(project, base, scene):
-    """Taste rereads one design's whole journey, now that it has a new step."""
-    ev = taste.journey(project, read_json(os.path.join(base, 'trail.json'), []), scene, title(base, scene))
-    if ev:
-        TASTE.learn(ev)
-
-
-def all_journeys():
-    """Every design with a history, in every project, oldest first: what Re-read all learns from."""
-    out = []
-    for p in projects():
-        base = scenes_dir(p)
-        trail = read_json(os.path.join(base, 'trail.json'), [])
-        last = {}
-        for e in trail:
-            if isinstance(e, dict) and e.get('status') == 'done':
-                last[taste.stem(e.get('id'))] = e
-        for fam, e in last.items():
-            ev = taste.journey(p, trail, e['id'], title(base, e['id']))
-            if ev:
-                out.append((e.get('at') or 0, ev))
-    return [ev for _, ev in sorted(out, key=lambda x: x[0])]
-
-
-def learn_from_run(run, base):
-    """When a run ends. A notes round that landed is evidence of taste, and its round moves on to the /try notes.
-    A take whose group has all landed gets its critic: the page sends pictures of the takes first; if no page does
-    within 30s (none is open), the critic reads the code instead. A group where every take failed lets its note go."""
-    project, rid = run['project'], run.get('round', '')
-    if run['kind'] == 'try' and run.get('group'):
-        group = run['group']
-        with agent.LOCK:
-            mine = [r for r in agent.RUNS.values() if r.get('group') == group]
-        if any(r['status'] in ('starting', 'working') for r in mine):
-            return
-        if not any(r['status'] == 'done' for r in mine):
-            reopen_round(base, rid)
-            rounds_change(base, lambda rs: [r.update(status='failed') for r in rs if r.get('id') == rid])
-            return
-        if sum(r['status'] == 'done' for r in mine) == 1:  # one take is no choice: it's the answer
-            one = next(r for r in mine if r['status'] == 'done')
-            RUNNER.trail_update(base, lambda e: e.get('id') == one['scene'], lambda e: e.update(picked=True, pickedAt=agent.now()))
-            learn_journey(project, base, one['scene'])
-            round_picked(project, base, group, one['scene'], one.get('name') or one.get('summary', ''))
-            return
-        threading.Timer(30, lambda: CRITIC.start(base, group, {}, TASTE.brief(project))).start()
-        publish_waiting()  # every take has landed: Today shows it under Needs you
-        return
-    if run['kind'] != 'notes':
-        return
-    if rid:
-        if run['status'] == 'done':
-            rounds_change(base, lambda rs: [r.update(base=run['scene'], wait='') for r in rs if r.get('id') == rid])
-            start_takes(project, base, rid)
-        else:
-            reopen_round(base, rid)
-            rounds_change(base, lambda rs: [r.update(status='failed') for r in rs if r.get('id') == rid])
-    if run['status'] != 'done':
-        return
-    learn_journey(project, base, run['scene'])
-
-
-RUNNER.on_done = learn_from_run
 
 
 PORT = int(sys.argv[1]) if __name__ == '__main__' and len(sys.argv) > 1 else 4321
@@ -894,5 +625,4 @@ if __name__ == '__main__':
             print(f'Port {port} is taken by something else. Try: python3 serve.py {port + 1}')
         sys.exit(1)
     print(f'Atelier on http://localhost:{port}  (projects: {", ".join(projects()) or "none yet"})')
-    threading.Thread(target=publish_waiting, daemon=True).start()
     server.serve_forever()

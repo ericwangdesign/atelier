@@ -208,9 +208,12 @@ def scene_versions(pid, folder):
             at = os.stat(path).st_mtime_ns // 1_000_000
         except OSError:
             continue
-        find = lambda key: (re.search(r'\b' + key + r':\s*([\'"])(.*?)(?<!\\)\1', text) or [None, None, ''])[2]
+        # the key bare (title: '…') or quoted, as a scene written out as JSON has it ("title": "…")
+        find = lambda key: (re.search(r'\b' + key + r'[\'"]?:\s*([\'"])(.*?)(?<!\\)\1', text) or [None, None, ''])[2]
+        stem = re.match(r'(.+?)-(v\d+[\w.-]*)$', n)  # a scene with no title: pack-v3 is iteration v3 of "pack"
         t = trail.get(n, {})
-        out.append({'id': n, 'title': find('title') or n, 'label': find('version') or '', 'design': find('title') or n,
+        name = find('title') or (stem.group(1) if stem else n)
+        out.append({'id': n, 'title': name, 'label': find('version') or (stem.group(2) if stem else ''), 'design': name,
                     'by': '', 'at': at, 'from': t.get('from') if t.get('from') in names else None,
                     'note': t.get('summary') or '', 'open': f'stage.html?project={quote(pid)}&design={quote(n)}', 'run': '',
                     'source': os.path.join(base, n + '.js'), 'picture': '', 'scene': True})
@@ -263,11 +266,43 @@ def card(pid, folder, group, scenes, place=''):
             'picture': next((v['picture'] for v in reversed(vs) if v['picture']), '')}
 
 
+def stack(folder, scenes=True):
+    """How the project is coded, in a few words, read from what is in its folder. "stack" in project.json wins."""
+    said = read(folder).get('stack')
+    if isinstance(said, str) and said.strip():
+        return said.strip()
+    try:
+        names = set(os.listdir(folder))
+    except OSError:
+        names = set()
+    out = []
+    if any(n.endswith(('.xcodeproj', '.xcworkspace')) for n in names) or 'Package.swift' in names:
+        out.append('Swift')
+    if 'package.json' in names:
+        try:
+            pkg = json.load(open(os.path.join(folder, 'package.json')))
+            deps = {**(pkg.get('dependencies') or {}), **(pkg.get('devDependencies') or {})}
+        except (OSError, ValueError):
+            deps = {}
+        for dep, name in (('next', 'Next.js'), ('react', 'React'), ('vue', 'Vue'), ('svelte', 'Svelte'), ('expo', 'Expo'), ('typescript', 'TypeScript'), ('tailwindcss', 'Tailwind')):
+            if dep in deps and not (name == 'React' and 'Next.js' in out):
+                out.append(name)
+        if not deps or not out:
+            out.append('JavaScript')
+    if names & {'pyproject.toml', 'requirements.txt'}:
+        out.append('Python')
+    if not out and any(n.endswith('.html') for n in names):
+        out.append('HTML, CSS, JavaScript')
+    if scenes and os.path.isdir(os.path.join(folder, 'scenes')):
+        out.append('Atelier scenes (HTML, CSS, JavaScript)' if not out else 'Atelier scenes')
+    return ', '.join(out)
+
+
 def detail(pid, folder, group, scenes, place=''):
     data = read(folder)
     return {**card(pid, folder, group, scenes, place), 'docs': [d for d in data.get('docs') or [] if isinstance(d, dict) and d.get('url')],
             'pieces': [p for p in data.get('pieces') or [] if isinstance(p, dict) and p.get('title')],
-            'versions': versions(pid, folder, scenes), 'dir': folder, 'me': me()}
+            'versions': versions(pid, folder, scenes), 'dir': folder, 'stack': stack(folder, scenes), 'me': me()}
 
 
 def change(folder, fields):

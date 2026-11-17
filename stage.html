@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M12 9v14l11-7z' fill='white'/%3E%3C/svg%3E">
 <!--
   The stage: a wallpaper, screens at any size, a glass panel on the right, and a glass timeline at the bottom that
-  plays a project's scenes step by step. Notes and the agent that answers them live in agent.js.
+  plays a project's scenes step by step. History lives in trail.js. There is no agent here: notes leave as a brief.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Geist for the tool itself; Inter Tight for the starter design (starter/first.js). -->
@@ -143,14 +143,14 @@
   .panes { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
   .panes::-webkit-scrollbar { display: none; }
   /* The tabs scroll sideways when they outgrow the panel, never squeeze; a fade marks the side with more. */
-  .tabbar { flex: 1; min-width: 0; display: flex; gap: 4px; padding: 2px 16px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding: 0 16px; }
+  .tabbar { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 2px 12px; /* five tabs fit the 320 panel: 2 between, 6 inside each, 12 at the ends */ overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding: 0 16px; }
   .tabbar::-webkit-scrollbar { display: none; }
   /* The mask stays on at all times and only its fade widths change: adding or removing a mask under the glass's
      backdrop blur rebuilds the layer, and the panel flashed every time the row reached an end. */
   .tabbar { --fl: 0px; --fr: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
     transition: --fl .18s ease-out, --fr .18s ease-out; }
   .tabbar.more-l { --fl: 36px; } .tabbar.more-r { --fr: 36px; }
-  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 10px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); font-size: var(--c-t-sm); font-weight: var(--c-w-medium); cursor: pointer; }
+  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 6px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); font-size: var(--c-t-sm); font-weight: var(--c-w-medium); cursor: pointer; }
   .tab:hover { color: var(--c-text); }
   .tab:focus-visible { outline: none; color: var(--c-text); } /* no white ring after a click: the pill already shows where you are */
   .tab[aria-selected="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
@@ -188,7 +188,7 @@
   .acts { display: flex; gap: 8px; }
   .btn { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); cursor: pointer; display: grid; place-items: center; white-space: nowrap; }
   .btn:hover { background: var(--surf-hover); }
-  .btn { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; } .btn:active:not(:disabled) { transform: scale(.97); }
+  .btn { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; } .btn:active:not(:disabled) { transform: scale(.97); } .btn:disabled { opacity: .45; cursor: default; }
   .chk { display: flex; align-items: center; justify-content: space-between; min-height: 20px; color: var(--c-text-2); cursor: pointer; }
   /* Selected is always the same translucent white as a selected pill, never a solid fill or a colour. */
   .chk input[type=checkbox], .cghead input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); position: relative; cursor: pointer; transition: background .2s; }
@@ -325,7 +325,6 @@
   /* a note on words: a soft wash under them, a little stronger while its note is open */
   .whl { position: absolute; border-radius: 2px; background: rgb(77 166 255 / .14); box-shadow: 0 1.5px 0 rgb(77 166 255 / .55); pointer-events: none; }
   .whl.on { background: rgb(77 166 255 / .24); box-shadow: 0 1.5px 0 #4da6ff; }
-  .whl.sent { background: rgb(255 255 255 / .12); box-shadow: 0 1.5px 0 rgb(255 255 255 / .45); }
   /* the chip that comes up over selected words */
   .wordchip { position: fixed; z-index: 58; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px 0 10px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); cursor: pointer;
     animation: chipin .16s cubic-bezier(.23, 1, .32, 1); }
@@ -335,11 +334,6 @@
   @keyframes chipin { from { opacity: 0; transform: translateY(4px); } }
   @media (prefers-reduced-motion: reduce) { .wordchip { animation: none; } }
   /* the words a note is on, quoted in the list and the editor */
-  .trytag { display: inline-block; padding: 0 6px; margin: 0 2px; border-radius: var(--c-r-pill); background: var(--c-accent-soft); color: var(--c-accent); font-size: var(--c-t-xs); line-height: var(--c-lh-xs); vertical-align: 1px; }
-  .slash { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 6px; padding: 6px 8px; border: 0; border-radius: var(--c-r-sm); background: var(--surf-on); color: var(--c-text-2); font: inherit; font-size: var(--c-t-sm); text-align: left; cursor: pointer; }
-  .slash b { color: var(--c-text); font-weight: var(--c-w-medium); }
-  .slash span { flex: 1; }
-  .slash kbd { font: inherit; font-size: var(--c-t-xs); color: var(--c-text-3); }
   .nq { color: var(--c-text-2); line-height: var(--c-lh-ui); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .nq::before { content: "“"; } .nq::after { content: "”"; }
   .notepop .nq { margin-top: 8px; }
@@ -373,8 +367,8 @@
   @media (prefers-reduced-motion: reduce) { .notepop, .notepop.show { transform: none; } .toast { animation: none; } }
   /* The editor reads in one order (Eric, Oct 27: "there is no hierarchy"): what you write leads, the picture and the
      tools step back, Edit CSS folds away, and Send is the one thing in blue. */
-  .notepop textarea { display: block; width: 100%; min-height: 88px; margin-top: 10px; padding: 10px 12px; border: 0; border-radius: var(--c-r-md); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text); font: inherit; line-height: var(--c-lh-ui); resize: none; }
-  .notepop textarea:focus { outline: none; box-shadow: inset 0 0 0 1px var(--c-line-2); }
+  .notepop textarea { display: block; width: 100%; min-height: 54px; margin-top: 12px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-text); font: inherit; line-height: var(--c-lh-ui); resize: none; }
+  .notepop textarea:focus { outline: none; }
   /* what the note is on: a small picture with its name beside it; a click shows it whole */
   .popshot { display: flex; align-items: center; gap: 10px; margin-top: 10px; min-width: 0; }
   .popshot[hidden] { display: none; }
@@ -383,7 +377,7 @@
   .popshot .popcut { min-width: 0; font-size: var(--c-t-sm); overflow-wrap: anywhere; }
   .popshot.big { flex-direction: column; align-items: flex-start; gap: 6px; }
   .popshot.big .snap { width: 100%; height: auto; max-width: none; max-height: 220px; cursor: zoom-out; }
-  /* tools: one quiet fill for the drawing tools and the mic; the one in hand gets a lighter fill, not blue */
+  /* tools: one quiet fill for the drawing tools; the one in hand gets a lighter fill, not blue */
   .poptools { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
   .poptools .gap, .popacts .gap { flex: 1; }
   .tseg { display: flex; gap: 2px; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); }
@@ -397,7 +391,7 @@
   .pchip[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); }
   .pchip[hidden] { display: none; }
   /* Edit CSS: one block, names in grey and values in white, two to a row (padding and margin get a row each) */
-  .popcss { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 8px; padding: 4px 12px; border-radius: var(--c-r-md); background: var(--surf); box-shadow: var(--surf-edge); }
+  .popcss { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 8px; padding: 4px 12px; border-radius: var(--c-r-sm); background: var(--surf); box-shadow: var(--surf-edge); }
   .popcss[hidden] { display: none; }
   .cssf { display: flex; align-items: center; gap: 8px; min-width: 0; height: 30px; }
   .cssf span { flex: none; color: var(--c-text-3); }
@@ -413,6 +407,16 @@
   .pbin { flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
   .pbin:hover { background: var(--surf-hover); color: var(--c-text); }
   .pbin svg { width: 14px; height: 14px; }
+  /* Eric, Nov 16: "some of the buttons are too small and the corners are too rounded". Every control in a note is
+     32 (the tools were 24, the chip 28, the bin and the buttons 30) with 16 icons. The panel's corner is 16 with 16
+     of padding: a 24 corner on 12 of padding broke his rule that padding is never less than the corner. */
+  .notepop { width: 304px; padding: 16px; border-radius: var(--c-r-md); }
+  /* one rhythm (Nov 16): 16 around, 12 between every row; what sits in the card is a control (8) */
+  .notepop > :not(:first-child) { margin-top: 12px; }
+  .notepop .thread { border-radius: var(--c-r-sm); }
+  .notepop .ptool, .notepop .pbin { width: 32px; height: 32px; } .notepop .ptool svg, .notepop .pbin svg { width: 16px; height: 16px; }
+  .notepop .pchip, .notepop .btn { height: 32px; }
+  .notepop .nbadge { min-width: 24px; height: 24px; }
   /* Markup on a note: blue strokes with a dark edge under them, so they read on light and dark designs. Only while
      its note is open or its pin is pointed at; nothing stays on the design. */
   .ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; display: none; }
@@ -492,7 +496,7 @@
   @media (max-width: 900px) { :root { --panel-w: 0px; } .side { display: none; } .transport { left: 16px; right: 16px; } .transport .seg, .clock, .stepn { display: none; } }
   @media (prefers-reduced-motion: reduce) { .side, .transport { transition: none; } }
 </style>
-<link rel="stylesheet" href="agent.css">
+<link rel="stylesheet" href="trail.css">
 </head>
 <body>
 <div class="wall" id="wall"></div>
@@ -587,8 +591,8 @@
     <ol class="notes" id="notelist"></ol>
     <p class="hint" id="noteempty">Press N, then click a screen. Or select words and press N.</p>
     <p class="hint" id="notesync"></p>
-    <div class="acts"><button class="btn go" id="notesend" title="One new version per design, with all its open notes, beside the original">Send to agent</button></div>
-    <div class="notelinks"><button class="link" id="notecopy">Copy brief</button><button class="link" id="noteclear">Clear all</button></div>
+    <div class="acts"><button class="btn go" id="notecopy">Copy brief</button></div>
+    <div class="notelinks"><button class="link" id="noteclear">Clear all</button></div>
   </div>
 
   <div class="sect" data-k="trail" data-tab="notes">
@@ -596,7 +600,7 @@
     <ol class="trail" id="traillist"></ol>
     <p class="hint" id="trailempty">Nothing yet</p>
   </div>
-  <!-- Taste: what the agents have learned you like, from how each design changed. Every run reads it first. taste.js fills it from /api/taste. -->
+  <!-- Taste: what you like, in lines. Every agent session reads it before design work. taste.js fills it from /api/taste. -->
   <div class="sect" data-k="taste" data-tab="taste">
     <button class="st">Taste</button>
     <label class="chk tasteon"><span>Use in every run</span><input type="checkbox" id="tasteon" checked></label>
@@ -604,7 +608,6 @@
     <ol class="tastelist" id="tastelist"></ol>
     <p class="hint" id="tasteempty">Nothing yet</p>
     <input class="tasteadd" id="tasteadd" maxlength="140" placeholder="Add something you always want" aria-label="Add to your taste">
-    <div class="notelinks"><button class="link" id="tastereread" title="Relearn from every design's history; your own lines stay">Re-read all</button></div>
   </div>
 
   <div class="sect" data-k="liquid" data-tab="stage">
@@ -634,12 +637,10 @@
   </div>
 </aside>
 <div class="cutbox" id="cutbox"><span id="cutlabel"></span></div>
-<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><div class="popedit" id="popedit" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="4" placeholder="Note · / for commands"></textarea><button class="slash" id="popslash" type="button" hidden><b>/try 3</b><span>Three takes on just this</span><kbd>Tab</kbd></button><div class="popshot" id="popshot" hidden><img class="snap" id="popsnap" alt="" hidden><span class="nm popcut" id="popcut"></span></div><div class="poptools" id="poptools"><div class="tseg"><button class="ptool" type="button" data-tool="pen" aria-pressed="false" aria-label="Pen" title="Pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></button><button class="ptool" type="button" data-tool="ellipse" aria-pressed="false" aria-label="Ellipse" title="Ellipse"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></button><button class="ptool" type="button" data-tool="rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/></svg></button><button class="ptool" type="button" data-tool="arrow" aria-pressed="false" aria-label="Arrow" title="Arrow"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13L13 3M7 3h6v6"/></svg></button><button class="ptool" type="button" id="popmic" aria-pressed="false" aria-label="Dictate" title="Dictate"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="5.75" y="1.75" width="4.5" height="8" rx="2.25"/><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.25"/></svg></button></div><i class="gap"></i><button class="pchip" type="button" id="popcssbtn" aria-pressed="false" hidden>Edit CSS</button></div><div class="popcss" id="popcss" hidden></div><div class="popacts"><button class="pbin" type="button" id="popdel" aria-label="Delete note" title="Delete note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 4.25h10.5M6.25 4.25V2.75h3.5v1.5M4.25 4.25l.6 8.5a1 1 0 0 0 1 .9h4.3a1 1 0 0 0 1-.9l.6-8.5"/></svg></button><button class="btn" id="popdone">Resolve</button><i class="gap"></i><button class="btn" id="popsave">Save</button><button class="btn go" id="popsend" title="Send just this note to the agent now · ⌘↵" hidden>Send</button></div></div>
+<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><div class="popedit" id="popedit" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="4" placeholder="Note"></textarea><div class="popshot" id="popshot" hidden><img class="snap" id="popsnap" alt="" hidden><span class="nm popcut" id="popcut"></span></div><div class="poptools" id="poptools"><div class="tseg"><button class="ptool" type="button" data-tool="pen" aria-pressed="false" aria-label="Pen" title="Pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></button><button class="ptool" type="button" data-tool="ellipse" aria-pressed="false" aria-label="Ellipse" title="Ellipse"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></button><button class="ptool" type="button" data-tool="rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/></svg></button><button class="ptool" type="button" data-tool="arrow" aria-pressed="false" aria-label="Arrow" title="Arrow"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13L13 3M7 3h6v6"/></svg></button></div><i class="gap"></i><button class="pchip" type="button" id="popcssbtn" aria-pressed="false" hidden>Edit CSS</button></div><div class="popcss" id="popcss" hidden></div><div class="popacts"><button class="pbin" type="button" id="popdel" aria-label="Delete note" title="Delete note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 4.25h10.5M6.25 4.25V2.75h3.5v1.5M4.25 4.25l.6 8.5a1 1 0 0 0 1 .9h4.3a1 1 0 0 0 1-.9l.6-8.5"/></svg></button><button class="btn" id="popdone">Resolve</button><i class="gap"></i><button class="btn" id="popsave">Save</button></div></div>
 <button class="wordchip glass" id="wordchip" type="button" hidden>Note<span class="key">N</span></button>
 <div class="toast glass" id="toast" hidden></div>
 <div class="areabox" id="areabox"></div>
-<div class="pickpop glass" id="redirpop" hidden><p class="pt" id="redirt"></p><textarea id="redirwhy" rows="2" placeholder="Instead…"></textarea><div class="acts"><button class="btn" id="redirno">Cancel</button><button class="btn go" id="rediryes">Redirect</button></div></div>
-<div class="pickpop glass" id="pickpop" hidden><p class="pt" id="pickt"></p><textarea id="pickwhy" rows="2" placeholder="Why this one? (optional)"></textarea><div class="acts"><button class="btn" id="pickno">Cancel</button><button class="btn go" id="pickyes">Pick</button></div></div>
 <div class="drop" id="drop">Drop an image for the wallpaper</div>
 
 <script src="engine.js"></script>
@@ -816,6 +817,7 @@ function buildTimeline() {
 }
 /* time to step position: step index plus progress through it */
 function posAt(time) {
+  if (!STARTS.length) return 0; // before a design's timeline has loaded there are no steps to be in
   if (time >= DURATION) return STEPS.length;
   let i = STARTS.findLastIndex(s => s <= time);
   return i + (time - STARTS[i]) / STEPS[i].dur;
@@ -1154,8 +1156,7 @@ const SAFE = { handheld: [54, 34], tablet: [32, 20] };
 function fit() {
   const f = $('frames'), cs = getComputedStyle(f);
   const availW = f.clientWidth - parseFloat(cs.paddingLeft) * 2 - 32 * (screens.length - 1);
-  const AG = Math.min(window.AG_BELOW || 0, f.clientHeight * .35); // room an agent's card needs under the screens (agent.js)
-  f.style.paddingBottom = AG ? parseFloat(cs.paddingTop) + AG + 'px' : '';
+  const AG = 0;
   const availH = f.clientHeight - parseFloat(cs.paddingTop) * 2 - 24 - AG;
   const dim = sc => sc.crop ? sc.crop : sc; // a focused screen is only as big as its element
   const totalW = screens.reduce((a, s) => a + dim(s).w, 0), maxH = Math.max(...screens.map(s => dim(s).h));
@@ -1203,7 +1204,8 @@ function fit() {
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 function drive() {
   const pos = posAt(t), i = stepIndex();
-  screens.forEach(sc => sc.layers.forEach(L => { Engine.drive(L, pos); L.root && L.root.toggleAttribute('data-paused', !playing); }));
+  const into = t >= DURATION ? Infinity : t - STARTS[Math.min(Math.floor(pos), STARTS.length - 1)]; // seconds into the step, for a tour's own moves
+  screens.forEach(sc => sc.layers.forEach(L => { Engine.drive(L, pos, into); L.root && L.root.toggleAttribute('data-paused', !playing); }));
   // bar
   $('scrub').value = t; $('scrub').style.setProperty('--p', (t / DURATION * 100) + '%');
   $('clock').textContent = fmt(t); $('total').textContent = fmt(DURATION);
@@ -1252,7 +1254,7 @@ function ink() {
 function seek(x) { t = clamp(x, 0, DURATION); drive(); if (!playing) land(); }
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const dt = clamp((now - last) / 1000, 0, 0.1); last = now; // a frame's own time can be a hair before `last` was read: never run the clock backwards
   if (playing) {
     t += dt * S.speed;
     if (t >= DURATION) { if (S.loop) t = 0; else { t = DURATION; playing = false; } }
@@ -1713,7 +1715,7 @@ function placeWords() {
       if (!rects.length) return;
       const pc = (v, a, w) => ((v - a) / w * 100).toFixed(3) + '%', last = rects.at(-1);
       marks.push({ sc, p, left: `calc(${pc(last.right, box.left, box.width)} + ${(18 / K).toFixed(2)}px)`, top: pc((last.top + last.bottom) / 2, box.top, box.height),
-        cls: 'whl' + (n.sent ? ' sent' : '') + (editing === n ? ' on' : ''),
+        cls: 'whl' + (editing === n ? ' on' : ''),
         rects: rects.map(b => [pc(b.left, box.left, box.width), pc(b.top, box.top, box.height), (b.width / box.width * 100).toFixed(3) + '%', (b.height / box.height * 100).toFixed(3) + '%']) });
     });
   });
@@ -2166,8 +2168,8 @@ function renderPins() {
   screens.forEach(sc => {
     const ids = sc.designs.map(d => d.id);
     sc.pins.innerHTML = S.notes.map((n, k) => (editing === n || !n.done && n.step === pinStep) && (n.kind === kindOf(sc.w, sc.h) || n.kind === sc.kind) && ids.includes(n.design)
-      ? marksSVG(n, sc) + (n.area ? `<i class="area${n.sent ? ' sent' : ''}" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
-        + `<button class="pin${editing === n ? ' open' : ''}${n.sent ? ' sent' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.sent ? 'An agent is on it: ' + n.text : n.text)}">${k + 1}</button>` : '').join('');
+      ? marksSVG(n, sc) + (n.area ? `<i class="area" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
+        + `<button class="pin${editing === n ? ' open' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.text)}">${k + 1}</button>` : '').join('');
   });
   wordsDrawn = ''; placeWords(); // pins were rebuilt: put the ones on words back on their words
   placeAnchors(); applyPreviews();
@@ -2194,26 +2196,21 @@ const noteWhere = n => {
   const sc = sceneById(n.design) || sceneById(String(n.design).replace(/-\d+$/, '-v1')), page = n.design === 'url' ? 'URL' : sc ? [sc.title, sc.version].filter(Boolean).join(' ') : n.design;
   return sc && sc.steps.length > 1 ? `${page} · Step ${n.step + 1} ${stepLabel(n)}` : page;
 };
-/* /try 3 in a note: shown as a chip, so a note that asks for takes reads differently from one that asks for a fix */
-const TRYRE = /(^|\s)\/try(?:\s+(\d))?\b/i;
-const tryChip = text => { const m = text.match(TRYRE); if (!m) return esc(text);
-  const k = Math.max(2, Math.min(4, +(m[2] || 3))), at = m.index + m[1].length;
-  return esc(text.slice(0, at)) + `<span class="trytag">${k} takes</span>` + esc(text.slice(at + m[0].length - m[1].length)); };
 function renderNotes() {
   const said = n => (n.replies || []).map(r => `<span class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}${r.made && sceneById(r.made) ? ` <button class="link vlink" data-show="${esc(n.design)}|${esc(r.made)}">${esc(sceneById(r.made).version || r.made)}</button>` : ''}</span>`).join('');
-  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}${n.sent ? ' sent' : ''}"><span class="nbadge">${k + 1}</span><span class="nb">${n.words ? `<span class="nq">${esc(n.words.text)}</span>` : ''}<span class="nt">${n.text ? tryChip(n.text) : '<i>Empty</i>'}</span>
-    <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${n.sent ? (TRYRE.test(n.text) ? `<span class="nr working" data-try="${n.id}"></span>` : '<span class="nr working"><i class="agspin"></i>An agent is on it</span>') : ''}${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
+  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}"><span class="nbadge">${k + 1}</span><span class="nb">${n.words ? `<span class="nq">${esc(n.words.text)}</span>` : ''}<span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
+    <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
   $('notelist').innerHTML = groups.length < 2 ? groups.flatMap(g => g.items).map(noteRow).join('') : groups.map((g, i) => {
     const open = g.items.filter(([n]) => !n.done).length, shown = sitOpen[g.start] ?? (i === 0 || open > 0);
     return `<li class="sit${shown ? '' : ' shut'}" data-sit="${g.start}"><span>${sitWhen(g.start)}</span><span class="ver">${open ? `${open} open` : 'Done'}</span></li>`
       + (shown ? g.items.map(noteRow).join('') : '');
   }).join('');
   $('notelist').hidden = !S.notes.length; $('noteempty').hidden = !!S.notes.length;
-  $('notesync').hidden = document.querySelector('.notelinks').hidden = !S.notes.length; // nothing to copy, clear or save yet
+  $('notesync').hidden = document.querySelector('.notelinks').hidden = !S.notes.length; // nothing to clear or save yet
+  $('notecopy').disabled = !S.notes.length; // always in sight, so what notes are for is clear before the first one; off until there's something to copy
   $('notesync').textContent = notesServer ? '' : 'Saved in this browser only'; // on disk is the normal case: the path is on Copy brief
   $('notesync').hidden = !!notesServer || !S.notes.length; $('notecopy').title = notesServer ? `Also in ${SCENE_PATH}notes/brief.md` : '';
   renderPins(); save(); queueSync();
-  window.Agent && Agent.notesChanged();
 }
 
 /* ---------- notes on disk ----------
@@ -2283,15 +2280,14 @@ function openEditor(n, x, y, fresh, around) {
   setPlaying(false); // the screen holds still while you write about it
   editing = n; marksAtOpen = JSON.stringify(n.marks || []); markedLast = false; cssAtOpen = JSON.stringify(n.css || {});
   $('popcssbtn').hidden = !(n.cut && !n.cuts && n.cssRef); cssOpen(false);
-  $('popsend').hidden = !canSendNow(n);
   $('popdone').textContent = n.done ? 'Reopen' : 'Resolve'; $('popdone').hidden = !!fresh; renderPins();
   $('popn').textContent = S.notes.indexOf(n) + 1;
   $('popmeta').textContent = (n.side ? n.side + ' · ' : '') + noteWhere(n);
   $('poptext').value = n.text; showSnap(n);
   $('popwords').hidden = !n.words; $('popwords').textContent = n.words ? n.words.text : '';
   $('popedit').hidden = !n.edit; $('popedit').innerHTML = n.edit ? `<s>${esc(n.edit.old)}</s><b>${esc(n.edit.new)}</b>` : '';
-  $('popthread').hidden = !(n.replies && n.replies.length) && !n.sent;
-  $('popthread').innerHTML = (n.sent ? '<p class="nr working"><i class="agspin"></i>An agent is on it</p>' : '') + (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
+  $('popthread').hidden = !(n.replies && n.replies.length);
+  $('popthread').innerHTML = (n.replies || []).map(r => `<p class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}</p>`).join('');
   const pop = $('notepop'), was = !pop.hidden && pop.classList.contains('show');
   clearTimeout(popHide); pop.hidden = false;
   const w = pop.offsetWidth, R = 12, GAP = 8;
@@ -2310,8 +2306,7 @@ function openEditor(n, x, y, fresh, around) {
 }
 function closeEditor(keep, done) {
   const n = editing; if (!n) return;
-  $('popslash').hidden = true;
-  setMarking(''); dictate(false);
+  setMarking('');
   if (!keep) { n.marks = JSON.parse(marksAtOpen); if (!n.marks.length) delete n.marks; } // Esc takes back what was drawn
   if (!keep) { n.css = JSON.parse(cssAtOpen); if (!Object.keys(n.css).length) delete n.css; } // and what was restyled
   cssOpen(false);
@@ -2330,37 +2325,12 @@ function closeEditor(keep, done) {
 $('popsave').onclick = () => closeEditor(true);
 $('popsnap').addEventListener('pointerdown', e => e.preventDefault()); // the caret stays in the note
 $('popsnap').onclick = () => $('popshot').classList.toggle('big');
-/* Send one note now: ⌘Return (or Send) saves it and sends just that note to the agent as its own run, without waiting
-   for Send to agent. Plain Return still only saves. Only where an agent can run (served by serve.py, a scene design). */
-const canSendNow = n => !!(window.Agent && Agent.sendNow) && n.design !== 'url' && !!sceneById(n.design) && !n.done && !n.sent;
-function sendNow() {
-  const n = editing; if (!n) return;
-  if (!canSendNow(n)) return closeEditor(true);
-  closeEditor(true);
-  if (S.notes.includes(n)) Agent.sendNow(n); // an empty note went with the editor: nothing to send
-}
-$('popsend').addEventListener('pointerdown', e => e.preventDefault());
-$('popsend').onclick = sendNow;
 $('popdel').onclick = () => { $('poptext').value = ''; closeEditor(true); };
 $('popdone').onclick = () => closeEditor(true, !editing.done);
-/* Commands in a note. Typing / at the start of a word offers the one there is: /try 3, three takes on just this
-   part, with everything else held still. Tab or a click takes it. */
-const SLASH = /(^|\s)\/[a-z]*$/i;
-const slashOn = () => { const t = $('poptext'), v = t.value.slice(0, t.selectionStart); const m = v.match(SLASH);
-  $('popslash').hidden = !m || !'/try'.startsWith(m[0].trim().toLowerCase()); };
-const slashTake = () => { const t = $('poptext'), at = t.selectionStart, v = t.value, m = v.slice(0, at).match(SLASH); if (!m) return;
-  const from = at - m[0].length + m[1].length; t.value = v.slice(0, from) + '/try 3 ' + v.slice(at); t.selectionStart = t.selectionEnd = from + 7;
-  $('popslash').hidden = true; t.focus(); };
-$('poptext').addEventListener('input', slashOn);
 $('poptext').addEventListener('input', () => { markedLast = false; }); // ⌘Z is the text's again
-$('popslash').addEventListener('pointerdown', e => e.preventDefault()); // keep the caret in the note
-$('popslash').onclick = slashTake;
 $('poptext').addEventListener('keydown', e => {
-  if (!$('popslash').hidden && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) { e.preventDefault(); slashTake(); e.stopPropagation(); return; }
-  if (!$('popslash').hidden && e.key === 'Escape') { e.preventDefault(); $('popslash').hidden = true; e.stopPropagation(); return; }
   if (marking && e.key === 'Escape') { e.preventDefault(); setMarking(''); e.stopPropagation(); return; } // first Esc puts the tool down
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendNow(); }
-  else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); closeEditor(true); }
   else if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); }
   e.stopPropagation();
 });
@@ -2384,25 +2354,6 @@ $('notelist').addEventListener('click', e => {
 });
 $('noteadd').onclick = () => setNoting(!noting);
 $('noteclear').onclick = () => { if (S.notes.length && confirm(`Delete all ${S.notes.length} notes?`)) { S.notes.forEach(n => touch(n, true)); S.notes = []; renderNotes(); } };
-/* ---------- dictate ----------
-   The mic in the note fills it by voice (the browser's own speech recognition), at the caret, as the words come.
-   Press it again, or close the note, to stop. Hidden where the browser has none. */
-const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-let hearing = null;
-$('popmic').hidden = !Speech;
-function dictate(on) {
-  if (!on || !Speech) { const h = hearing; hearing = null; $('popmic').setAttribute('aria-pressed', false); if (h) try { h.stop(); } catch {} return; }
-  const t = $('poptext'), rec = new Speech(), head = t.value.slice(0, t.selectionStart), tail = t.value.slice(t.selectionEnd);
-  const sep = head && !/\s$/.test(head) ? ' ' : '';
-  rec.continuous = true; rec.interimResults = true; rec.lang = navigator.language || 'en-US';
-  rec.onresult = e => { if (hearing !== rec) return; const said = [...e.results].map(r => r[0].transcript).join('').trim();
-    t.value = head + (said ? sep + said : '') + tail; t.selectionStart = t.selectionEnd = t.value.length - tail.length; markedLast = false; slashOn(); };
-  rec.onend = () => { if (hearing === rec) dictate(false); };
-  rec.onerror = e => { if (hearing === rec && /not-allowed|service-not-allowed/.test(e.error)) UI.say($('popmic'), 'No mic'); };
-  hearing = rec; $('popmic').setAttribute('aria-pressed', true);
-  try { rec.start(); } catch { dictate(false); }
-}
-$('popmic').onclick = () => dictate(!hearing);
 
 /* ---------- Edit CSS ----------
    On a note that cut one element, Edit CSS opens the common properties under the note. Each change shows at once on
@@ -2441,7 +2392,7 @@ $('popcssbtn').onclick = () => cssOpen($('popcss').hidden);
 $('popcss').addEventListener('input', e => { const f = e.target.closest('.cssf'); if (f && e.target.tagName === 'INPUT') cssSet(f.dataset.p, e.target.value); });
 $('popcss').addEventListener('keydown', e => {
   e.stopPropagation();
-  if (e.key === 'Enter') { e.preventDefault(); if (e.metaKey || e.ctrlKey) sendNow(); else closeEditor(true); return; }
+  if (e.key === 'Enter') { e.preventDefault(); closeEditor(true); return; }
   if (e.key === 'Escape') { e.preventDefault(); closeEditor(false); return; }
   const t = e.target, m = (e.key === 'ArrowUp' || e.key === 'ArrowDown') && t.value.match(/^(-?[\d.]+)([a-z%]*)$/i); if (!m) return;
   e.preventDefault();
@@ -2530,7 +2481,7 @@ $('frames').addEventListener('pointerout', e => { const p = e.target.closest('.p
 // A note with no words of its own still says what it is: what was drawn, edited or restyled.
 const gist = n => n.edit ? `Text: "${n.edit.old}" → "${n.edit.new}"` : n.css && Object.keys(n.css).length ? 'CSS: ' + Object.entries(n.css).map(([p, [a, b]]) => `${p} ${a} → ${b}`).join(', ')
   : n.marks && n.marks.length ? n.marks.map(m => (m.on || '').split(' ')[0]).filter(Boolean).join(', ').replace(/^./, c => c.toUpperCase()) + ', see markup' : '';
-/* One note as the brief writes it: where it is, what it's on, what it says. Send to agent uses the same lines. */
+/* One note as the brief writes it: where it is, what it's on, what it says. */
 function noteLines(n, k) {
   const sc = sceneById(n.design), file = n.design === 'url' ? n.url : `${SCENE_PATH}${sc ? sc.base || sc.id : n.design}.js` + (sc && sc.variant ? `, variant "${sc.version}"` : '');
   const lines = [`${k + 1}. ${n.side ? n.side + ', ' : ''}${designName(n.design, n.url)} (${file}), step ${n.step + 1} "${stepLabel(n)}" at position ${n.pos}, ${n.size}, ${Math.round(n.x * 100)}% across and ${Math.round(n.y * 100)}% down.`];
@@ -2620,7 +2571,7 @@ $('tabbar').addEventListener('wheel', e => { const t = $('tabbar'); if (t.scroll
 const DUP = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><path d="M8 4V3a1.5 1.5 0 0 0-1.5-1.5h-3A1.5 1.5 0 0 0 1.5 3v3.5A1.5 1.5 0 0 0 3 8h1"/></svg>';
 let duping = false;
 async function duplicateDesign(id, from) {
-  if (duping || from?.wrap?.classList.contains('agbusy')) return; duping = true;
+  if (duping) return; duping = true;
   const sc = sceneById(id);
   try {
     const r = await fetch('/api/duplicate?project=' + encodeURIComponent(PROJECT), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sc.base || sc.id, file: (sceneById(sc.base) || sc).file || '' }) });
@@ -2657,7 +2608,7 @@ function families() {
    Click shows just that one; shift- or ⌘-click adds it to the screen (or takes it off), up to five. */
 function renderDesigns() {
   const on = shownDesigns().map(d => d.id), many = on.length > 1;
-  const info = id => (window.Agent && Agent.info && Agent.info(id)) || {};
+  const info = id => (window.Trail && Trail.info(id)) || {};
   const mk = id => { const k = on.indexOf(id); return `<span class="mk">${k >= 0 && many ? letter(k) : ''}</span>`; };
   $('dlist').classList.toggle('many', many);
   const row = id => {
@@ -2815,7 +2766,7 @@ function apply() {
   renderControls(); applyControls();
   drive(); renderNotes();
   if (focus) requestAnimationFrame(measureFocus);
-  window.Agent && Agent.paint();
+  window.Trail && Trail.paint();
   save();
 }
 /* re-fit after the panel or bar slides away */
@@ -2888,7 +2839,7 @@ Liquid.tuner($('tuner'));
 /* opened from a gallery thumbnail: the screen is the thumbnail, grown (see ui.css); the name is dropped once it lands */
 if (fromGallery && screens[0]) { screens[0].frame.style.viewTransitionName = 'screen'; addEventListener('pagereveal', e => e.viewTransition?.finished.finally(() => screens[0].frame.style.viewTransitionName = '')); setTimeout(() => screens[0].frame.style.viewTransitionName = '', 1500); }
 </script>
-<script src="agent.js"></script>
+<script src="trail.js"></script>
 <script src="taste.js"></script>
 <div id="ready" hidden></div>
 

@@ -1,8 +1,8 @@
 # For agents working with Atelier
 
 Atelier is a design stage. Designs are scene files; the designer reviews them on screen and leaves notes.
-When the designer presses Send to agent, `agent.py` writes your prompt for you. This file is for the
-other times: when the designer asks you, in your own session, to "check the notes" or to change a design.
+Atelier has no agent of its own: the notes leave it as a brief (Copy brief), and the work happens in your session.
+This file is for when the designer pastes a brief, or asks you to "check the notes" or to change a design.
 
 ## Where things are
 
@@ -62,11 +62,11 @@ backgrounds run to the edges.
 4. In `notes/notes.json`, for each note you handled: set `"done": true` and add
    `"replies": [{"who": "<your name>", "text": "what you changed, in one line", "made": "home-v3"}]`. Keep the file valid
    JSON and leave other notes alone. The page picks it up within two seconds.
-5. Tell the designer what changed, by note number.
-
-A note with `/try 3` in it (or `/try 2`, `/try 4`) asks for that many takes on just that part, with everything else
-held still. In your own session, make each take its own version, change only what the note is about in each, and
-leave the note open: the designer picks one.
+5. Add one entry to `scenes/trail.json` (a JSON list; make it if it isn't there) for each version you made:
+   `{"id": "home-v3", "from": "home-v2", "kind": "notes", "at": <now, in ms>, "notes": [{"n": 4, "text": "the note"}],
+   "summary": "what changed, in one line", "status": "done"}`. That is History, and it puts the new version on screen
+   beside the one it came from without a refresh. Write it last, once the scene file runs.
+6. Tell the designer what changed, by note number.
 
 Controls listed under "Controls moved off their defaults" are values the designer picked. Bake them in as the
 scene's new defaults (the control's `value` and the CSS fallback) when asked.

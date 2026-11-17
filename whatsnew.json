@@ -1,5 +1,26 @@
 [
   {
+    "at": "2026-11-17",
+    "lines": [
+      "All five tabs fit the panel now: Stage is no longer cut off at the right.",
+      "Copy brief is always in the Notes tab, greyed out until there's a note.",
+      "Pausing right after a design loads no longer breaks the stage.",
+      "The first time a browser opens home, What's new starts as read, so a new install opens on the shelf."
+    ]
+  },
+  {
+    "at": "2026-11-16",
+    "lines": [
+      "Home opens in a new view, Columns (Grid is next to it at the top right): one column per folder, like Finder. One click on a project shows its newest design live in the pane beside it, with its designs and iterations as chips, how it's coded, who made it, its source, and Open, Remix, Edit.",
+      "Set `\"stack\"` in a project's project.json to say how it's coded; otherwise Atelier reads it from the folder.",
+      "The pages in a folder sit lower, inside it.",
+      "Home is a little bigger all round and set in one typeface at regular weight; Grid's folders and cards are one size at any window width.",
+      "A prototype's tour now runs on the timeline's clock: pause stops it at once, and dragging the timeline shows the step as it is at that moment, paused or not, forward or back.",
+      "There is no agent inside Atelier any more. Send to agent, /try takes, the critic, Pick and Instead… are gone. Copy brief is the one button: paste it into your own Claude session, and the version it makes shows beside the original.",
+      "A note is one layer: the words sit on the card, with 12 corners, 16 around and 12 between rows. The mic is gone."
+    ]
+  },
+  {
     "at": "2026-11-15",
     "lines": [
       "Home has a new look, picked from 28 versions: neutral greys with no blue tint, no wallpaper and no screenshots.",

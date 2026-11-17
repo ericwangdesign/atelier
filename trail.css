@@ -1,0 +1,85 @@
+/* History, replies on notes, area notes and gathered cuts, and the Taste tab (trail.js, taste.js). Built on the stage's
+   tokens; blue is the one accent. */
+
+/* ---------- panel ---------- */
+/* primaries are the accent tint, never white (Eric, Oct 19) */
+.btn.go { background: color-mix(in srgb, var(--c-accent) 24%, transparent); color: var(--c-accent); font-weight: var(--c-w-medium); box-shadow: none; }
+.btn.go:hover { background: color-mix(in srgb, var(--c-accent) 34%, transparent); }
+.btn.go:disabled, .btn:disabled { opacity: .4; cursor: default; }
+/* a primary with nothing to send reads as a quiet button, not a grey slab */
+.btn.go:disabled { opacity: 1; background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-3); }
+.btn.go:disabled:hover { background: var(--surf); }
+.trail { margin: 0; padding: 0; list-style: none; }
+.sect > .st + .trail { margin-top: 4px; }
+.sect > .trail + * { margin-top: 6px; }
+.trail li { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--c-r-md); }
+.trail li + li { margin-top: 2px; }
+.trail li:hover { background: var(--c-fill); }
+.trail .tt { color: var(--c-text); font-weight: var(--c-w-medium); line-height: var(--c-lh-ui); }
+.trail .from { color: var(--c-text-3); font-weight: var(--c-w-body); }
+.trail .ts { color: var(--c-text-2); line-height: var(--c-lh-ui); overflow-wrap: anywhere; }
+.trail .nm { overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.trail .chips { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 2px; }
+.trail .tacts { display: flex; gap: 12px; padding-top: 2px; }
+.chip.lost { opacity: .5; }
+
+/* ---------- replies on notes ---------- */
+.nr { display: block; color: var(--c-text-2); line-height: var(--c-lh-ui); overflow-wrap: anywhere; }
+.nr b { color: var(--c-accent); font-weight: var(--c-w-medium); }
+.notes .nm .link { display: inline; font: inherit; line-height: inherit; color: var(--c-text-3); }
+.notes .nm .link:hover, .notes li:hover .nm .link.open { color: var(--c-text); }
+.notes .vlink { color: var(--c-accent) !important; font: inherit; }
+.thread { margin-top: 8px; padding: 8px 10px; border-radius: var(--c-r-md); background: var(--c-fill); display: flex; flex-direction: column; gap: 6px; }
+.thread p { margin: 0; }
+
+.agspin { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c-accent) 30%, transparent); border-top-color: var(--c-accent); animation: agrot .8s linear infinite; }
+@keyframes agrot { to { transform: rotate(1turn); } }
+
+/* ---------- notes, drawn ---------- */
+.pins .area { position: absolute; border-radius: calc(var(--c-r-xs) / var(--k, 1)); background: rgb(255 255 255 / .06); pointer-events: none;
+  box-shadow: inset 0 0 0 calc(1.5px / var(--k, 1)) rgb(255 255 255 / .9), 0 0 0 calc(1px / var(--k, 1)) rgb(0 0 0 / .3); }
+.areabox { position: fixed; z-index: 55; display: none; pointer-events: none; border-radius: var(--c-r-xs); background: color-mix(in srgb, var(--c-accent) 10%, transparent); box-shadow: 0 0 0 1.5px var(--c-accent); }
+.areabox.on { display: block; }
+.cutsel { position: fixed; z-index: 54; pointer-events: none; border-radius: var(--c-r-xs); background: color-mix(in srgb, var(--c-accent) 14%, transparent); box-shadow: 0 0 0 1.5px var(--c-accent); }
+.cutsel::after { content: attr(data-n); position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--c-accent); color: var(--c-on-accent); font: var(--c-w-medium) var(--c-t-xs)/18px var(--c-font); text-align: center; }
+
+/* ---------- popovers ----------
+   The note editor sits over designs that can be white: it's nearly solid, so its text always reads. */
+.notepop.glass { background: rgb(22 22 28 / .94); }
+.notepop textarea::placeholder { color: rgb(255 255 255 / .55); }
+
+@media (prefers-reduced-motion: reduce) { .agspin { animation-duration: 2s; } }
+
+/* ---------- taste ---------- */
+.tasteon { margin-top: 12px; }
+.tastelearn { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--c-accent); font-size: var(--c-t-ui); }
+.tastelearn[hidden] { display: none; }
+.tastelist { margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.tastelist:empty { display: none; }
+.tl { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 8px 32px 8px 10px; border-radius: var(--c-r-md); }
+.tl:hover { background: var(--c-fill); }
+.tl .tt { color: var(--c-text); line-height: 18px; outline: 0; cursor: text; border-radius: var(--c-r-xs); }
+.tl .tt[contenteditable="true"] { box-shadow: 0 0 0 1.5px var(--c-accent); background: rgb(0 0 0 / .25); padding: 0 4px; margin: 0 -4px; }
+.tl .tm { display: flex; align-items: center; gap: 6px; color: var(--c-text-3); font-size: var(--c-t-ui); line-height: var(--c-lh-ui); }
+/* one row, always: where it came from gives way first, cut short, never wrapping under the dots */
+.tl .tm { white-space: nowrap; min-width: 0; } .tl .tm > * { flex: none; }
+.tl .tm .src { display: flex; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tl .tm .jlink { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; white-space: nowrap; }
+.tl .tm .scope { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.tl .tm .scope:hover { color: var(--c-text); }
+.tl .tm .str { display: inline-flex; gap: 2px; } .tl .tm .str i { width: 4px; height: 4px; border-radius: 50%; background: var(--c-text-3); opacity: .45; } .tl .tm .str i.on { background: var(--c-accent); opacity: 1; }
+.tl .x { position: absolute; right: 6px; top: 6px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-text-3); cursor: pointer; opacity: 0; transition: opacity .15s; }
+.tl:hover .x, .tl .x:focus-visible { opacity: 1; } .tl .x:hover { color: var(--c-text); background: var(--surf-hover); }
+@media (hover: none) { .tl .x { opacity: 1; } }
+.tl.leaving { opacity: 0; transform: translateX(6px); transition: opacity .16s ease, transform .16s cubic-bezier(.23, 1, .32, 1); }
+.tasteadd { display: block; width: 100%; height: 32px; margin-top: 10px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); outline: 0; background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text); font: inherit; }
+.tasteadd::placeholder { color: rgb(255 255 255 / .55); }
+.tasteadd:focus { box-shadow: 0 0 0 1.5px var(--c-accent); }
+.sect.tasteoff .tastelist, .sect.tasteoff .tasteadd { opacity: .45; }
+.anglestats { display: flex; flex-direction: column; gap: 10px; }
+.anglestats:empty { display: none; }
+.ang { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 10px; font-size: var(--c-t-ui); color: var(--c-text-2); }
+.ang .bar { height: 4px; border-radius: var(--c-r-pill); background: var(--c-fill); overflow: hidden; }
+.ang .bar i { display: block; height: 100%; border-radius: inherit; background: var(--c-accent); transform-origin: left; transition: transform .4s cubic-bezier(.23, 1, .32, 1); }
+.ang .n { color: var(--c-text-3); font-variant-numeric: tabular-nums; }
+.ang.top { color: var(--c-text); }

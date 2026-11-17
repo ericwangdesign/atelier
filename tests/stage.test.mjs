@@ -19,7 +19,6 @@ const server = createServer(async (req, res) => {
     let body = ''; for await (const c of req) body += c; stored = JSON.parse(body).notes || []; return json(res, { version: String(++version) });
   }
   if (p === '/api/state') return json(res, req.method === 'GET' ? { state: {}, version: '0' } : { version: String(++version) });
-  if (p === '/api/agent') return json(res, { runs: [], critic: {} });
   if (p === '/api/trail') return json(res, { trail: [] });
   if (p === '/api/taste') return json(res, { on: false, lines: [] });
   if (p === '/api/snap') return json(res, { file: 'snap.png' });
@@ -340,68 +339,6 @@ console.log('Notes carry more than words');
     const n = await lastNote(page);
     expect(n.edit && n.edit.old === old.replace(/\s+/g, ' ').trim() && n.edit.new === 'Framed words' && n.edit.ref.frame, `the note's edit is ${JSON.stringify(n.edit)}`);
     expect(await frameEl(page).evaluate(() => document.querySelector('.ml').textContent) === 'Framed words', 'the page lost the new words');
-    await page.keyboard.press('Escape');
-  });
-  await ctx.close();
-}
-
-{
-  // a stand-in for the browser's speech recognition: the test says the words
-  const { page, ctx } = await stage('built-v1', () => { window.SpeechRecognition = window.webkitSpeechRecognition = class { start() { window.__rec = this; } stop() { this.stopped = true; this.onend && this.onend(); } }; });
-  await check('dictate: the mic fills the note at the caret, and stops when pressed again or the note closes', async () => {
-    await page.keyboard.press('n'); const p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await wait(200);
-    await page.keyboard.type('please');
-    expect(await page.evaluate(() => !$('popmic').hidden), 'the mic is hidden though the browser has speech');
-    await page.click('#popmic');
-    expect(await page.evaluate(() => !!window.__rec && $('popmic').getAttribute('aria-pressed') === 'true' && window.__rec.lang && window.__rec.continuous), 'the mic did not start listening');
-    await page.evaluate(() => __rec.onresult({ results: [[{ transcript: 'make it' }]] }));
-    await page.evaluate(() => __rec.onresult({ results: [[{ transcript: 'make it' }], [{ transcript: ' blue' }]] }));
-    expect(await page.$eval('#poptext', t => t.value) === 'please make it blue', `the note says "${await page.$eval('#poptext', t => t.value)}"`);
-    await page.click('#popmic');
-    expect(await page.evaluate(() => __rec.stopped && $('popmic').getAttribute('aria-pressed') === 'false'), 'pressing the mic again did not stop it');
-    await page.click('#popmic'); await page.keyboard.press('Enter'); await wait(100);
-    expect(await page.evaluate(() => __rec.stopped && !hearing), 'closing the note left the mic on');
-    expect((await lastNote(page)).text === 'please make it blue', 'the dictated words were not kept');
-  });
-  await ctx.close();
-}
-{
-  const { page, ctx } = await stage('built-v1', () => { delete window.webkitSpeechRecognition; delete window.SpeechRecognition; });
-  await check('dictate: no mic where the browser has no speech recognition', async () => {
-    await page.keyboard.press('n'); const p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await wait(200);
-    expect(await page.evaluate(() => $('popmic').hidden && getComputedStyle($('popmic')).display === 'none'), 'the mic shows anyway');
-  });
-  await ctx.close();
-}
-
-{
-  const { page, ctx } = await stage('built-v1');
-  const sent = [];
-  await page.route('**/api/agent?**', route => {
-    if (route.request().method() !== 'POST') return route.fallback();
-    const b = JSON.parse(route.request().postData()); sent.push(b);
-    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ runs: [{ id: 'run' + sent.length, status: 'working' }], scenes: [], round: 'q' + sent.length }) });
-  });
-  await check('send one note now: ⌘Return sends just that note as its own run; plain Return only saves', async () => {
-    await page.keyboard.press('n');
-    let p = await at(page, 200, 100); await page.mouse.click(p.x, p.y); await page.keyboard.type('one'); await page.keyboard.press('Enter'); await wait(100);
-    expect(!sent.length, 'plain Return sent the note');
-    p = await at(page, 600, 300); await page.mouse.click(p.x, p.y); await wait(100);
-    expect(await page.evaluate(() => !$('popsend').hidden), 'no Send in the note');
-    await page.keyboard.type('two'); await page.keyboard.press('Meta+Enter'); await wait(400);
-    const [one, two] = await page.evaluate(() => S.notes.slice(-2));
-    expect(sent.length === 1 && sent[0].notes.length === 1 && sent[0].notes[0].id === two.id && Object.keys(sent[0].briefs).join() === String(two.id), `sent ${JSON.stringify(sent.map(b => b.notes))}`);
-    expect(/Note: two/.test(sent[0].briefs[two.id]), 'the brief sent is not the note\'s');
-    expect(two.sent === 'run1' && !one.sent && !(await page.evaluate(() => !!editing)), `the note is not marked as sent (${two.sent}), or the other one is`);
-  });
-  await check('send one note now: Send in an open note does the same', async () => {
-    const pin = await page.evaluate(() => { const r = document.querySelector('.pin').getBoundingClientRect(); return { x: r.left + 12, y: r.top + 12 }; });
-    await page.mouse.click(pin.x, pin.y); await wait(100);
-    await page.click('#popsend'); await wait(400);
-    const one = await page.evaluate(() => S.notes.at(-2));
-    expect(sent.length === 2 && sent[1].notes.length === 1 && sent[1].notes[0].id === one.id && one.sent === 'run2', `sent ${JSON.stringify(sent.map(b => b.notes))}`);
-    await page.mouse.click(pin.x, pin.y); await wait(100);
-    expect(await page.evaluate(() => $('popsend').hidden), 'a note already with the agent can be sent again');
     await page.keyboard.press('Escape');
   });
   await ctx.close();

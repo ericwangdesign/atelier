@@ -1,11 +1,9 @@
-/* Taste: the stage's side of taste.py. Loaded after agent.js, and shares the stage's names ($, esc, PROJECT).
+/* Taste: the stage's side of taste.py. Loaded after trail.js, and shares the stage's names ($, esc, PROJECT).
 
-   The Taste tab lists what the agents have learned you like, from how each design changed: every version from the
-   first to the latest, the notes behind each, the takes you picked and why. Every run reads it first. Under each
-   line, the designs it came from; click one to see its first and latest versions side by side. Re-read all
-   relearns everything from every design's history, keeping your own lines. Click a line to edit it (then it's yours, and learning never drops
-   it), × forgets it, the scope switches between this project and everywhere, and you can add your own. A toast
-   says what was learned, a few seconds after a pick or a round of notes lands. */
+   The Taste tab lists what you like, in lines. Every agent session reads it before design work (taste.md). Nothing
+   in Atelier learns or rewrites it any more: lines learned back when it ran agents stay, with the designs they came
+   from (click one to see its first and latest versions side by side). Click a line to edit it, × forgets it, the
+   scope switches between this project and everywhere, and you can add your own. */
 window.Taste = (() => {
   if (!PROJECT || CAPTURE) return {};
   const API = body => fetch(`/api/taste?project=${encodeURIComponent(PROJECT)}`, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})
@@ -48,7 +46,6 @@ window.Taste = (() => {
     $('tastelearn').hidden = !data.learning;
     const rr = data.rereading;
     $('tastelearn').querySelector('span').textContent = rr ? `Rereading every design · ${rr.done} of ${rr.of}` : 'Learning from what you just did';
-    $('tastereread').disabled = !!rr;
     if (key === drawn) return; drawn = key;
     $('tasteon').checked = data.on;
     $('tastelist').closest('.sect').classList.toggle('tasteoff', !data.on);
@@ -71,11 +68,6 @@ window.Taste = (() => {
   $('tasteadd').onkeydown = e => {
     if (e.key !== 'Enter' || !e.target.value.trim()) return;
     act({ act: 'add', text: e.target.value }); e.target.value = '';
-  };
-  $('tastereread').onclick = async () => {
-    if (!confirm('Relearn your taste from every design\'s history? Lines you wrote or edited stay.')) return;
-    try { const d = await API({ act: 'reread' }); say(d.started ? 'Rereading every design' : 'Nothing to reread yet'); } catch (err) { say(err.message); }
-    refresh();
   };
   $('tastelist').addEventListener('click', e => {
     const j = e.target.closest('.jlink');

@@ -2,7 +2,7 @@
   "name": "atelier",
   "license": "MIT",
   "private": true,
-  "description": "A design stage where you and coding agents work on the same screens: notes they answer, directions they explore, and the trail of why each version exists.",
+  "description": "A design stage for designers who build with a coding agent: notes that leave as a brief, versions side by side, and the trail of why each version exists.",
   "scripts": {
     "start": "python3 serve.py",
     "test": "node tests/stage.test.mjs"
