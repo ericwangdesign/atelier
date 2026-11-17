@@ -1,65 +1,165 @@
 /* Atelier's tokens: every colour, size and radius the tool's own UI uses. Both pages (index.html, stage.html) load this
-   first; ui.css, agent.css and the pages' own rules only read from it.
+   first; ui.css, trail.css and the pages' own rules only read from it.
 
-   The scale and the names match the writing canvas and the vault (one family of tools), behind a --c- prefix ("chrome"):
-   a design on the stage renders inside the page, and custom properties inherit into it, so an unprefixed --accent or
-   --text here would leak into a design that reads one without setting it.
+   Since Nov 17 the values are the gen UI kit's (vault/projects/generative-ui/genui-cabin-v2/tokens.css), copied here
+   so the public repo stands alone. Change them there first, then here. What the kit settled:
+   - Text is one ink at four strengths. Every colour is solid: nothing is see-through, so layered pieces never turn
+     cluttered (Eric, Nov 17).
+   - Light is the default; dark is the same ladder turned over. mode.js sets :root[data-mode] before the first paint,
+     from the Theme setting (Auto follows the Mac).
+   - Space on a 2px grid, controls 24 / 28 / 32 tall, radius 5 / 7 / 10 / 14, one ease, five durations.
+   - One accent, kept for the answer and for "an agent is here". The primary button is ink, never white.
 
-   Atelier is dark only and sits on a wallpaper, so its colours are white at an opacity rather than solid greys. */
+   The names keep a --c- prefix ("chrome"): a design on the stage renders inside the page, and custom properties
+   inherit into it, so an unprefixed --accent or --ink here would leak into a design that reads one without setting it.
+   The old names (--c-text, --c-fill, --surf…) stay as aliases, so every rule written against them follows the kit. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* ---- type: Geist. The tool's text is 13, a step under the vault's 14 (12 read small on the glass, Oct 16) ---- */
+  /* ---- grounds ---- */
+  --c-ground: #fafafa;        /* the page */
+  --c-pane: #f4f4f5;          /* a pane: a step under the cards on it */
+  --c-surface: #ffffff;       /* panels, cards, fields */
+  --c-raised: #ffffff;        /* what sits on a track: the picked segment, a thumb. Always lighter than its track */
+  --c-wash: #f7f7f7;          /* hover, tracks, tags */
+  --c-wash-2: #f1f1f1;        /* pressed, a secondary button */
+
+  /* ---- ink, four strengths ---- */
+  --c-ink: #1f1f1f;
+  --c-ink-2: #555555;
+  --c-ink-3: #6b6b6b;
+  --c-ink-4: #9a9a9a;
+  /* greys for marks, not words: bars, rails, dots */
+  --c-mark-3: #a8a8a8;
+  --c-mark-4: #d0d0d0;
+
+  /* ---- edges ---- */
+  --c-edge: #ebebeb;
+  --c-edge-2: #dedede;
+  --c-rule: #f0f0f0;
+
+  /* ---- the one accent, and states ---- */
+  --c-accent: #0071e3;
+  --c-accent-soft: #e6f1fc;
+  --c-on-accent: #ffffff;
+  --c-focus: rgba(0, 96, 226, 0.7);
+  --c-good: #187a44;  --c-good-soft: #e9f7ef;
+  --c-bad: #b02a06;   --c-bad-soft: #feeceb;
+  --c-warn: #a05200;  --c-warn-soft: #fdf1e6;
+
+  /* ---- the primary button is ink; in the dark a mid grey with white words, never a white button ---- */
+  --c-btn: #1f1f1f;
+  --c-on-btn: #ffffff;
+
+  /* ---- lift: a card's half-pixel edge and 1px of shadow; float only for what sits over the stage ---- */
+  --c-lift: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 1px 1px -1px rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --c-lift-hover: 0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 1px -1px rgba(0, 0, 0, 0.12), 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  --c-float: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 8px 24px -6px rgba(0, 0, 0, 0.14), 0 2px 6px -2px rgba(0, 0, 0, 0.06);
+
+  /* a menu chevron, drawn in the second ink (a data URI can't read currentColor) */
+  --c-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%23555' stroke-width='1.3'/%3E%3C/svg%3E");
+
+  /* ---- type: Geist (Eric's taste wins over the kit's Inter), 13 as the base. Each size carries its line ---- */
   --c-font: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --c-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;   /* code only */
-  --c-t-xs: 12px;    --c-lh-xs: 16px;     /* badges, timeline ticks, kbd hints */
-  --c-t-ui: 13px;    --c-lh-ui: 18px;     /* everything in a panel: the default */
-  --c-t-sm: 14px;    --c-lh-sm: 20px;     /* menus, a section's title */
-  --c-t-md: 15px;    --c-lh-md: 22px;     /* a project's name, a card's title */
-  --c-t-lg: 16px;    --c-lh-lg: 22px;     /* a count beside the page title */
-  --c-t-title: 20px; --c-lh-title: 26px;  /* the page title on home */
-  --c-w-body: 400;   /* light text on a dark ground gains weight, so 400 here where the vault uses 420 */
+  --c-t-xs: 12px;    --c-lh-xs: 16px;     /* meta, badges, timeline ticks, kbd */
+  --c-t-ui: 13px;    --c-lh-ui: 20px;     /* names, rows, buttons: the default */
+  --c-t-sm: 13px;    --c-lh-sm: 20px;     /* menus, a section's title */
+  --c-t-md: 15px;    --c-lh-md: 24px;     /* a project's name, a tile's title */
+  --c-t-lg: 15px;    --c-lh-lg: 24px;
+  --c-t-title: 24px; --c-lh-title: 32px;  /* the big name */
+  --c-w-body: 400;
   --c-w-medium: 500;
   --c-tr-tight: -0.02em; --c-tr-snug: -0.01em;
 
-  /* ---- radius: the vault's grid ---- */
-  --c-r-xs: 4px;     /* kbd, code, an area note's box */
-  --c-r-sm: 8px;     /* thumbnails */
-  --c-r-md: 12px;    /* rows, fields, cards */
-  --c-r-lg: 24px;    /* the glass panels */
-  --c-r-pill: 999px;
+  /* ---- space, a 2px grid ---- */
+  --c-s-2: 2px; --c-s-4: 4px; --c-s-6: 6px; --c-s-8: 8px; --c-s-12: 12px; --c-s-16: 16px; --c-s-24: 24px;
+  /* ---- control heights ---- */
+  --c-h-sm: 24px; --c-h-md: 28px; --c-h-lg: 32px;
 
-  /* ---- colour: text, the same ladder as the vault, as white over the glass ---- */
-  --c-text: #fff;
-  --c-text-2: rgb(255 255 255 / .8);     /* secondary */
-  --c-text-3: rgb(255 255 255 / .64);    /* labels, meta */
-  --c-fill: rgb(255 255 255 / .1);       /* something sitting on the panel: a row's hover, a thread, kbd */
-  --c-hover: rgb(255 255 255 / .2);
-  --c-line: rgb(255 255 255 / .1);       /* only where a line is the thing */
-  --c-line-2: rgb(255 255 255 / .22);    /* a field's focus */
-  --c-ground: #05070d;                   /* behind the wallpaper, before it loads */
+  /* ---- radius: steps with size. 5 small parts, 7 controls, 10 cards and rows, 14 the floating panels ---- */
+  --c-r-xs: 4px;
+  --c-r-sm: 5px;
+  --c-r: 7px;
+  --c-r-md: 10px;
+  --c-r-lg: 14px;
+  --c-r-pill: 999px;   /* round marks only: a pin, a badge, a thumb */
 
-  /* ---- colour: the one accent. Blue only ever means "an agent is here" ---- */
-  --c-accent: #4da6ff;                                                   /* the vault's night blue */
-  --c-accent-soft: color-mix(in srgb, var(--c-accent) 16%, transparent);
-  --c-on-accent: #05070d;
-  --c-bad: #ff7a6b;                                                      /* the vault's night red */
-  --c-ease: cubic-bezier(.23, 1, .32, 1);
+  /* ---- motion: one ease, five durations. Nothing a person waits for runs past a quarter second ---- */
+  --c-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --c-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* a pop only, never travel */
+  --c-d-instant: 120ms; --c-d-quick: 160ms; --c-d-std: 220ms; --c-d-calm: 320ms; --c-d-slow: 420ms;
 
-  /* ---- glass: buttons are glass everywhere, on home and the stage. A little white, a little frost, a hairline edge,
-     and light from straight above (a soft rim along the top, a quarter as much along the bottom). Never a solid fill.
-     liquid.js sets --g-* from the glass tuner; these are the fallbacks. In Chrome it also bends the background at the
-     rims like a lens. ---- */
+  /* ---- the old names, kept as aliases of the kit ---- */
+  --c-text: var(--c-ink);
+  --c-text-2: var(--c-ink-2);
+  --c-text-3: var(--c-ink-3);
+  --c-text-4: var(--c-ink-4);
+  --c-fill: var(--c-wash-2);    /* something sitting on the panel: a row's hover, a thread, kbd */
+  --c-hover: var(--c-edge);
+  --c-line: var(--c-rule);      /* only where a line is the thing */
+  --c-line-2: var(--c-edge-2);
+
+  /* Every control (buttons, pills, fields, menus, toggles, tracks) is one material: a solid grey a step under the
+     panel, the picked one raised on it. "Glass" in the Stage tab brings back the old frosted look for the panels;
+     the controls on it then take the tuner's glass (liquid.js sets data-look). */
+  --surf: var(--c-wash-2); --surf-hover: var(--c-edge); --surf-on: var(--c-raised); --surf-edge: none; --surf-blur: none;
+  --c-ground-stage: #05070d;   /* behind the wallpaper, before it loads */
+
+  /* the liquid glass tuner's fallbacks (liquid.js sets --g-*) */
   --g-fill: .03; --g-blur: 1px; --g-light: .2; --g-edge: .04;
-  --glass-btn: rgb(255 255 255 / var(--g-fill));                          /* at rest */
+  --glass-btn: rgb(255 255 255 / var(--g-fill));
   --glass-btn-hover: rgb(255 255 255 / calc(var(--g-fill) + .06));
-  --glass-btn-on: rgb(255 255 255 / calc(var(--g-fill) + .12));           /* pressed, chosen, or the main action (play) */
+  --glass-btn-on: rgb(255 255 255 / calc(var(--g-fill) + .12));
   --glass-edge: inset 0 0 0 0.5px rgb(255 255 255 / var(--g-edge)), inset 0 1px 0.5px rgb(255 255 255 / var(--g-light)), inset 0 -1px 0.5px rgb(255 255 255 / calc(var(--g-light) / 4));
   --glass-blur: blur(var(--g-blur));
-  /* The surface of everything you press, type in, pick or drag (buttons, pills, fields, menus, toggles, slider tracks),
-     so every control reads as one material. Two looks, picked with the tuner's Controls pills (liquid.js sets
-     data-look on <html>): flat, the default, plain translucent white with no edge, frost or lens;
-     or glass, with the edge, top light and frost from the tuner. */
-  --surf: rgb(255 255 255 / .1); --surf-hover: rgb(255 255 255 / .14); --surf-on: rgb(255 255 255 / .22); --surf-edge: none; --surf-blur: none;
 }
-:root[data-look="glass"] { --surf: var(--glass-btn); --surf-hover: var(--glass-btn-hover); --surf-on: var(--glass-btn-on); --surf-edge: var(--glass-edge); --surf-blur: var(--glass-blur); }
+
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --c-ground: #0c0c0d;
+  --c-pane: #121213;
+  --c-surface: #1c1c1e;
+  --c-raised: #454548;        /* in the dark a card is darker than a track on it, so the picked thing needs its own, lighter one */
+  --c-wash: #252527;
+  --c-wash-2: #2e2e30;
+
+  --c-ink: #e8e8e8;
+  --c-ink-2: #a9a9aa;
+  --c-ink-3: #98989a;
+  --c-ink-4: #707072;
+  --c-mark-3: #6a6a6c;
+  --c-mark-4: #48484a;
+
+  --c-edge: #3c3c3e;
+  --c-edge-2: #49494b;
+  --c-rule: #2e2e30;
+
+  --c-accent: #4da6ff;
+  --c-accent-soft: #243242;
+  --c-on-accent: #0c0c0d;
+  --c-focus: rgba(77, 141, 255, 0.8);
+  --c-good: #7dcf9f;  --c-good-soft: #2a3530;
+  --c-bad: #ff8a7a;   --c-bad-soft: #3c2727;
+  --c-warn: #ffb35c;  --c-warn-soft: #3a2f27;
+
+  --c-btn: #636366;
+  --c-on-btn: #ffffff;
+
+  --c-lift: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --c-lift-hover: 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 2px 4px 0 rgba(0, 0, 0, 0.45);
+  --c-float: 0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+
+  --c-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%23a9a9aa' stroke-width='1.3'/%3E%3C/svg%3E");
+}
+
+/* Glass panels (Stage tab › Panels › Glass): the frosted look from before the kit, white text over the wallpaper.
+   The controls on them take the tuner's glass, as they did. Solid is the default. */
+:root[data-panes="glass"] .glass { --c-text: #fff; --c-text-2: rgb(255 255 255 / .8); --c-text-3: rgb(255 255 255 / .64); --c-text-4: rgb(255 255 255 / .4);
+  --c-ink: #fff; --c-ink-2: rgb(255 255 255 / .8); --c-ink-3: rgb(255 255 255 / .64); --c-ink-4: rgb(255 255 255 / .4);
+  --c-fill: rgb(255 255 255 / .1); --c-hover: rgb(255 255 255 / .2); --c-line: rgb(255 255 255 / .1); --c-line-2: rgb(255 255 255 / .22);
+  --c-mark-4: rgb(255 255 255 / .18); --c-raised: rgb(255 255 255 / .22); --c-wash-2: rgb(255 255 255 / .1); --c-edge: rgb(255 255 255 / .16);
+  --surf: rgb(255 255 255 / .1); --surf-hover: rgb(255 255 255 / .14); --surf-on: rgb(255 255 255 / .22);
+  --c-btn: rgb(255 255 255 / .22); --c-on-btn: #fff; --c-accent: #4da6ff; --c-lift: none;
+  --c-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E"); }
+:root[data-panes="glass"][data-look="glass"] .glass { --surf: var(--glass-btn); --surf-hover: var(--glass-btn-hover); --surf-on: var(--glass-btn-on); --surf-edge: var(--glass-edge); --surf-blur: var(--glass-blur); }

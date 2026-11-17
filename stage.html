@@ -15,6 +15,7 @@
 <!-- Nothing is drawn until the page has built itself (the #ready marker at the end of the body), so it never shows
      an empty panel while its scripts and scenes load, and the crossfade from the other page lands on the finished page. -->
 <link rel="expect" href="#ready" blocking="render">
+<script src="mode.js"></script>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="wall.css">
 <link rel="stylesheet" href="ui.css">
@@ -25,9 +26,9 @@
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; }
-  body { background: var(--c-ground); color: var(--c-text); font: var(--c-w-body) var(--c-t-ui)/var(--c-lh-ui) var(--c-font); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  body { background: var(--c-ground-stage); color: var(--c-text); font: var(--c-w-body) var(--c-t-ui)/var(--c-lh-ui) var(--c-font); -webkit-font-smoothing: antialiased; overflow: hidden; }
   button, input { font: inherit; color: inherit; }
-  button:focus-visible, input:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 1px; }
 
   /* ---------- wallpaper ---------- */
 
@@ -36,21 +37,26 @@
      Fit only uses the part the panel and bar leave free. */
   .canvas { position: fixed; inset: 0; overflow: hidden; cursor: default; touch-action: none; }
   .canvas.panning { cursor: grabbing; }
-  .frames { position: absolute; inset: 0 calc(var(--panel-w) + 16px) var(--bar-h) 0; display: flex; align-items: center; justify-content: center; gap: 32px; padding: 32px; pointer-events: none; }
+  .frames { position: absolute; inset: 40px calc(var(--panel-w) + 16px) var(--bar-h) 0; /* 40 at the top: the annotate bar and toasts have room, so they never cover a design */ display: flex; align-items: center; justify-content: center; gap: 32px; padding: 32px; pointer-events: none; }
   :root[data-panel="off"] .frames { right: 0; }
+  :root:is([data-capture], [data-ui="off"]) .frames { top: 0; }
+  body.noting :is(.cap, .fdup) { visibility: hidden; } /* the annotate bar sits where the caption was */
   :root[data-bar="off"] .frames { bottom: 0; }
   .fwrap { flex: none; position: relative; pointer-events: auto; }
   .fwrap.drag { z-index: 10; }
   .cap { position: absolute; left: 0; bottom: 100%; margin-bottom: 8px; color: rgb(255 255 255 / .85); text-shadow: 0 1px 2px rgb(0 0 0 / .4); font-size: var(--c-t-xs); line-height: var(--c-lh-ui); white-space: nowrap; font-variant-numeric: tabular-nums; }
   /* Duplicate sits at the screen's top right, centred on the caption's line (8 + 8 above the frame); the caption stops short of it */
   .fdup { position: absolute; right: 0; bottom: 100%; margin-bottom: 6px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: rgb(255 255 255 / .85); display: grid; place-items: center; cursor: pointer; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .4)); transition: background-color .15s ease; }
-  .fdup:hover { background: var(--surf-hover); color: var(--c-text); }
+  .fdup:hover { background: var(--c-surface); color: var(--c-ink); filter: none; box-shadow: var(--c-lift); }
   .fdup svg { width: 12px; height: 12px; }
   .fwrap.dupable .cap { max-width: calc(100% - 28px); overflow: hidden; text-overflow: ellipsis; }
   :root[data-ui="off"] .fdup { visibility: hidden; }
   /* exporting (capture mode): no border and square corners, so a cut-out screen is the design edge to edge */
   :root[data-capture] .frame, :root[data-capture] .screen { border-radius: 0 !important; border: 0 !important; box-shadow: none !important; }
+  /* the light wallpaper photo is dark where the caption sits: white words, a heavier shadow */
   :root[data-wall="light"] .cap { text-shadow: 0 1px 3px rgb(0 0 0 / .7), 0 0 12px rgb(0 0 0 / .5); }
+  /* without the photo the light wallpaper is a pale grey: ink words, no shadow */
+  :root[data-wall="light"]:not([data-photos~="light"]) :is(.cap, .fdup) { color: var(--c-ink-2); text-shadow: none; filter: none; }
   :root[data-ui="off"] .cap, :root[data-ui="off"] .rz { visibility: hidden; }
   .scaler { position: relative; }
   /* Screens move by their caption, title bar or status bar. Double-click one to put it back. */
@@ -66,13 +72,14 @@
   .rz.nw, .rz.ne, .rz.sw, .rz.se { width: 28px; height: 28px; z-index: 4; }
   .rz.nw { left: -14px; top: -14px; cursor: nwse-resize; } .rz.se { right: -14px; bottom: -14px; cursor: nwse-resize; }
   .rz.ne { right: -14px; top: -14px; cursor: nesw-resize; } .rz.sw { left: -14px; bottom: -14px; cursor: nesw-resize; }
-  .rz::after { content: ""; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .85); box-shadow: 0 1px 4px rgb(0 0 0 / .4); opacity: 0; transition: opacity .15s ease; }
+  .rz::after { content: ""; border-radius: var(--c-r-pill); background: var(--c-surface); box-shadow: var(--c-float); opacity: 0; transition: opacity .15s ease; }
   .rz.e::after, .rz.w::after { width: 4px; height: 44px; } .rz.n::after, .rz.s::after { width: 44px; height: 4px; }
   .rz.nw::after, .rz.ne::after, .rz.sw::after, .rz.se::after { width: 10px; height: 10px; }
   .rz:hover::after, body.sizing .rz::after { opacity: 1; }
   body.sizing, body.sizing * { cursor: var(--rz-cursor) !important; }
-  .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; display: flex; flex-direction: column; background: #141414;
-    border: 1px solid rgb(255 255 255 / .14); box-shadow: 0 24px 80px rgb(0 0 20 / .45); }
+  .frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; display: flex; flex-direction: column; background: var(--c-surface);
+    border: 0; box-shadow: 0 0 0 0.5px rgb(0 0 0 / .24), 0 24px 64px -16px rgb(0 0 0 / .45), 0 4px 12px -4px rgb(0 0 0 / .2); }
+  .frame.handheld, .frame.tablet { background: #000; box-shadow: 0 0 0 0.5px rgb(255 255 255 / .16), 0 0 0 1px rgb(0 0 0 / .5), 0 24px 64px -16px rgb(0 0 0 / .5); }
   .frame.window { border-radius: var(--c-r-md); }
   .frame.handheld { border-radius: 48px; }
   .frame.tablet { border-radius: 28px; }
@@ -82,7 +89,7 @@
   .host { position: absolute; inset: 0; }
   .host { isolation: isolate; } /* a design's own z-indexes stay inside it, under pins and the note catcher */
   .host > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
-  .host .empty { position: absolute; inset: 0; display: grid; place-items: center; color: #8b8984; font: var(--c-t-md) var(--c-font); background: #141414; }
+  .host .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--c-ink-3); font: var(--c-t-md) var(--c-font); background: var(--c-pane); }
   /* compare views: B sits over A. Swipe clips it at the divider, Onion fades it, Difference leaves only what changed. */
   .screen[data-cmp=swipe] .host.b { clip-path: inset(0 0 0 calc(var(--wipe, .5) * 100%)); }
   .screen[data-cmp=onion] .host.b { opacity: var(--onion, .5); }
@@ -94,8 +101,8 @@
     background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M11 10l-4 4 4 4M17 10l4 4-4 4' fill='none' stroke='%23141414' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
     box-shadow: 0 calc(2px / var(--k, 1)) calc(8px / var(--k, 1)) rgb(0 0 0 / .4); }
   .screen[data-cmp=swipe] .wipe { display: block; }
-  .ab { display: none; position: absolute; top: calc(12px / var(--k, 1)); z-index: 4; height: 24px; padding: 0 10px; border-radius: var(--c-r-pill); white-space: nowrap; pointer-events: none;
-    background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .2); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/24px var(--c-font); }
+  .ab { display: none; position: absolute; top: calc(12px / var(--k, 1)); z-index: 4; height: 24px; padding: 0 8px; border-radius: var(--c-r-sm); white-space: nowrap; pointer-events: none;
+    background: var(--c-btn); box-shadow: var(--c-float); color: var(--c-on-btn); font: var(--c-w-medium) var(--c-t-ui)/24px var(--c-font); }
   .ab.a { left: calc(12px / var(--k, 1)); transform: scale(calc(1 / var(--k, 1))); transform-origin: top left; }
   .ab.b { right: calc(12px / var(--k, 1)); transform: scale(calc(1 / var(--k, 1))); transform-origin: top right; }
   /* in Swipe the labels sit either side of the divider and follow it */
@@ -107,13 +114,16 @@
   /* chrome: a window title bar for desktop sizes, above the design. Phones and tablets work like the real thing: the
      design runs the full height, and the status bar and home indicator float over it, in black or white to suit
      what's under them. Scenes keep clear of them with var(--safe-top) and var(--safe-bottom). */
-  .tbar { height: 36px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #141414; border-bottom: 1px solid #2c2c2c; color: #8b8984; font: 12px var(--c-font); }
-  .tbar .tl3 { display: flex; gap: 8px; flex: 1; } .tbar .tl3 i { width: 12px; height: 12px; border-radius: 50%; background: #3a3a3a; }
+  .tbar { height: 36px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--c-pane); color: var(--c-ink-3); font: var(--c-t-xs) var(--c-font); }
+  .tbar .tl3 { display: flex; gap: 8px; flex: 1; } .tbar .tl3 i { width: 12px; height: 12px; border-radius: 50%; background: var(--c-mark-4); }
   .status { height: 54px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 28px 0 44px; color: #f5f2ed; font: 600 17px -apple-system, "SF Pro Text", var(--c-font); }
   .status, .home { position: absolute; left: 0; right: 0; z-index: 3; pointer-events: none; transition: color .2s ease; }
   .status { top: 0; } .home { bottom: 0; }
   .frame.ink-top .status { color: #000; } .frame.ink-bottom .home { color: #000; }
   .status .island { width: 125px; height: 37px; border-radius: 100px; background: #000; flex: none; }
+  /* a design can hide the time and levels, the way iOS does when the Dynamic Island grows over them: it sends a
+     'scene-status' event with { hide: true } (and { hide: false } to bring them back) */
+  .status > span { transition: opacity .18s ease; } .frame.st-off .status > span { opacity: 0; }
   .status .levels { width: 78px; display: flex; justify-content: flex-end; } .status .levels i { width: 72px; height: 11px; background: currentColor; -webkit-mask: url(levels.svg) center / 100% 100% no-repeat; mask: url(levels.svg) center / 100% 100% no-repeat; }
   .frame.tablet .status { height: 32px; padding: 0 24px; font-size: var(--c-t-sm); } .frame.tablet .island { visibility: hidden; }
   .home { height: 34px; display: grid; place-items: center; color: #f5f2ed; } .home::before { content: ""; width: 136px; height: 5px; border-radius: var(--c-r-pill); background: currentColor; transition: background-color .2s ease; }
@@ -121,9 +131,35 @@
   .frame:not(.window) .tbar, .frame.window .status, .frame.window .home, .frame.bare .tbar, .frame.bare .status, .frame.bare .home { display: none; }
 
   /* ---------- glass, shared by the panel and the bar ---------- */
-  .glass { color: var(--c-text); background: rgb(40 40 46 / var(--tint)); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%); backdrop-filter: blur(var(--blur)) saturate(180%);
-    border-radius: var(--c-r-lg); box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / .28), inset 0 1px 0 rgb(255 255 255 / .18), 0 16px 48px rgb(0 0 0 / .35); }
-  :root[data-wall="light"] .glass { background: rgb(24 24 30 / calc(var(--tint) + .24)); }
+  /* Solid (the kit, Nov 17): the panel and the bar are the surface colour, held by a half-pixel edge and the float
+     shadow, because they sit over the stage. Nothing behind them shows through. */
+  .glass { color: var(--c-text); background: var(--c-surface); border-radius: var(--c-r-lg); box-shadow: var(--c-float); }
+  /* Glass: the frosted look from before, picked in Stage › Panels */
+  :root[data-panes="glass"] .glass { background: rgb(40 40 46 / var(--tint)); -webkit-backdrop-filter: blur(var(--blur)) saturate(180%); backdrop-filter: blur(var(--blur)) saturate(180%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .18), 0 16px 48px rgb(0 0 0 / .35); }
+  :root[data-panes="glass"][data-wall="light"] .glass { background: rgb(24 24 30 / calc(var(--tint) + .24)); }
+  :root[data-panes="solid"] :is(#blurwrap, .sect[data-k="liquid"]) { display: none !important; }
+  /* Frost (Nov 17, Eric: "bring some of the glassy panel back"): the side panel, the timeline and the annotate bar
+     are a tinted frost over the wallpaper, lit along the top, in the kit's own colours and words; the note card and
+     toasts stay solid, since they sit over designs. Blur and Tint in Stage › Look tune it; the lens is the tuner's. */
+  :root[data-panes="frost"] :is(.side, .transport, .annobar).glass {
+    /* clearer (Eric, Nov 17): a light tint, and the blur brightened under it so dark words still read on a dark wallpaper */
+    background: color-mix(in srgb, var(--c-surface) calc(20% + var(--tint) * 100%), transparent);
+    -webkit-backdrop-filter: blur(var(--blur)) saturate(25%) brightness(1.2); backdrop-filter: blur(var(--blur)) saturate(25%) brightness(1.2); /* light glass stays a neutral grey over a coloured wallpaper (taste: no tinted surfaces) */
+    --c-ink-4: var(--c-ink-3); --c-ink-3: #5c5c5c;
+    /* no ring round the rim: a grey hairline on the blue wallpaper read as a yellow outline (Eric, Nov 17); the lit top edge and the shadow hold the shape */
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .8), 0 16px 48px -12px rgb(0 0 0 / .25);
+    --c-wash: color-mix(in srgb, var(--c-ink) 4%, transparent); --c-wash-2: color-mix(in srgb, var(--c-ink) 7%, transparent); --c-edge: color-mix(in srgb, var(--c-ink) 11%, transparent);
+    --c-raised: rgb(255 255 255 / .9); --c-mark-4: color-mix(in srgb, var(--c-ink) 18%, transparent);
+    --surf: var(--c-wash-2); --surf-hover: var(--c-edge); --surf-on: var(--c-raised); }
+  :root[data-panes="frost"][data-mode="dark"] :is(.side, .transport, .annobar).glass {
+    background: color-mix(in srgb, var(--c-surface) calc(4% + var(--tint) * 100%), transparent);
+    -webkit-backdrop-filter: blur(var(--blur)) saturate(160%) brightness(.82); backdrop-filter: blur(var(--blur)) saturate(160%) brightness(.82);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .14), 0 16px 48px -12px rgb(0 0 0 / .6);
+    --c-wash: rgb(255 255 255 / .05); --c-wash-2: rgb(255 255 255 / .08); --c-edge: rgb(255 255 255 / .13); --c-raised: rgb(255 255 255 / .16); --c-mark-4: rgb(255 255 255 / .2); --c-ink-3: #98989a; --c-ink-4: #707072; }
+  /* on frost a picked tab or pill is the raised fill with the kit's lift; the timeline's thumb stays solid */
+  :root[data-panes="frost"] .tab[aria-selected="true"] { background: var(--c-raised); box-shadow: var(--c-lift); }
+  :root[data-panes="frost"] .btn[aria-pressed="true"] { background: var(--c-edge); }
 
   /* ---------- panel ---------- */
   .side { position: fixed; top: 16px; right: 16px; bottom: 16px; width: var(--panel-w); display: flex; flex-direction: column; overflow: hidden; z-index: 20; transition: transform .26s cubic-bezier(.23, 1, .32, 1), opacity .2s ease; }
@@ -134,68 +170,77 @@
      edges, and a row's text sits 8 inside its fill. */
   /* the tab bar stays put and only the sections under it scroll, so nothing ever slides beneath it */
   /* the project, as Figma shows the file: its name at the top, a menu to switch or start a new one */
-  .projbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 20px 16px 4px; }
+  .projbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 16px 16px 4px; }
   /* zoom sits at the right of the project row, like Figma; its chevron lines up with the sections' (8 in, -8 out), and it
      overhangs the 24px row by 2 above and below so the row keeps its height */
   .proj { max-width: 100%; height: 24px; padding: 0 18px 0 0; border: 0; color: var(--c-text); font: var(--c-w-medium) var(--c-t-md)/24px var(--c-font); letter-spacing: var(--c-tr-snug); cursor: pointer; text-overflow: ellipsis;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 2px center no-repeat; }
-  .tabs { flex: none; display: flex; align-items: center; gap: 4px; padding: 6px 0 10px; border-bottom: 1px solid var(--c-line); }
+    background: var(--c-chev) right 2px center no-repeat; }
+  .tabs { flex: none; display: flex; align-items: center; gap: 4px; padding: 8px 0 8px; }
   .panes { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
   .panes::-webkit-scrollbar { display: none; }
   /* The tabs scroll sideways when they outgrow the panel, never squeeze; a fade marks the side with more. */
-  .tabbar { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 2px 12px; /* five tabs fit the 320 panel: 2 between, 6 inside each, 12 at the ends */ overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding: 0 16px; }
+  .tabbar { flex: 1; min-width: 0; display: flex; gap: 2px; padding: 2px 10px; /* five tabs fit the 320 panel: 2 between, 6 inside each, 12 at the ends */ overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; scroll-padding: 0 16px; }
   .tabbar::-webkit-scrollbar { display: none; }
   /* The mask stays on at all times and only its fade widths change: adding or removing a mask under the glass's
      backdrop blur rebuilds the layer, and the panel flashed every time the row reached an end. */
   .tabbar { --fl: 0px; --fr: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fl), #000 calc(100% - var(--fr)), transparent);
     transition: --fl .18s ease-out, --fr .18s ease-out; }
   .tabbar.more-l { --fl: 36px; } .tabbar.more-r { --fr: 36px; }
-  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 6px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); font-size: var(--c-t-sm); font-weight: var(--c-w-medium); cursor: pointer; }
+  .tab { flex: none; white-space: nowrap; height: 28px; padding: 0 7px; border: 0; border-radius: var(--c-r); background: none; color: var(--c-text-3); font-size: var(--c-t-sm); font-weight: var(--c-w-medium); cursor: pointer; transition: background-color var(--c-d-instant), color var(--c-d-instant); }
   .tab:hover { color: var(--c-text); }
   .tab:focus-visible { outline: none; color: var(--c-text); } /* no white ring after a click: the pill already shows where you are */
-  .tab[aria-selected="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
-  .zsel { flex: none; margin: -2px -8px -2px auto; width: 68px; height: 28px; padding: 0 22px 0 8px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text-2); font-size: var(--c-t-sm); font-variant-numeric: tabular-nums; text-align-last: right; justify-content: flex-end; cursor: pointer;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 8px center no-repeat; }
+  .tab[aria-selected="true"] { background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text); }
+  .zsel { flex: none; margin: -2px -8px -2px auto; width: 68px; height: 28px; padding: 0 22px 0 8px; border: 0; border-radius: var(--c-r); color: var(--c-text-2); font-size: var(--c-t-sm); font-variant-numeric: tabular-nums; text-align-last: right; justify-content: flex-end; cursor: pointer;
+    background: var(--c-chev) right 8px center no-repeat; }
   .zsel:hover { color: var(--c-text); background-color: var(--surf-hover); box-shadow: var(--surf-edge); }
-  .sect { padding: 14px 16px 16px; }
+  .sect { padding: 12px 16px; }
+  .sect:last-child { padding-bottom: 16px; }
   .sect.offtab { display: none; }
-  .sect:not(.offtab) ~ .sect:not(.offtab) { border-top: 1px solid var(--c-line); }
+  /* a tab's sections arrive the kit's way: up 6px out of a 3px blur, 40ms apart. Only when a tab opens (display
+     none to block starts the animation); nothing replays while you work in it */
+  .sect:not(.offtab) { animation: c-rise var(--c-d-calm) var(--c-ease) backwards; }
+  .sect:not(.offtab) ~ .sect:not(.offtab) { animation-delay: 40ms; } .sect:not(.offtab) ~ .sect:not(.offtab) ~ .sect:not(.offtab) { animation-delay: 80ms; }
+  @keyframes c-rise { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } }
+  @media (prefers-reduced-motion: reduce) { .sect:not(.offtab) { animation: none; } }
+  .sect:not(.offtab) ~ .sect:not(.offtab) { padding-top: 12px; }
   .st { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; border: 0; background: none; font-size: var(--c-t-sm); line-height: 20px; font-weight: var(--c-w-medium); text-align: left; cursor: pointer; }
   .st::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid var(--c-text-3); border-bottom: 1.5px solid var(--c-text-3); transform: translateY(-2px) rotate(45deg); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
   .sect.folded .st::after { transform: rotate(-45deg); }
   .sect.folded > :not(.st) { display: none !important; }
   .lbl { display: flex; justify-content: space-between; align-items: center; color: var(--c-text-2); line-height: var(--c-lh-ui); }
   .lbl output { color: var(--c-text); font-variant-numeric: tabular-nums; }
-  .seg { display: flex; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
+  .seg { display: flex; gap: 2px; padding: 2px; border-radius: var(--c-r); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
   /* pills share the width equally, but never get narrower than their text with 10 either side */
-  .pill { flex: 1 1 0; min-width: fit-content; height: 26px; padding: 0 10px; border: 0; border-radius: var(--c-r-pill); background: none; color: var(--c-text-2); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pill { flex: 1 1 0; min-width: fit-content; height: 24px; padding: 0 8px; border: 0; border-radius: var(--c-r-sm); background: none; color: var(--c-text-2); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .pill:hover { color: var(--c-text); }
-  .pill[aria-pressed="true"] { background: var(--surf-on); box-shadow: var(--surf-edge); color: var(--c-text); }
-  .range { display: block; width: 100%; height: 14px; -webkit-appearance: none; appearance: none; background: none; cursor: pointer; }
-  .range::-webkit-slider-runnable-track { height: 4px; border-radius: var(--c-r-pill); background: var(--surf-hover); box-shadow: var(--surf-edge); }
-  .range::-moz-range-track { height: 4px; border-radius: var(--c-r-pill); background: var(--surf-hover); }
-  .range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgb(0 0 0 / .35); }
-  .range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
-  .two { display: grid; grid-template-columns: 1fr 12px 1fr 30px; gap: 4px; align-items: center; }
-  .ibtn { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text-2); display: grid; place-items: center; cursor: pointer; }
+  .pill[aria-pressed="true"] { background: var(--surf-on); box-shadow: var(--c-lift), var(--surf-edge); color: var(--c-text); }
+  .range { display: block; width: 100%; height: 16px; -webkit-appearance: none; appearance: none; background: none; cursor: pointer; }
+  .range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--surf); box-shadow: inset 0 0 0 0.5px var(--c-edge-2); }
+  .range::-moz-range-track { height: 6px; border-radius: 3px; background: var(--surf); }
+  .range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%; background: var(--c-raised); border: 0; box-shadow: var(--c-lift-hover), 0 0 0 1px var(--c-edge-2); transition: transform var(--c-d-instant); }
+  .range:active::-webkit-slider-thumb { transform: scale(1.15); }
+  .range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--c-raised); border: 0; box-shadow: var(--c-lift-hover), 0 0 0 1px var(--c-edge-2); }
+  .two { display: grid; grid-template-columns: 1fr 12px 1fr 28px; gap: 4px; align-items: center; }
+  .ibtn { width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--c-r); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text-2); display: grid; place-items: center; cursor: pointer; }
   .ibtn:hover { background: var(--surf-hover); color: var(--c-text); }
   .ibtn svg { width: 12px; height: 12px; }
   .two span { color: var(--c-text-3); text-align: center; }
-  .num, .txt { display: block; width: 100%; height: 30px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); font-variant-numeric: tabular-nums; }
+  .num, .txt { display: block; width: 100%; height: 28px; padding: 0 10px; border: 0; border-radius: var(--c-r); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); font-variant-numeric: tabular-nums; }
   .num::-webkit-inner-spin-button { display: none; }
   .num:hover, .txt:hover { background-color: var(--surf-hover); }
-  select.txt { display: flex; align-items: center; cursor: pointer; padding-right: 32px; background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 12px center no-repeat; }
+  select.txt { display: flex; align-items: center; cursor: pointer; padding-right: 30px; background: var(--surf) var(--c-chev) right 10px center no-repeat; }
   .acts { display: flex; gap: 8px; }
-  .btn { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); cursor: pointer; display: grid; place-items: center; white-space: nowrap; }
+  .btn { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 0; border-radius: var(--c-r); font-weight: var(--c-w-medium); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); cursor: pointer; display: grid; place-items: center; white-space: nowrap; }
   .btn:hover { background: var(--surf-hover); }
-  .btn { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; } .btn:active:not(:disabled) { transform: scale(.97); } .btn:disabled { opacity: .45; cursor: default; }
+  .btn { transition: transform .15s cubic-bezier(.25, .46, .45, .94), background-color .15s ease; } .btn:active:not(:disabled) { transform: scale(.97); } .btn:disabled { background: var(--c-wash); color: var(--c-ink-4); cursor: default; }
   .chk { display: flex; align-items: center; justify-content: space-between; min-height: 20px; color: var(--c-text-2); cursor: pointer; }
   /* Selected is always the same translucent white as a selected pill, never a solid fill or a colour. */
-  .chk input[type=checkbox], .cghead input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 28px; height: 16px; margin: 0; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); position: relative; cursor: pointer; transition: background .2s; }
-  .chk input[type=checkbox]::before, .cghead input[type=checkbox]::before { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: rgb(255 255 255 / .55); transition: transform .25s cubic-bezier(.23, 1, .32, 1), background .2s; }
-  .chk input[type=checkbox]:checked, .cghead input[type=checkbox]:checked { background: var(--surf-on); } .chk input[type=checkbox]:checked::before, .cghead input[type=checkbox]:checked::before { transform: translateX(12px); background: #fff; }
+  /* the kit's switch: off is a grey track with a small grey knob, on is the primary's fill with a full knob */
+  .chk input[type=checkbox], .cghead input[type=checkbox] { appearance: none; -webkit-appearance: none; flex: none; width: 30px; height: 18px; margin: 0; border-radius: 9px; background: var(--surf); box-shadow: inset 0 0 0 1px var(--c-edge-2); position: relative; cursor: pointer; transition: background-color var(--c-d-quick), box-shadow var(--c-d-quick); }
+  .chk input[type=checkbox]::before, .cghead input[type=checkbox]::before { content: ""; position: absolute; left: 3px; top: 3px; width: 12px; height: 12px; border-radius: 6px; background: var(--c-mark-3); transform: scale(.67); transition: transform var(--c-d-std) var(--c-ease), background-color var(--c-d-quick); }
+  .chk input[type=checkbox]:checked, .cghead input[type=checkbox]:checked { background: var(--c-btn); box-shadow: none; } .chk input[type=checkbox]:checked::before, .cghead input[type=checkbox]:checked::before { transform: translateX(12px); background: var(--c-on-btn); }
   .swatch { flex: none; width: 20px; height: 20px; border: 0; padding: 0; border-radius: 50%; background: none; cursor: pointer; }
-  button.swatch { background: linear-gradient(var(--sw), var(--sw)), repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 0 / 8px 8px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+  button.swatch { background: linear-gradient(var(--sw), var(--sw)), repeating-conic-gradient(#888 0 25%, #ccc 0 50%) 0 0 / 8px 8px; box-shadow: inset 0 0 0 1px rgb(128 128 128 / .3); }
   .swrow { display: flex; flex-wrap: wrap; gap: 8px; }
   .swrow .swatch { width: 24px; height: 24px; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -208,29 +253,30 @@
   .cgroup.off .cgbody { opacity: .4; }
   .cgn { color: var(--c-text-3); font-size: var(--c-t-xs); }
   :where(.sect, .stack) > .cgroup + *, :where(.sect, .stack) > * + .cgroup { margin-top: 16px; }
-  .swatch::-webkit-color-swatch-wrapper { padding: 0; } .swatch::-webkit-color-swatch { border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+  .swatch::-webkit-color-swatch-wrapper { padding: 0; } .swatch::-webkit-color-swatch { border: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(128 128 128 / .3); }
   .swatch::-moz-color-swatch { border: 0; border-radius: 50%; }
   .note { color: var(--c-text-3); line-height: var(--c-lh-ui); text-wrap: balance; }
   .note:empty { display: none; }
   .steps { padding: 0; list-style: none; counter-reset: s; }
-  .steps li { counter-increment: s; display: flex; gap: 8px; align-items: center; height: 28px; padding: 0 8px; border-radius: var(--c-r-pill); color: var(--c-text-2); cursor: pointer; }
+  .steps li { counter-increment: s; display: flex; gap: 8px; align-items: center; height: 28px; padding: 0 8px; border-radius: var(--c-r); color: var(--c-text-2); cursor: pointer; }
   .steps li::before { content: counter(s); width: 12px; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
   .steps li span { margin-left: auto; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
   .steps li + li { margin-top: 2px; }
   .steps li:hover { background: var(--c-fill); }
-  .steps li.cur { background: rgb(255 255 255 / .16); color: var(--c-text); }
+  .steps li.cur { background: var(--surf); color: var(--c-text); font-weight: var(--c-w-medium); }
   .keys { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; color: var(--c-text-2); }
   .keys dt { color: var(--c-text-2); } .keys dd { margin: 0; text-align: right; }
-  kbd { font: inherit; display: inline-block; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--c-r-xs); background: var(--c-fill); color: var(--c-text); line-height: 20px; text-align: center; }
+  kbd { font: var(--c-w-medium) var(--c-t-xs)/20px var(--c-font); display: inline-block; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--c-r-sm); background: var(--c-fill); color: var(--c-text-2); text-align: center; }
   kbd + kbd { margin-left: 4px; }
-  .btn[aria-pressed="true"] { background: var(--surf-on); }
+  .btn[aria-pressed="true"] { background: var(--c-edge-2); color: var(--c-ink); } /* a tool in hand (Note, Cut): a step darker, never the white of a raised pill on a white panel */
+  :root[data-panes="glass"] .btn[aria-pressed="true"] { background: var(--surf-on); }
   /* design list, like layers: a lettered mark for each design on screen, an empty ring for the rest */
   .dlist { padding: 0; list-style: none; }
-  .dlist li { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 5px; border-radius: var(--c-r-pill); color: var(--c-text-2); cursor: pointer; user-select: none; }
+  .dlist li { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px 0 4px; border-radius: var(--c-r); color: var(--c-text-2); cursor: pointer; user-select: none; }
   .dlist li + li { margin-top: 2px; }
   .dlist li:hover { background: var(--c-fill); color: var(--c-text); }
   .dlist li.on { color: var(--c-text); }
-  .dlist li.full { opacity: .4; cursor: default; } .dlist li.full:hover { background: none; color: var(--c-text-2); }
+  .dlist li.full { color: var(--c-ink-4); cursor: default; } .dlist li.full:hover { background: none; color: var(--c-text-2); }
   /* a variant sits under its scene, indented like a child layer */
   .dlist li.var { padding-left: 28px; }
   .dlist li > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -241,20 +287,20 @@
   .dlist li.fh { height: 28px; padding-left: 8px; color: var(--c-text); font-weight: var(--c-w-medium); }
   .dlist li.fh + li.sub { margin-top: 0; }
   .dlist li.sub + li:not(.sub) { margin-top: 8px; }
-  .dlist li.sub { height: 30px; }
+  .dlist li.sub { height: 28px; }
   .dlist li .vn { flex: none; min-width: 22px; color: var(--c-text); font-variant-numeric: tabular-nums; }
   .dlist li .vd { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-3); }
   .dlist li.on .vd, .dlist li:hover .vd { color: var(--c-text-2); }
-  .dlist li.lost { opacity: .5; }
-  .dlist li .star { flex: none; color: #4da6ff; }
-  .chip { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border: 0; border-radius: var(--c-r-pill); background: var(--c-fill); color: var(--c-text-2); font: inherit; font-size: var(--c-t-ui); cursor: pointer; }
-  .chip:hover { color: var(--c-text); background: var(--c-line-2); }
-  .chip.on { background: rgb(255 255 255 / .22); color: var(--c-text); }
+  .dlist li.lost { color: var(--c-ink-4); }
+  .dlist li .star { flex: none; color: var(--c-accent); }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border: 0; border-radius: var(--c-r-sm); background: var(--c-fill); color: var(--c-text-2); font: inherit; font-size: var(--c-t-ui); cursor: pointer; }
+  .chip:hover { color: var(--c-text); background: var(--c-hover); }
+  .chip.on { background: var(--c-btn); color: var(--c-on-btn); }
   .chip b { font-weight: var(--c-w-medium); }
   .chip .x { margin: 0 -4px 0 0; visibility: hidden; } .chip:hover .x { visibility: visible; }
   .lay { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   /* a note's snapshot: what was under the pin when it was made */
-  .snap { display: block; width: 100%; margin-top: 8px; border-radius: var(--c-r-xs); background: rgb(0 0 0 / .3); }
+  .snap { display: block; width: 100%; margin-top: 8px; border-radius: var(--c-r-sm); background: var(--c-fill); }
   .notes .snap { max-height: 72px; object-fit: cover; object-position: center; }
   .subrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .link { flex: none; padding: 0; border: 0; background: none; color: var(--c-text-2); line-height: var(--c-lh-ui); cursor: pointer; }
@@ -263,16 +309,16 @@
   /* in the list the mark is only a state: a small dot on the one on screen, or with several on screen, a letter
      (A to E, matching the screen) on each one that's on. Nothing on the rest. Same 20px slot, so text never moves. */
   .dlist .mk { box-shadow: none; }
-  .dlist:not(.many) li.on .mk::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(255 255 255 / .9); }
-  .dlist.many li.on .mk { background: rgb(255 255 255 / .88); color: #0b0b0f; }
+  .dlist:not(.many) li.on .mk::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c-ink); }
+  .dlist.many li.on .mk { background: var(--c-btn); color: var(--c-on-btn); }
   .ver { margin-left: auto; color: var(--c-text-3); font-variant-numeric: tabular-nums; }
   .sub { color: var(--c-text); font-weight: var(--c-w-medium); line-height: var(--c-lh-ui); }
   #ctls > .stack + .stack { margin-top: 16px; }
   .hint { color: var(--c-text-3); line-height: var(--c-lh-ui); }
   /* notes list: the number matches the pin on the screen */
   .notes { padding: 0; list-style: none; }
-  .notes li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--c-r-md); cursor: pointer; }
-  .notes li + li { margin-top: 2px; }
+  .notes li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: var(--c-r); cursor: pointer; }
+  .notes li + li { margin-top: 4px; } /* twice the 2 inside a note, so a note's meta never runs into the next note */
   .notes li:hover { background: var(--c-fill); }
   /* notes come in sittings, newest first; an older sitting with nothing open folds to its header */
   .notes li.sit { align-items: center; gap: 6px; height: 28px; padding: 0 8px; color: var(--c-text-2); font-size: var(--c-t-ui); }
@@ -282,9 +328,9 @@
   .notes li.sit.shut::before { transform: rotate(-45deg); }
   .notes li.sit .ver { font-size: var(--c-t-ui); }
   /* the list number matches its pin; a done note keeps only the ring, like a design that is off */
-  .nbadge { flex: none; box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 5px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .22); color: var(--c-text); display: grid; place-items: center; font-size: var(--c-t-xs); font-weight: var(--c-w-medium); font-variant-numeric: tabular-nums; } /* a circle for one digit, a pill with room on both sides for two */
-  .notes li.done .nbadge { background: none; box-shadow: inset 0 0 0 1.5px var(--c-line-2); color: var(--c-text-3); }
-  .notes li.done .nt { color: var(--c-text-3); text-decoration: line-through; text-decoration-color: var(--c-line-2); }
+  .nbadge { flex: none; box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 5px; border-radius: var(--c-r-pill); background: var(--c-btn); color: var(--c-on-btn); display: grid; place-items: center; font-size: var(--c-t-xs); font-weight: var(--c-w-medium); font-variant-numeric: tabular-nums; } /* a circle for one digit, a pill with room on both sides for two */
+  .notes li.done .nbadge { background: var(--c-fill); box-shadow: none; color: var(--c-text-3); }
+  .notes li.done .nt { color: var(--c-text-3); text-decoration: line-through; text-decoration-color: var(--c-mark-3); }
   .nb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
   .nt { color: var(--c-text); line-height: var(--c-lh-ui); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .nt i { color: var(--c-text-3); font-style: normal; }
@@ -315,23 +361,23 @@
   /* pins keep one size at any zoom */
   /* a pin is a small glass chip, like the A and B labels, so it reads on light and dark designs alike */
   /* centred by flex on the number's own box, tabular figures, and a pill once it needs two digits */
-  .pin { position: absolute; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
-    background: rgb(40 40 46 / .72); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .4), 0 2px 8px rgb(0 0 0 / .35);
+  .pin { position: absolute; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--c-r-pill); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+    background: var(--c-btn); color: var(--c-on-btn);
+    box-shadow: 0 0 0 1.5px var(--c-surface), 0 2px 8px rgb(0 0 0 / .3);
     translate: -50% -50%; transform: scale(calc(1 / var(--k, 1))); cursor: pointer; pointer-events: auto; transition: background .15s, box-shadow .15s; }
-  .pin:hover, .pin.open { background: rgb(80 80 88 / .85); box-shadow: inset 0 0 0 1.5px #fff, 0 2px 8px rgb(0 0 0 / .35); }
+  .pin:hover, .pin.open { background: var(--c-accent); color: var(--c-on-accent); box-shadow: 0 0 0 1.5px var(--c-surface), 0 2px 8px rgb(0 0 0 / .3); }
   .pin.flash { animation: pinflash .9s cubic-bezier(.23, 1, .32, 1); }
   @keyframes pinflash { 30% { transform: scale(calc(1.5 / var(--k, 1))); } }
   /* a note on words: a soft wash under them, a little stronger while its note is open */
-  .whl { position: absolute; border-radius: 2px; background: rgb(77 166 255 / .14); box-shadow: 0 1.5px 0 rgb(77 166 255 / .55); pointer-events: none; }
-  .whl.on { background: rgb(77 166 255 / .24); box-shadow: 0 1.5px 0 #4da6ff; }
+  .whl { position: absolute; border-radius: 2px; background: color-mix(in srgb, var(--c-accent) 14%, transparent); box-shadow: 0 1.5px 0 color-mix(in srgb, var(--c-accent) 55%, transparent); pointer-events: none; }
+  .whl.on { background: color-mix(in srgb, var(--c-accent) 24%, transparent); box-shadow: 0 1.5px 0 var(--c-accent); }
   /* the chip that comes up over selected words */
-  .wordchip { position: fixed; z-index: 58; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px 0 10px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); cursor: pointer;
+  .wordchip { position: fixed; z-index: 58; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 5px 0 10px; border: 0; border-radius: var(--c-r); color: var(--c-text); font: var(--c-w-medium) var(--c-t-ui)/1 var(--c-font); cursor: pointer;
     animation: chipin .16s cubic-bezier(.23, 1, .32, 1); }
   .wordchip[hidden] { display: none; }
-  .wordchip.glass { background: rgb(40 40 46 / .94); box-shadow: 0 4px 16px rgb(0 0 0 / .45); } /* solid enough to read over the words it sits on */
-  .wordchip .key { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .12); color: var(--c-text-3); font-size: var(--c-t-xs); }
-  @keyframes chipin { from { opacity: 0; transform: translateY(4px); } }
+  .wordchip.glass { background: var(--c-surface); box-shadow: var(--c-float); } /* solid enough to read over the words it sits on */
+  .wordchip .key { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 4px; background: var(--c-fill); color: var(--c-text-3); font-size: var(--c-t-xs); }
+  @keyframes chipin { from { opacity: 0; transform: translateY(4px) scale(.92); } }
   @media (prefers-reduced-motion: reduce) { .wordchip { animation: none; } }
   /* the words a note is on, quoted in the list and the editor */
   .nq { color: var(--c-text-2); line-height: var(--c-lh-ui); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -347,9 +393,9 @@
   body.through .catch { display: none; }
   body.through .cutbox { display: none !important; }
   /* Cut: the element under the pointer, outlined, with its name and size. Arrow keys walk to its parent and child. */
-  .cutbox { position: fixed; z-index: 55; display: none; pointer-events: none; border-radius: var(--c-r-xs); background: rgb(77 166 255 / .1); box-shadow: 0 0 0 1.5px #4da6ff; }
+  .cutbox { position: fixed; z-index: 55; display: none; pointer-events: none; border-radius: var(--c-r-xs); background: color-mix(in srgb, var(--c-accent) 10%, transparent); box-shadow: 0 0 0 1.5px var(--c-accent); }
   body.cutting .cutbox.on { display: block; }
-  .cutbox span { position: absolute; left: -1.5px; bottom: calc(100% + 6px); height: 20px; padding: 0 8px; border-radius: var(--c-r-pill); background: #4da6ff; color: #05070d; font: var(--c-w-medium) var(--c-t-xs)/20px var(--c-font); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cutbox span { position: absolute; left: -1.5px; bottom: calc(100% + 6px); height: 20px; padding: 0 8px; border-radius: var(--c-r-sm); background: var(--c-accent); color: var(--c-on-accent); font: var(--c-w-medium) var(--c-t-xs)/20px var(--c-font); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .cutbox.below span { bottom: auto; top: calc(100% + 6px); }
   /* Focus: a screen crops to one element. Its chrome, pins and resize handles step aside. */
   .frame.focus { border-radius: var(--c-r-md); }
@@ -380,31 +426,44 @@
   /* tools: one quiet fill for the drawing tools; the one in hand gets a lighter fill, not blue */
   .poptools { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
   .poptools .gap, .popacts .gap { flex: 1; }
-  .tseg { display: flex; gap: 2px; padding: 2px; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); }
-  .ptool { flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
+  .tseg { display: flex; gap: 2px; padding: 2px; border-radius: var(--c-r); background: var(--surf); box-shadow: var(--surf-edge); }
+  .ptool { flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--c-r-sm); background: none; color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
   .ptool:hover { color: var(--c-text); }
-  .ptool[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); }
+  .ptool[aria-pressed="true"] { background: var(--surf-on); box-shadow: var(--c-lift); color: var(--c-text); }
   .ptool svg { width: 14px; height: 14px; }
   .ptool[hidden] { display: none; }
-  .pchip { flex: none; height: 28px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-2); font: inherit; cursor: pointer; white-space: nowrap; }
+  .pchip { flex: none; height: 28px; padding: 0 10px; border: 0; border-radius: var(--c-r); font-weight: var(--c-w-medium); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-2); font: inherit; cursor: pointer; white-space: nowrap; }
   .pchip:hover { background: var(--surf-hover); color: var(--c-text); }
   .pchip[aria-pressed="true"] { background: var(--surf-on); color: var(--c-text); }
   .pchip[hidden] { display: none; }
   /* Edit CSS: one block, names in grey and values in white, two to a row (padding and margin get a row each) */
-  .popcss { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 8px; padding: 4px 12px; border-radius: var(--c-r-sm); background: var(--surf); box-shadow: var(--surf-edge); }
+  /* Edit CSS: every value is a field you can use (Eric, Nov 17: "since this is interactive, make it feel like it"). A filled
+     kit input per property; drag a numeric label sideways to scrub it (⇧ for tens), type, or ↑ ↓. A changed value gets
+     the accent dot and its label in ink; double-click the label to put it back. Colours: the swatch opens the picker,
+     the hex beside it types. */
+  .popcss { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
   .popcss[hidden] { display: none; }
-  .cssf { display: flex; align-items: center; gap: 8px; min-width: 0; height: 30px; }
-  .cssf span { flex: none; color: var(--c-text-3); }
+  .cssf { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; height: 32px; padding: 0 10px; border-radius: var(--c-r); background: var(--surf); cursor: text;
+    transition: background var(--c-d-instant, 100ms), box-shadow var(--c-d-instant, 100ms); }
+  .cssf:hover { background: var(--surf-hover); }
+  .cssf:focus-within { background: var(--c-surface); box-shadow: 0 0 0 1.5px var(--c-accent); }
+  .cssf span { flex: none; display: flex; align-items: center; gap: 6px; color: var(--c-text-3); user-select: none; }
+  .cssf.num span { cursor: ew-resize; }
+  .cssf.num span:hover, .cssf.scrub span { color: var(--c-text); }
+  .cssf.scrub { background: var(--c-surface); box-shadow: 0 0 0 1.5px var(--c-accent); }
   .cssf.on span { color: var(--c-text); }
+  .cssf.on span::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--c-accent); }
   .cssf input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: var(--c-text); font: inherit; text-align: right; font-variant-numeric: tabular-nums; }
   .cssf input:focus { outline: none; }
-  .cssf .swatch { margin-left: auto; }
+  .cssf .swatch { flex: none; width: 18px; height: 18px; }
+  .cssf.col { grid-column: 1 / -1; } .cssf.col input { text-transform: lowercase; } /* a hex with alpha needs the room */
   .cssf.wide { grid-column: 1 / -1; }
+  html.scrubbing, html.scrubbing * { cursor: ew-resize !important; user-select: none; }
   /* the end: Delete is a quiet bin, Resolve and Save are grey, Send is the one blue pill; each as wide as its word */
   .popacts { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
   .popacts .btn { flex: none; padding: 0 14px; }
   .popacts .btn[hidden] { display: none; }
-  .pbin { flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
+  .pbin { flex: none; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--c-r); background: var(--surf); box-shadow: var(--surf-edge); color: var(--c-text-3); display: grid; place-items: center; cursor: pointer; }
   .pbin:hover { background: var(--surf-hover); color: var(--c-text); }
   .pbin svg { width: 14px; height: 14px; }
   /* Eric, Nov 16: "some of the buttons are too small and the corners are too rounded". Every control in a note is
@@ -414,14 +473,14 @@
   /* one rhythm (Nov 16): 16 around, 12 between every row; what sits in the card is a control (8) */
   .notepop > :not(:first-child) { margin-top: 12px; }
   .notepop .thread { border-radius: var(--c-r-sm); }
-  .notepop .ptool, .notepop .pbin { width: 32px; height: 32px; } .notepop .ptool svg, .notepop .pbin svg { width: 16px; height: 16px; }
+  .notepop .ptool { width: 28px; height: 28px; } .notepop .pbin { width: 32px; height: 32px; } .notepop .ptool svg, .notepop .pbin svg { width: 16px; height: 16px; }
   .notepop .pchip, .notepop .btn { height: 32px; }
   .notepop .nbadge { min-width: 24px; height: 24px; }
   /* Markup on a note: blue strokes with a dark edge under them, so they read on light and dark designs. Only while
      its note is open or its pin is pointed at; nothing stays on the design. */
   .ink { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; display: none; }
   .ink.on, .ink.hover { display: block; }
-  .ink path { fill: none; stroke: var(--c-accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  .ink path { fill: none; stroke: #4da6ff; /* one marker blue in both themes: it is baked into snapshots and the brief calls it blue */ stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
   .ink path.halo { stroke: rgb(0 0 0 / .45); stroke-width: 5; }
   body.marking .catch { display: block; cursor: crosshair; }
   body.marking .rz { pointer-events: none; } /* a stroke that starts at the screen's edge draws, never resizes */
@@ -433,13 +492,13 @@
   .notelinks[hidden] { display: none; }
   .notelinks .link { font-size: var(--c-t-ui); }
   .notelinks .link:hover { color: var(--c-text); }
-  .toast { position: fixed; top: 16px; left: 16px; right: calc(var(--panel-w) + 32px); width: max-content; margin: 0 auto; z-index: 40; padding: 0 14px; height: 32px; border-radius: var(--c-r-pill); line-height: 32px; animation: toastin .22s cubic-bezier(.23, 1, .32, 1); }
-  @keyframes toastin { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
-  .drop { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: rgb(0 0 0 / .4); font-size: var(--c-t-lg); }
+  .toast { position: fixed; top: 16px; left: 16px; right: calc(var(--panel-w) + 32px); width: max-content; margin: 0 auto; z-index: 40; padding: 0 12px; height: 32px; border-radius: var(--c-r) !important; line-height: 32px; font-weight: var(--c-w-medium); animation: toastin .22s var(--c-ease); }
+  @keyframes toastin { from { opacity: 0; transform: translateY(-4px) scale(.96); filter: blur(3px); } }
+  .drop { position: fixed; inset: 0; z-index: 50; display: none; place-items: center; background: var(--c-pane); color: var(--c-ink); font-size: var(--c-t-lg); font-weight: var(--c-w-medium); }
   .drop.show { display: grid; }
 
   /* ---------- timeline bar ---------- */
-  .transport { position: fixed; left: 16px; right: calc(var(--panel-w) + 32px); bottom: 16px; max-width: 960px; margin: 0 auto; z-index: 30; padding: 12px; transition: transform .26s cubic-bezier(.23, 1, .32, 1), opacity .2s ease, right .26s cubic-bezier(.23, 1, .32, 1); }
+  .transport { position: fixed; left: 16px; right: calc(var(--panel-w) + 32px); bottom: 16px; max-width: 960px; margin: 0 auto; z-index: 30; padding: 14px; transition: transform .26s cubic-bezier(.23, 1, .32, 1), opacity .2s ease, right .26s cubic-bezier(.23, 1, .32, 1); }
   :root[data-panel="off"] .transport { right: 16px; }
   :root[data-bar="off"] .transport { transform: translateY(calc(100% + 32px)); opacity: 0; pointer-events: none; }
   /* A prototype's bar: Restart and its name, nothing to scrub. */
@@ -452,46 +511,198 @@
   /* Bar rhythm: 12 in from every edge. Transport buttons sit 4 apart, every other group 12. */
   .trow { display: flex; align-items: center; gap: 12px; height: 32px; }
   .tgroup { display: flex; align-items: center; gap: 4px; flex: none; }
-  .tbtn { height: 32px; padding: 0 12px; border: 0; border-radius: var(--c-r-pill); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text); cursor: pointer; flex: none; display: grid; place-items: center; }
+  .tbtn { height: 32px; padding: 0 12px; border: 0; border-radius: var(--c-r); font-weight: var(--c-w-medium); background: var(--surf); -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); color: var(--c-text); cursor: pointer; flex: none; display: grid; place-items: center; }
   .tbtn:hover { background: var(--surf-hover); }
   .tbtn.ic { width: 32px; padding: 0; }
   .tbtn svg { width: 10px; height: 10px; }
   /* play is the main action: the same glass, a step brighter, pause while playing */
-  #play { width: 32px; height: 32px; background: var(--surf-on); color: var(--c-text); transition: transform .15s cubic-bezier(.25, .46, .45, .94), background .15s ease; }
-  #play:hover { background: color-mix(in srgb, var(--surf-on), white 8%); } #play:active { transform: scale(.97); }
+  #play { width: 32px; height: 32px; background: var(--c-btn); color: var(--c-on-btn); box-shadow: none; transition: transform .15s cubic-bezier(.25, .46, .45, .94), background .15s ease; }
+  #play:hover { background: color-mix(in srgb, var(--c-btn) 86%, var(--c-surface)); } #play:active { transform: scale(.97); }
   #play svg { width: 11px; height: 11px; } #play .i-play { margin-left: 1px; }
   #play .i-pause, #play.on .i-play { display: none; } #play.on .i-pause { display: block; }
   /* times sit either side of the scrubber: elapsed in white, the total dimmer. Fixed width so nothing shifts as digits change. */
   .clock { flex: none; width: 36px; font-size: var(--c-t-ui); letter-spacing: .01em; font-variant-numeric: tabular-nums; }
-  .clock.now { color: var(--c-text); text-align: right; } .clock.total { color: rgb(255 255 255 / .45); }
+  .clock.now { color: var(--c-text); text-align: right; } .clock.total { color: var(--c-ink-4); }
   .scrubwrap { flex: 1; min-width: 80px; position: relative; height: 16px; }
   #scrub { width: 100%; display: block; position: relative; z-index: 1; -webkit-appearance: none; appearance: none; background: none; height: 16px; margin: 0; cursor: pointer; }
   /* the slider's own track is invisible; the chapter segments below draw it */
   #scrub::-webkit-slider-runnable-track { height: 4px; background: transparent; }
   #scrub::-moz-range-track { height: 4px; background: transparent; }
-  #scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 0.5px rgb(0 0 0 / .12), 0 1px 2px rgb(0 0 0 / .3), 0 3px 8px rgb(0 0 0 / .25); transition: transform .12s ease; }
-  #scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; border: 0; background: #fff; box-shadow: 0 0 0 0.5px rgb(0 0 0 / .12), 0 1px 2px rgb(0 0 0 / .3), 0 3px 8px rgb(0 0 0 / .25); }
+  #scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; border: 0; background: var(--c-raised); box-shadow: var(--c-lift-hover), 0 0 0 1px var(--c-edge-2); transition: transform .12s ease; }
+  #scrub::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; border: 0; background: var(--c-raised); box-shadow: var(--c-lift-hover), 0 0 0 1px var(--c-edge-2); }
   #scrub:hover::-webkit-slider-thumb { transform: scale(1.1); } #scrub:active::-webkit-slider-thumb { transform: scale(1.2); }
-  #scrub:focus-visible { outline: none; } #scrub:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgb(255 255 255 / .35), 0 1px 2px rgb(0 0 0 / .3); }
+  #scrub:focus-visible { outline: none; } #scrub:focus-visible::-webkit-slider-thumb { box-shadow: var(--c-lift-hover), 0 0 0 2px var(--c-focus); }
   /* Chapters: one segment per step, 2 apart, each filling white as its step plays. They span the thumb's travel
      (7 in from each end), so a step's start sits exactly in the gap before its segment. */
   .ticks { position: absolute; left: 7px; right: 7px; top: 6px; height: 4px; pointer-events: none; z-index: 0; }
-  .ticks i { position: absolute; top: 0; height: 4px; border-radius: var(--c-r-pill); background: rgb(255 255 255 / .18); overflow: hidden; transition: transform .15s ease; }
-  .ticks b { display: block; height: 100%; background: #fff; transform: scaleX(0); transform-origin: left; }
+  .ticks i { position: absolute; top: 0; height: 4px; border-radius: var(--c-r-pill); background: var(--c-mark-4); overflow: hidden; transition: transform .15s ease; }
+  .ticks b { display: block; height: 100%; background: var(--c-ink); transform: scaleX(0); transform-origin: left; }
   .scrubwrap:hover .ticks i { transform: scaleY(1.5); }
   /* speed: a menu, 32 tall like the buttons beside it (four or more choices are always a menu, never pills) */
-  .spd { flex: none; height: 32px; padding: 0 28px 0 12px; border: 0; border-radius: var(--c-r-pill); color: var(--c-text); font-size: var(--c-t-ui); font-variant-numeric: tabular-nums; cursor: pointer;
-    background: var(--surf) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-opacity='.7' stroke-width='1.3'/%3E%3C/svg%3E") right 12px center no-repeat;
+  .spd { flex: none; height: 32px; padding: 0 28px 0 12px; border: 0; border-radius: var(--c-r); color: var(--c-text); font-size: var(--c-t-ui); font-weight: var(--c-w-medium); font-variant-numeric: tabular-nums; cursor: pointer;
+    background: var(--surf) var(--c-chev) right 12px center no-repeat;
     -webkit-backdrop-filter: var(--surf-blur); backdrop-filter: var(--surf-blur); box-shadow: var(--surf-edge); }
   .spd:hover { background-color: var(--surf-hover); }
   .mrow { display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; }
   .marks { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; }
-  .mark { height: 24px; padding: 0 8px; border: 0; border-radius: var(--c-r-pill); background: none; color: rgb(255 255 255 / .55); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .mark span { font-size: var(--c-t-xs); font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .35); }
-  .mark.cur span { color: rgb(255 255 255 / .55); }
-  .mark.past { color: rgb(255 255 255 / .75); }
-  .mark:hover, .mark.cur { background: rgb(255 255 255 / .14); color: var(--c-text); }
-  .stepn { flex: none; line-height: 24px; font-size: var(--c-t-xs); color: rgb(255 255 255 / .45); font-variant-numeric: tabular-nums; }
+  .mark { height: 24px; padding: 0 8px; border: 0; border-radius: var(--c-r-sm); background: none; color: var(--c-ink-3); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background-color var(--c-d-instant), color var(--c-d-instant); }
+  .mark span { font-size: var(--c-t-xs); font-variant-numeric: tabular-nums; color: var(--c-ink-4); }
+  .mark.cur span { color: var(--c-ink-3); }
+  .mark.past { color: var(--c-ink-2); }
+  .mark:hover, .mark.cur { background: var(--surf); color: var(--c-text); }
+  .mark.cur { font-weight: var(--c-w-medium); }
+  .stepn { flex: none; line-height: 24px; font-size: var(--c-t-xs); color: var(--c-ink-4); font-variant-numeric: tabular-nums; }
+
+  /* ---------- Annotate (Nov 17): Agentation's and Cursor's flow, drawn with the gen UI kit's parts ----------
+     The hover outline names the element (Cursor, Agentation); the note is the kit's Popover holding the kit's Input,
+     its tools the kit's icon buttons, its tips the kit's Tooltip; markers are the accent, numbered, and pop in. */
+  body.noting .cutbox.on { display: block; }
+  body.noting.texting .cutbox, body.marking .cutbox { display: none !important; }
+  .cutbox { border-radius: var(--c-r-sm); background: color-mix(in srgb, var(--c-accent) 8%, transparent); box-shadow: 0 0 0 1.5px var(--c-accent); transition: left 70ms var(--c-ease), top 70ms var(--c-ease), width 70ms var(--c-ease), height 70ms var(--c-ease); }
+  .cutbox span { height: 22px; padding: 0 8px; border-radius: var(--c-r-sm); background: var(--c-btn); color: var(--c-on-btn); font: var(--c-w-medium) var(--c-t-xs)/22px var(--c-font); box-shadow: var(--c-float); }
+  /* the bar */
+  .annobar { position: fixed; top: 16px; left: 16px; right: calc(var(--panel-w) + 32px); z-index: 41; width: max-content; max-width: calc(100% - var(--panel-w) - 48px); margin: 0 auto; display: flex; align-items: center; gap: 16px; padding: 6px 6px 6px 16px; border-radius: var(--c-r-lg); animation: annoin var(--c-d-std) var(--c-ease); }
+  :root[data-panel="off"] .annobar { right: 16px; max-width: calc(100% - 32px); }
+  .annobar[hidden] { display: none; }
+  .ahint { display: inline-flex; align-items: center; gap: 6px; color: var(--c-ink-3); white-space: nowrap; }
+  .ahint kbd { min-width: 0; height: 20px; padding: 0 6px; border-radius: var(--c-r-sm); background: var(--c-wash-2); color: var(--c-ink); font: var(--c-w-medium) var(--c-t-xs)/20px var(--c-font); }
+  .agap { flex: none; width: 0; }
+  .asay { color: var(--c-ink); font-weight: var(--c-w-medium); white-space: nowrap; animation: tipin 160ms var(--c-ease); }
+  .annobar.saying .ahint { display: none; }
+  .annobar .btn { flex: none; height: 32px; padding: 0 12px; display: inline-flex; gap: 8px; }
+  .annobar .btn em { font-style: normal; font-variant-numeric: tabular-nums; opacity: .7; }
+  .annobar .btn em:empty { display: none; }
+  @keyframes annoin { from { opacity: 0; transform: translateY(-6px); filter: blur(3px); } }
+  body.noting .toast { top: 68px; } /* one-off hints sit under the bar */
+  @media (max-width: 1240px) { .ahint:nth-of-type(n+4) { display: none; } }
+  /* the note: the kit's Popover */
+  .notepop { width: 300px; padding: 12px; border-radius: var(--c-r-md); }
+  .notepop > :not(:first-child) { margin-top: 8px; }
+  .notepop .pophead { gap: 8px; min-height: 24px; }
+  .notepop .nbadge { min-width: 20px; height: 20px; background: var(--c-edge); color: var(--c-ink); }
+  .popwhat { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--c-w-medium); color: var(--c-ink); }
+  .popwhat:empty { display: none; }
+  .notepop .pophead .nm { flex: 1 1 auto; font-size: var(--c-t-xs); }
+  .popfield { border-radius: var(--c-r); background: var(--c-surface); box-shadow: inset 0 0 0 1px var(--c-edge); padding: 6px 8px; transition: box-shadow var(--c-d-quick); }
+  .popfield:hover { box-shadow: inset 0 0 0 1px var(--c-edge-2); }
+  .popfield:focus-within { box-shadow: inset 0 0 0 1px var(--c-edge-2), 0 0 0 1px var(--c-edge-2); }
+  .notepop .popfield textarea { margin: 0; min-height: 60px; }
+  .notepop textarea::placeholder { color: var(--c-ink-4); }
+  :root[data-panes="glass"] .popfield { background: rgb(255 255 255 / .06); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
+  .popshot .snap { height: 40px; border-radius: var(--c-r-sm); }
+  .popshot .popcut { font-size: var(--c-t-xs); color: var(--c-ink-3); }
+  /* tools: the kit's quiet icon buttons, no track */
+  .poptools { gap: 2px; margin-left: -4px; }
+  .poptools .tseg { gap: 2px; padding: 0; background: none; box-shadow: none; }
+  .notepop .ptool, .notepop .pchip { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; border-radius: var(--c-r); background: none; box-shadow: none; color: var(--c-ink-3); transition: background-color var(--c-d-instant), color var(--c-d-instant), transform var(--c-d-instant); }
+  .notepop .ptool:hover, .notepop .pchip:hover { background: var(--c-wash-2); color: var(--c-ink); }
+  .notepop .ptool:active, .notepop .pchip:active { transform: scale(.96); }
+  .notepop .ptool[aria-pressed="true"], .notepop .pchip[aria-pressed="true"] { background: var(--c-wash-2); color: var(--c-ink); box-shadow: none; }
+  .notepop .ptool svg, .notepop .pchip svg { width: 16px; height: 16px; }
+  /* the foot: the bin, then Resolve, Cancel and the one primary, small, sized to their words */
+  .notepop .popacts { gap: 6px; margin-top: 12px; }
+  .notepop .popacts .btn { height: 28px; padding: 0 10px; border-radius: var(--c-r); }
+  .notepop .pbin { width: 28px; height: 28px; border-radius: var(--c-r); background: none; color: var(--c-ink-3); }
+  .notepop .pbin:hover { background: var(--c-wash-2); color: var(--c-bad); }
+  .notepop .pbin svg { width: 16px; height: 16px; }
+  .notepop [hidden] { display: none !important; }
+  /* the kit's Tooltip, on anything with data-tip in the note and the bar */
+  :is(.notepop, .annobar) [data-tip] { position: relative; }
+  :is(.notepop, .annobar) [data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); translate: -50% 0; z-index: 6; padding: 4px 8px; border-radius: 6px; background: var(--c-btn); color: var(--c-on-btn);
+    font: 400 var(--c-t-xs)/16px var(--c-font); white-space: nowrap; pointer-events: none; animation: tipin 140ms var(--c-ease); }
+  @keyframes tipin { from { opacity: 0; transform: translateY(2px); } }
+  /* markers: the accent, numbered, a ring of the panel colour so they read on any design; they pop in, and the note shows on hover */
+  .pin { background: var(--c-accent); color: var(--c-on-accent); box-shadow: 0 0 0 2px #fff, 0 2px 8px rgb(0 0 0 / .28); transition: box-shadow var(--c-d-instant), transform var(--c-d-instant); }
+  .pin:hover, .pin.open { background: var(--c-accent); color: var(--c-on-accent); box-shadow: 0 0 0 2px #fff, 0 0 0 4px color-mix(in srgb, var(--c-accent) 45%, transparent), 0 2px 8px rgb(0 0 0 / .28); }
+  .pin.new { animation: pinpop 220ms var(--c-spring); }
+  @keyframes pinpop { from { transform: scale(calc(.5 / var(--k, 1))); opacity: 0; } }
+  .pin[data-tip]:not(.open):hover::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 8px); translate: -50% 0; width: max-content; max-width: 240px; padding: 6px 10px; border-radius: var(--c-r); background: var(--c-btn); color: var(--c-on-btn);
+    font: 400 var(--c-t-xs)/16px var(--c-font); text-align: left; white-space: normal; pointer-events: none; animation: tipin 140ms var(--c-ease); }
+  .pins .area { background: color-mix(in srgb, var(--c-accent) 6%, transparent); box-shadow: none; outline: calc(1.5px / var(--k, 1)) dashed var(--c-accent); outline-offset: 0; }
+  /* the list's numbers are the markers' blue, so a number in the list is the pin on the screen */
+  /* in the panel the number is neutral (Eric, Nov 17: "blue is too much"); blue is kept for the marks on the design */
+  .notes li:not(.done) .nbadge { background: var(--c-edge); color: var(--c-ink); }
+  .notes li:not(.done):hover .nbadge { background: var(--c-edge-2); }
+  /* several picked (⇧ click): each keeps the hover's outline and gets the markers' badge */
+  .cutsel { border-radius: var(--c-r-sm); background: color-mix(in srgb, var(--c-accent) 10%, transparent); box-shadow: 0 0 0 1.5px var(--c-accent); }
+  .cutsel::after { left: -12px; top: -12px; width: 24px; height: 24px; background: var(--c-accent); color: var(--c-on-accent); font: var(--c-w-medium) var(--c-t-xs)/24px var(--c-font); box-shadow: 0 0 0 2px #fff, 0 2px 8px rgb(0 0 0 / .28); animation: pinpop 220ms var(--c-spring); }
+  /* the card already names the element in its head */
+  .notepop .popshot .popcut { display: none; }
+  @media (prefers-reduced-motion: reduce) { .pin.new, .annobar, .cutbox { animation: none; transition: none; } }
+
+  /* ---------- Designs: one item per design, its versions as the kit's chips ---------- */
+  .dlist li.fam { display: block; height: auto; padding: 0; border-radius: 0; cursor: default; color: var(--c-text); }
+  .dlist li.fam:hover { background: none; }
+  .dlist li + li.fam, .dlist li.fam + li { margin-top: 16px; } /* items 16 apart, 8 inside: twice */
+  .famh { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 0; border: 0; background: none; color: var(--c-ink); font: inherit; text-align: left; cursor: pointer; }
+  .famh b { font-weight: var(--c-w-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .famh span { flex: none; color: var(--c-ink-3); font-size: var(--c-t-xs); font-variant-numeric: tabular-nums; }
+  .famh:hover b { text-decoration: underline; text-decoration-color: var(--c-mark-3); text-underline-offset: 3px; }
+  .vchips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .vchip { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border: 0; border-radius: var(--c-r-sm); background: var(--c-wash-2); color: var(--c-ink-2);
+    font: var(--c-w-body) var(--c-t-xs)/24px var(--c-font); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; transition: background-color var(--c-d-instant), color var(--c-d-instant), transform var(--c-d-instant); }
+  .vchip:hover { background: var(--c-edge); color: var(--c-ink); }
+  .vchip:active { transform: scale(.97); }
+  .vchip.on { background: var(--c-btn); color: var(--c-on-btn); font-weight: var(--c-w-medium); }
+  .vchip.lost { color: var(--c-ink-4); }
+  .vchip .vl { font-style: normal; font-weight: var(--c-w-medium); opacity: .7; }
+  .vchip .vstar { width: 5px; height: 5px; border-radius: 50%; background: var(--c-accent); }
+  .vchip .vx { display: none; margin: 0 -4px 0 0; width: 16px; text-align: center; opacity: .7; }
+  .vchip.variant:hover .vx { display: inline; }
+  .vabout { margin: 8px 0 0; color: var(--c-ink-3); line-height: var(--c-lh-ui); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .vabout b { color: var(--c-ink); font-weight: var(--c-w-medium); }
+  /* the kit's Tooltip on a chip: its version's line */
+  .vchips { position: relative; } .vchip { position: static; }
+  .vchip[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: -2px; right: -2px; bottom: calc(100% + 6px); z-index: 6; width: auto; max-width: none; padding: 6px 10px; border-radius: var(--c-r); background: var(--c-btn); color: var(--c-on-btn);
+    font: 400 var(--c-t-xs)/16px var(--c-font); white-space: normal; text-align: left; pointer-events: none; box-shadow: var(--c-float); animation: tipin 140ms var(--c-ease); }
+  .vchip.on[data-tip]:hover::after { background: var(--c-surface); color: var(--c-ink); }
+  .panes { overflow-x: visible; }
+
+  /* ---------- Note numbers: always a circle, with one sharp corner, like a comment pin (Eric, Nov 17) ----------
+     The same mark on the design, in the list, on the card and on a ⇧ pick. On the design the sharp corner is the
+     point: it sits exactly on the spot noted. One, two or three digits fit the same 24px circle, a size smaller each. */
+  .pin, .nbadge, .cutsel::after { --pr: 12px; width: 24px; min-width: 24px; height: 24px; padding: 0; border-radius: var(--pr) var(--pr) var(--pr) 3px;
+    display: grid; place-items: center; font: var(--c-w-medium) 12px/1 var(--c-font); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  :is(.pin, .nbadge)[data-len="2"] { font-size: 11px; } :is(.pin, .nbadge)[data-len="3"] { font-size: 9.5px; letter-spacing: -0.04em; }
+  .pin { translate: 0 -100%; transform-origin: 0 100%; } /* a white ring in both themes: a pin sits on the design, not on the panel */
+  .notes .nbadge, .notepop .nbadge { min-width: 24px; height: 24px; }
+  .notes li.done .nbadge { background: var(--c-wash-2); color: var(--c-ink-3); box-shadow: none; }
+  .cutsel::after { left: -2px; top: -26px; }
+  /* ---------- Comment marks on the design (Eric, Nov 17: "a blue circle, then a dark outline"; "these are flat") ----------
+     A dark comment shape (round, one sharp corner sitting on the spot) holding a raised blue disc with the number. The
+     disc is lit from above (lighter at the top, a soft shade along the bottom); the shell catches light on its top edge
+     and drops a shadow, so the mark stands off the design instead of lying on it. Same mark for pins and ⇧ picks (body: trail.css loads after this sheet). */
+  .pin, body .cutsel::before { width: 28px; min-width: 28px; height: 28px; border-radius: 14px 14px 14px 3px; background: #1c1c1e;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), 0 1px 2px rgb(0 0 0 / .35), 0 4px 10px rgb(0 0 0 / .3); }
+  .pin::before, body .cutsel::after { content: ''; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px; border-radius: 50%;
+    background: radial-gradient(130% 100% at 50% 0%, color-mix(in srgb, var(--c-accent), #fff 28%) 0%, var(--c-accent) 55%, color-mix(in srgb, var(--c-accent), #000 18%) 100%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .4), inset 0 -2px 3px rgb(0 0 0 / .18); min-width: 0; }
+  .pin { isolation: isolate; color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .25); transition: box-shadow var(--c-d-instant), scale 160ms var(--c-ease); }
+  .pin::before { z-index: -1; transition: filter 160ms var(--c-ease); }
+  .pin:hover, .pin.open { background: #1c1c1e; color: #fff; scale: 1.08; box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), 0 1px 2px rgb(0 0 0 / .35), 0 6px 14px rgb(0 0 0 / .34); }
+  .pin:hover::before { filter: brightness(1.08); }
+  .pin.open { box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), 0 0 0 3px color-mix(in srgb, var(--c-accent) 40%, transparent), 0 6px 14px rgb(0 0 0 / .34); }
+  :is(.pin)[data-len="3"] { font-size: 9px; }
+  body .cutsel::before { content: ''; position: absolute; left: -2px; top: -30px; }
+  body .cutsel::after { content: attr(data-n); left: 1px; top: -27px; display: grid; place-items: center; padding: 0; color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .25);
+    font: var(--c-w-medium) 12px/1 var(--c-font); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; animation: pinpop 220ms var(--c-spring); }
+  body .cutsel::before { animation: pinpop 220ms var(--c-spring); transform-origin: 0 100%; }
+  body .cutsel::after { transform-origin: -3px 25px; } /* the shell's corner, so the disc pops in with it */
+  /* ---------- the notes list on one grid: number | words | × ; a sitting's chevron sits in the number's column, its
+     count ends where the ×'s glyph ends (8px in) ---------- */
+  .notes li:not(.sit) { display: grid; grid-template-columns: 24px minmax(0, 1fr) 24px; column-gap: 10px; align-items: start; padding: 8px; border-radius: var(--c-r-md); }
+  .notes li + li { margin-top: 4px; }
+  .notes .nb { padding-top: 2px; gap: 2px; } /* the first line's middle (2 + 10) on the number's middle (12) */
+  .notes .nt { line-height: 20px; }
+  .notes .nt i { color: var(--c-ink-4); }
+  .notes .x { width: 24px; height: 24px; border-radius: var(--c-r-sm); display: grid; place-items: center; line-height: 1; font-size: 15px; }
+  .nmrow { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .nmrow .nmw { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nmrow { gap: 0; } .nmrow .open { flex: none; } .nmrow .open::before { content: '\00a0·\00a0'; color: var(--c-ink-3); }
+  .notes li.sit { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; column-gap: 10px; align-items: center; height: 32px; padding: 0 16px 0 8px; }
+  .notes li.sit::before { justify-self: center; margin: 0; }
+  .notes li.sit .ver { text-align: right; }
+  .notes li:not(.sit) + li.sit { margin-top: 12px; }
 
   @media (max-width: 900px) { :root { --panel-w: 0px; } .side { display: none; } .transport { left: 16px; right: 16px; } .transport .seg, .clock, .stepn { display: none; } }
   @media (prefers-reduced-motion: reduce) { .side, .transport { transition: none; } }
@@ -563,11 +774,17 @@
   </div>
 
   <div class="sect" data-k="glass" data-tab="stage">
-    <button class="st">Glass</button>
-    <div class="lbl">Blur <output id="bluro"></output></div>
-    <input class="range" type="range" id="blurr" min="0" max="80" step="2">
-    <div class="lbl">Tint <output id="tinto"></output></div>
-    <input class="range" type="range" id="tintr" min="0" max="0.8" step="0.02">
+    <button class="st">Look</button>
+    <div class="lbl">Theme</div>
+    <div class="seg" id="modeseg"><button class="pill" data-v="auto">Auto</button><button class="pill" data-v="light">Light</button><button class="pill" data-v="dark">Dark</button></div>
+    <div class="lbl">Panels</div>
+    <div class="seg" id="panesseg"><button class="pill" data-v="solid">Solid</button><button class="pill" data-v="frost">Frost</button><button class="pill" data-v="glass">Glass</button></div>
+    <div class="stack" id="blurwrap">
+      <div class="lbl">Blur <output id="bluro"></output></div>
+      <input class="range" type="range" id="blurr" min="0" max="80" step="2">
+      <div class="lbl">Tint <output id="tinto"></output></div>
+      <input class="range" type="range" id="tintr" min="0" max="0.8" step="0.02">
+    </div>
   </div>
 
   <div class="sect" data-k="flow" data-tab="prototype">
@@ -587,9 +804,9 @@
   <div class="sect" data-k="notes" data-tab="notes">
     <button class="st">Notes</button>
     <!-- the tools first, then what they made, then the one thing to do with it; the rest are links -->
-    <div class="acts tools"><button class="btn" id="noteadd" aria-pressed="false" title="Click to pin a note, drag to note an area">Note<span class="key">N</span></button><button class="btn" id="notecut" aria-pressed="false" title="Cut out elements and note them; shift-click for several">Cut<span class="key">X</span></button></div>
+    <div class="acts tools"><button class="btn" id="noteadd" aria-pressed="false" title="Click an element, drag an area, shift-click several">Annotate<span class="key">N</span></button><button class="btn" id="notecut" aria-pressed="false" hidden>Cut<span class="key">X</span></button></div>
     <ol class="notes" id="notelist"></ol>
-    <p class="hint" id="noteempty">Press N, then click a screen. Or select words and press N.</p>
+    <p class="hint" id="noteempty">Press N, then click an element or drag an area.</p>
     <p class="hint" id="notesync"></p>
     <div class="acts"><button class="btn go" id="notecopy">Copy brief</button></div>
     <div class="notelinks"><button class="link" id="noteclear">Clear all</button></div>
@@ -637,7 +854,13 @@
   </div>
 </aside>
 <div class="cutbox" id="cutbox"><span id="cutlabel"></span></div>
-<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><div class="popedit" id="popedit" hidden></div><div class="thread" id="popthread" hidden></div><textarea id="poptext" rows="4" placeholder="Note"></textarea><div class="popshot" id="popshot" hidden><img class="snap" id="popsnap" alt="" hidden><span class="nm popcut" id="popcut"></span></div><div class="poptools" id="poptools"><div class="tseg"><button class="ptool" type="button" data-tool="pen" aria-pressed="false" aria-label="Pen" title="Pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></button><button class="ptool" type="button" data-tool="ellipse" aria-pressed="false" aria-label="Ellipse" title="Ellipse"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></button><button class="ptool" type="button" data-tool="rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/></svg></button><button class="ptool" type="button" data-tool="arrow" aria-pressed="false" aria-label="Arrow" title="Arrow"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13L13 3M7 3h6v6"/></svg></button></div><i class="gap"></i><button class="pchip" type="button" id="popcssbtn" aria-pressed="false" hidden>Edit CSS</button></div><div class="popcss" id="popcss" hidden></div><div class="popacts"><button class="pbin" type="button" id="popdel" aria-label="Delete note" title="Delete note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 4.25h10.5M6.25 4.25V2.75h3.5v1.5M4.25 4.25l.6 8.5a1 1 0 0 0 1 .9h4.3a1 1 0 0 0 1-.9l.6-8.5"/></svg></button><button class="btn" id="popdone">Resolve</button><i class="gap"></i><button class="btn" id="popsave">Save</button></div></div>
+<div class="notepop glass" id="notepop" hidden><div class="pophead"><span class="nbadge" id="popn"></span><b class="popwhat" id="popwhat"></b><span class="nm" id="popmeta"></span></div><div class="nq" id="popwords" hidden></div><div class="popedit" id="popedit" hidden></div><div class="thread" id="popthread" hidden></div><div class="popfield"><textarea id="poptext" rows="3" placeholder="What should change?"></textarea></div><div class="popshot" id="popshot" hidden><img class="snap" id="popsnap" alt="" hidden><span class="nm popcut" id="popcut"></span></div><div class="poptools" id="poptools"><div class="tseg"><button class="ptool" type="button" data-tool="pen" aria-pressed="false" aria-label="Pen" title="Pen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></button><button class="ptool" type="button" data-tool="ellipse" aria-pressed="false" aria-label="Ellipse" title="Ellipse"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="8" cy="8" rx="6" ry="4.5"/></svg></button><button class="ptool" type="button" data-tool="rect" aria-pressed="false" aria-label="Rectangle" title="Rectangle"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/></svg></button><button class="ptool" type="button" data-tool="arrow" aria-pressed="false" aria-label="Arrow" title="Arrow"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13L13 3M7 3h6v6"/></svg></button></div><button class="pchip" type="button" id="popcssbtn" aria-pressed="false" aria-label="Edit CSS" data-tip="Edit CSS" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3C4 3 4 4 4 5.5S3.5 8 2.5 8c1 0 1.5 1 1.5 2.5S4 13 5.5 13M10.5 3C12 3 12 4 12 5.5s.5 2.5 1.5 2.5c-1 0-1.5 1-1.5 2.5S12 13 10.5 13"/></svg></button></div><div class="popcss" id="popcss" hidden></div><div class="popacts"><button class="pbin" type="button" id="popdel" aria-label="Delete note" title="Delete note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.75 4.25h10.5M6.25 4.25V2.75h3.5v1.5M4.25 4.25l.6 8.5a1 1 0 0 0 1 .9h4.3a1 1 0 0 0 1-.9l.6-8.5"/></svg></button><i class="gap"></i><button class="btn" id="popdone">Resolve</button><button class="btn" id="popcancel">Cancel</button><button class="btn go" id="popsave">Add</button></div></div>
+<!-- Annotate (N), after Agentation and Cursor's Annotate, in the kit's parts: a bar at the top of the stage with the gestures,
+     the open notes' count on Copy brief, and Done. The toast stays for one-off hints under it. -->
+<div class="annobar glass" id="annobar" hidden role="toolbar" aria-label="Annotate">
+  <span class="asay" id="annosay" hidden></span><span class="ahint"><kbd>Click</kbd>Element</span><span class="ahint"><kbd>Drag</kbd>Area</span><span class="ahint"><kbd>⇧ Click</kbd>Several</span><span class="ahint"><kbd>Double-click</kbd>Words</span><span class="ahint"><kbd>↑ ↓</kbd>Parent</span>
+  <i class="agap"></i><button class="btn go" id="annocopy" type="button">Copy brief<em id="annon"></em></button><button class="btn" id="annodone" type="button">Done<span class="key">Esc</span></button>
+</div>
 <button class="wordchip glass" id="wordchip" type="button" hidden>Note<span class="key">N</span></button>
 <div class="toast glass" id="toast" hidden></div>
 <div class="areabox" id="areabox"></div>
@@ -694,7 +917,7 @@ const DEVICES = {
 const kindOf = (w, h) => w < 600 ? 'handheld' : h > w ? 'tablet' : 'window';
 const nameOf = (w, h) => (Object.values(DEVICES).find(d => d.w === w && d.h === h) || { n: 'Custom' }).n;
 /* zoom 0 means fit. pos holds how far each screen was dragged, pan how far the whole canvas was. preset is the last size picked, for double-click to go back to. */
-const DEFAULTS = { preset: 'desktop', w: 1440, h: 900, second: false, chrome: true, wall: 'dark', color: '#1b1b22', exfmt: 'png', dim: 0, blur: 40, tint: .38, bar: true, panel: true, loop: false, speed: 1, folded: [], tab: 'design',
+const DEFAULTS = { preset: 'desktop', w: 1440, h: 900, second: false, chrome: true, wall: 'auto', mode: 'auto', panes: 'frost', panesV: 2, color: '#1b1b22', exfmt: 'png', dim: 0, blur: 40, tint: .38, bar: true, panel: true, loop: false, speed: 1, folded: [], tab: 'design',
   zoom: 0, pos: {}, pan: { x: 0, y: 0 },
   /* designs: a is always shown; b joins it when compare is on. Each is a scene id, or 'url'. */
   /* shown: the designs on screen, up to five, lettered A to E in list order. A design is a scene id, or 'url'. */
@@ -839,10 +1062,11 @@ function makeScreen(slot) {
   sc.tt = wrap.querySelector('.tt'); sc.pins = wrap.querySelector('.pins');
   const cat = wrap.querySelector('.catch');
   cat.addEventListener('pointerdown', e => marking ? markDown(sc, e) : picking ? pickFocus(sc, e) : cutting ? cutNote(sc, e) : noteDown(sc, e));
-  cat.addEventListener('pointermove', e => { if (cutting && !marking) cutHover(sc, e); });
+  cat.addEventListener('pointermove', e => { if ((cutting || noting) && !marking && !texting) cutHover(sc, e); });
+  cat.addEventListener('pointerleave', () => { if (noting) $('cutbox').classList.remove('on'); });
   cat.addEventListener('pointerleave', () => { cutAt = null; $('cutbox').classList.remove('on'); });
   // the wheel still scrolls the design under the catcher, or under a pin; the outline and picks follow what moved
-  sc.screen.addEventListener('wheel', e => { if (!e.ctrlKey && (e.target === cat || e.target.closest('.pins')) && scrollUnder(sc, e)) { e.preventDefault(); e.stopPropagation(); requestAnimationFrame(() => { if (cutting && cutAt) cutHover(cutAt.sc, cutAt.e); placePicks(); }); } }, { passive: false });
+  sc.screen.addEventListener('wheel', e => { if (!e.ctrlKey && (e.target === cat || e.target.closest('.pins')) && scrollUnder(sc, e)) { e.preventDefault(); e.stopPropagation(); requestAnimationFrame(() => { if ((cutting || noting) && cutAt) cutHover(cutAt.sc, cutAt.e); placePicks(); }); } }, { passive: false });
   wrap.querySelectorAll('.rz').forEach(resizer);
   const wipe = wrap.querySelector('.wipe');
   wipe.addEventListener('pointerdown', e => {
@@ -1221,6 +1445,7 @@ function drive() {
    the time and behind the home bar, a few times a second at most, and keep the last answer when it can't tell
    (an image, a gradient, off screen). */
 let inkAt = 0, inkT = 0;
+document.addEventListener('scene-status', (e) => { const f = e.composedPath().find((n) => n.classList && n.classList.contains('frame')); if (f) f.classList.toggle('st-off', !!(e.detail && e.detail.hide)); });
 function inkSoon() {
   clearTimeout(inkT); inkT = setTimeout(() => requestAnimationFrame(ink), 220);
   const now = performance.now(); if (now - inkAt > 200) { inkAt = now; requestAnimationFrame(ink); }
@@ -1437,9 +1662,16 @@ const setNoting = on => {
   if (on && cutting) setCutting(false);
   if (on && S.tab !== 'notes') { S.tab = 'notes'; apply(); } // the list the new pins land in
   noting = on; document.body.classList.toggle('noting', on); $('noteadd').setAttribute('aria-pressed', on);
-  $('toast').textContent = NOTE_TIP; $('toast').hidden = !on;
+  if (!on) { clearPicks(); $('cutbox').classList.remove('on'); } annoSay('');
+  $('annobar').hidden = !on; $('toast').hidden = true; annoCount();
 };
 const NOTE_TIP = 'Click to pin a note · hold ⌥ to use the design';
+// the bar's Copy brief says how many open notes it will carry
+// while annotating, a one-off line (what's picked, how to draw) shows in the bar in place of its hints, never over the design
+const annoSay = text => { $('annosay').textContent = text || ''; $('annosay').hidden = !text; $('annobar').classList.toggle('saying', !!text); };
+const annoCount = () => { const n = S.notes.filter(x => !x.done && x.text).length; $('annon').textContent = n || ''; $('annocopy').disabled = !n; };
+$('annocopy').onclick = e => { $('notecopy').click(); const b = e.currentTarget; b.firstChild.textContent = 'Copied'; setTimeout(() => { b.firstChild.textContent = 'Copy brief'; }, 1400); };
+$('annodone').onclick = () => setNoting(false);
 /* Note, cut and focus modes lay a catcher over the screens, so a click pins instead of pressing. Holding ⌥ moves it
    aside: the design takes clicks, hovers, typing and drags as usual, and letting go goes back to pinning (Eric, Oct 18:
    "can't click or interact with the design while in note mode"). Framed pages report ⌥ too (wireFrame), since their
@@ -1589,6 +1821,14 @@ function placeAnchors() {
   });
 }
 // A quick note: click, type, done. It still keeps a snapshot for the brief, but never shows it.
+// Annotate's click: a note on the element outlined under the pointer (↑ ↓ picked its parent or child), with its path,
+// box and styles, like a cut. Where nothing is outlined (a framed page from another site), a plain pin.
+function elementNote(sc, e) {
+  const at = layerAt(sc, e), el = at.L && cutTarget(at.L, e.clientX, e.clientY);
+  if (!el || el === at.L.root) return pinNote(sc, e);
+  if (editing) closeEditor(true);
+  cutMake([...cutPicks.filter(p => p.el !== el), { el, sc, at, e }]);
+}
 function pinNote(sc, e) {
   e.preventDefault(); e.stopPropagation();
   if (editing) closeEditor(true);
@@ -1753,6 +1993,7 @@ addEventListener('wheel', () => { $('wordchip').hidden = true; }, { passive: tru
 let lastPress = null;
 function noteDown(sc, e) {
   if (texting) { e.preventDefault(); e.stopPropagation(); return textPress(e); }
+  if (e.shiftKey || e.metaKey || e.ctrlKey) return cutNote(sc, e); // several elements into one note, as in Cursor and Agentation
   e.preventDefault(); e.stopPropagation();
   const x0 = e.clientX, y0 = e.clientY, box = $('areabox'), start = { clientX: x0, clientY: y0, preventDefault() {}, stopPropagation() {} };
   try { e.target.setPointerCapture(e.pointerId); } catch {} // a release over a framed page still ends the drag
@@ -1770,7 +2011,7 @@ function noteDown(sc, e) {
     if (ev.type === 'pointercancel') return;
     // a second press on the same spot: edit the words there, in place (the first press's empty note has gone)
     if (!dragged && lastPress && lastPress.sc === sc && performance.now() - lastPress.t < 450 && Math.hypot(x0 - lastPress.x, y0 - lastPress.y) < 8) { lastPress = null; return textEdit(sc, start); }
-    if (!dragged) { lastPress = { sc, t: performance.now(), x: x0, y: y0 }; pinNote(sc, start); lastPress.id = editing && editing.id; return; }
+    if (!dragged) { lastPress = { sc, t: performance.now(), x: x0, y: y0 }; elementNote(sc, start); lastPress.id = editing && editing.id; return; }
     const r = sc.screen.getBoundingClientRect(), x1 = clamp(ev.clientX, r.left, r.right), y1 = clamp(ev.clientY, r.top, r.bottom);
     areaNote(sc, start, { left: Math.min(x0, x1), top: Math.min(y0, y1), right: Math.max(x0, x1), bottom: Math.max(y0, y1) });
   };
@@ -1819,7 +2060,7 @@ function textEdit(sc, e) {
   el.setAttribute('contenteditable', 'plaintext-only'); el.setAttribute('spellcheck', 'false');
   el.addEventListener('keydown', textKey); el.addEventListener('blur', textBlur);
   document.body.classList.add('texting');
-  $('toast').textContent = 'Type the new words · Return to note it · Esc to undo'; $('toast').hidden = false;
+  if (noting) annoSay('Type the new words · Return notes them · Esc puts them back'); else { $('toast').textContent = 'Type the new words · Return to note it · Esc to undo'; $('toast').hidden = false; }
   el.focus({ preventScroll: true });
   const doc = el.ownerDocument, r = doc.createRange(); r.selectNodeContents(el);
   const sel = doc.defaultView.getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -1844,7 +2085,7 @@ function finishText(keep) {
   t.el.removeEventListener('keydown', textKey); t.el.removeEventListener('blur', textBlur);
   t.el.removeAttribute('contenteditable'); t.el.removeAttribute('spellcheck');
   t.el.ownerDocument.defaultView.getSelection().removeAllRanges(); t.el.blur();
-  document.body.classList.remove('texting'); toastBack();
+  document.body.classList.remove('texting'); if (noting) annoSay(''); toastBack();
   const now = t.el.textContent;
   if (!keep || squash(now) === squash(t.old) || !squash(now)) { t.el.innerHTML = t.html; return; } // as it was
   const note = newNote(t.sc, t.e, t.at, t.el), top = t.at.L.root.contains(t.el) ? t.at.L.root : null;
@@ -1896,8 +2137,24 @@ const setCutting = on => {
   if (!on) $('cutbox').classList.remove('on');
   $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several'; $('toast').hidden = !on;
 };
+// The words inside a button, a link or a label are that control: a click on "Start" notes the button, not its span
+// (as Agentation names a button by its words). ↑ ↓ still walk from there.
+const WRAP = /^(SPAN|B|I|EM|STRONG|SMALL|SVG|PATH|IMG|USE)$/i;
+const controlOf = el => {
+  for (let n = el, i = 0; n && i < 3; n = n.parentElement, i++) { if (n.matches?.('button, a, [role="button"], label, summary')) return n; if (!WRAP.test(n.tagName)) break; }
+  // a dot of a dot number or a stroke of an icon is too small to mean anything: its parent is what was pointed at
+  for (let i = 0; el && el.parentElement && i < 4; i++) { const r = rectOf(el); if (r.width >= 10 && r.height >= 10) break; el = el.parentElement; }
+  return el;
+};
+// what an element is called on screen: its tag and first classes, then its own words when it has a few
+const elLabel = el => { const t = (el.innerText ?? el.textContent ?? '').replace(/\s+/g, ' ').trim(); return elName(el) + (t ? ` “${t.length > 26 ? t.slice(0, 24) + '…' : t}”` : ''); };
+// a box with no words or pictures that ignores the pointer is decoration (a design's glow layer, a veil): what's under it was meant
+const decor = el => el && !(el.textContent || '').trim() && !el.querySelector?.('img, svg, video, canvas, input, textarea') && !/^(IMG|SVG|PATH|USE|G|VIDEO|CANVAS|INPUT|TEXTAREA)$/i.test(el.tagName) && (el.ownerDocument.defaultView || window).getComputedStyle(el).pointerEvents === 'none';
 function cutTarget(L, cx, cy) {
-  const base = pickUnder(L, cx, cy);
+  let under = pickUnder(L, cx, cy);
+  if (decor(under)) under = stackAt(L, cx, cy).find(e => !decor(e) && e !== L.root && L.root.contains(e)) || null;
+  if (!under) { cutBase = null; return null; } // only decoration there: nothing is outlined, and a click makes a plain pin
+  const base = controlOf(under);
   if (base !== cutBase) { cutBase = base; cutDepth = 0; }
   let el = base, i = 0;
   for (let up; el && i < cutDepth && (up = upFrom(L, el)); i++) el = up;
@@ -1913,7 +2170,7 @@ function cutHover(sc, e) {
   const r = rectOf(el), k = zoomOf(el);
   Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
   box.classList.toggle('below', r.top < 40);
-  $('cutlabel').textContent = `${elName(el)} · ${Math.round(r.width / k)} × ${Math.round(r.height / k)}`;
+  $('cutlabel').textContent = elLabel(el);
   box.classList.add('on');
 }
 // A selector a person (or an agent) can find again: up to five steps, each a tag, its first classes, and its place when it has twins.
@@ -1937,7 +2194,7 @@ function styleLine(el) {
   return out.join(', ');
 }
 const cutOf = (el, L) => { const { rr, k } = scale(L), r = rectOf(el);
-  return { path: cssPath(el, L.root), box: [(r.left - rr.left) / k, (r.top - rr.top) / k, r.width / k, r.height / k].map(Math.round), style: styleLine(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 280) }; };
+  return { label: elLabel(el), path: cssPath(el, L.root), box: [(r.left - rr.left) / k, (r.top - rr.top) / k, r.width / k, r.height / k].map(Math.round), style: styleLine(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 280) }; };
 function cutNote(sc, e) {
   e.preventDefault(); e.stopPropagation();
   if (editing) closeEditor(true);
@@ -1948,6 +2205,7 @@ function cutNote(sc, e) {
     if (had >= 0) { cutPicks[had].mark.remove(); cutPicks.splice(had, 1); }
     else { const mark = document.createElement('div'); mark.className = 'cutsel';
       mark.dataset.n = cutPicks.length + 1; document.body.append(mark); cutPicks.push({ el, sc, at, e: { clientX: e.clientX, clientY: e.clientY }, mark }); placePicks(); }
+    if (noting) { annoSay(cutPicks.length ? `${cutPicks.length} picked · Return notes them together` : ''); return; }
     $('toast').textContent = cutPicks.length ? `${cutPicks.length} picked. Click one more, or press Return, to note them together` : 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
     return;
   }
@@ -1959,7 +2217,7 @@ function cutMake(picks) {
   note.cut = cutOf(el, at.L);
   if (picks.length > 1) note.cuts = picks.map(p => cutOf(p.el, p.at.L)); else note.cssRef = refOf(at.L, el); // for Edit CSS
   clearPicks();
-  $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
+  if (noting) annoSay(''); else $('toast').textContent = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
   S.notes.push(note); touch(note); renderNotes(); openEditor(note, e.clientX, e.clientY, true, rectOf(el));
   snapNote(note, at.L, e.clientX, e.clientY);
 }
@@ -2063,8 +2321,10 @@ async function snapScene(L, px, py, cutBox, marks = []) {
   // a copy has no live scroll state, so it would draw scrollbars the screen hides and shift centred content by half of one
   const css = ('.snaphost * { scrollbar-width: none; }\n' + FROZEN + snapFonts + '\n' + await inlineUrls([...sr.querySelectorAll('style')].map(x => x.textContent).join('\n').replace(/:host/g, '.snaphost'), location.href))
     .replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  // the phone's safe areas are set on the screen, outside the copy: carry them in, or a phone design draws ~50px high
+  const cs = getComputedStyle(el), safe = ['--safe-top', '--safe-bottom'].map(v => cs.getPropertyValue(v).trim() ? `${v}:${cs.getPropertyValue(v).trim()};` : '').join('');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CW}" height="${CH}"><foreignObject x="0" y="0" width="${CW}" height="${CH}">`
-    + `<div xmlns="http://www.w3.org/1999/xhtml" class="snaphost" style="display:block;position:relative;width:${w}px;height:${h}px;transform:translate(${-x0}px,${-y0}px)"><style>${css}</style>`
+    + `<div xmlns="http://www.w3.org/1999/xhtml" class="snaphost" style="display:block;position:relative;width:${w}px;height:${h}px;${safe}transform:translate(${-x0}px,${-y0}px)"><style>${css}</style>`
     + new XMLSerializer().serializeToString(clone) + `</div></foreignObject></svg>`;
   const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
   const k = Math.min(2, 1600 / CW), cv = document.createElement('canvas'); cv.width = Math.round(CW * k); cv.height = Math.round(CH * k);
@@ -2145,7 +2405,9 @@ $('frames').addEventListener('pointerdown', e => {
   const r = sc.screen.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
   try { p.setPointerCapture(e.pointerId); } catch {} // dragged over a framed page, the pin still follows and lets go
   let moved = false;
-  const at = ev => [clamp((ev.clientX - r.left) / r.width, 0, 1), clamp((ev.clientY - r.top) / r.height, 0, 1)];
+  // the pin's point is its bottom-left corner: it keeps the same distance from the pointer as when it was grabbed
+  const pb = p.getBoundingClientRect(), gx = x0 - pb.left, gy = y0 - pb.bottom, tip = ev => ({ clientX: ev.clientX - gx, clientY: ev.clientY - gy });
+  const at = ev => [clamp((ev.clientX - gx - r.left) / r.width, 0, 1), clamp((ev.clientY - gy - r.top) / r.height, 0, 1)];
   const move = ev => {
     if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
     moved = true; p.classList.add('drag'); const [x, y] = at(ev); p.style.left = x * 100 + '%'; p.style.top = y * 100 + '%';
@@ -2156,21 +2418,23 @@ $('frames').addEventListener('pointerdown', e => {
     if (!moved || ev.type === 'pointercancel') return;
     pinDragged = true; setTimeout(() => { pinDragged = false; });
     const [x, y] = at(ev), L = sc.layers.find(l => l.root) || sc.layers[0];
-    const under = pickUnder(L, ev.clientX, ev.clientY);
-    n.x = +x.toFixed(3); n.y = +y.toFixed(3); n.on = describe(under); n.anchor = anchorOf(L, under, ev.clientX, ev.clientY);
-    touch(n); renderNotes(); snapNote(n, L, ev.clientX, ev.clientY);
+    const t = tip(ev), under = pickUnder(L, t.clientX, t.clientY);
+    n.x = +x.toFixed(3); n.y = +y.toFixed(3); n.on = describe(under); n.anchor = anchorOf(L, under, t.clientX, t.clientY);
+    touch(n); renderNotes(); snapNote(n, L, t.clientX, t.clientY);
   };
   addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 });
 /* a note shows on any screen of the same kind (window, phone, tablet) showing its design, on its step */
+let newPin = 0; // the note just made: its pin pops in once
 function renderPins() {
   pinStep = stepIndex();
   screens.forEach(sc => {
     const ids = sc.designs.map(d => d.id);
     sc.pins.innerHTML = S.notes.map((n, k) => (editing === n || !n.done && n.step === pinStep) && (n.kind === kindOf(sc.w, sc.h) || n.kind === sc.kind) && ids.includes(n.design)
       ? marksSVG(n, sc) + (n.area ? `<i class="area" style="left:${n.area.x * 100}%;top:${n.area.y * 100}%;width:${n.area.w * 100}%;height:${n.area.h * 100}%"></i>` : '')
-        + `<button class="pin${editing === n ? ' open' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%" title="${esc(n.text)}">${k + 1}</button>` : '').join('');
+        + `<button class="pin${editing === n ? ' open' : ''}${newPin === n.id ? ' new' : ''}" data-id="${n.id}" style="left:${n.x * 100}%;top:${n.y * 100}%"${n.text ? ` data-tip="${esc(n.text.length > 90 ? n.text.slice(0, 88) + '…' : n.text)}"` : ''} aria-label="Note ${k + 1}" data-len="${String(k + 1).length}">${k + 1}</button>` : '').join('');
   });
+  if (newPin && !editing) newPin = 0;
   wordsDrawn = ''; placeWords(); // pins were rebuilt: put the ones on words back on their words
   placeAnchors(); applyPreviews();
 }
@@ -2198,8 +2462,8 @@ const noteWhere = n => {
 };
 function renderNotes() {
   const said = n => (n.replies || []).map(r => `<span class="nr"><b>${esc(r.who)}</b> ${esc(r.text)}${r.made && sceneById(r.made) ? ` <button class="link vlink" data-show="${esc(n.design)}|${esc(r.made)}">${esc(sceneById(r.made).version || r.made)}</button>` : ''}</span>`).join('');
-  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}"><span class="nbadge">${k + 1}</span><span class="nb">${n.words ? `<span class="nq">${esc(n.words.text)}</span>` : ''}<span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
-    <span class="nm">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}${n.design !== 'url' && PROJECT ? ` · <button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
+  const groups = sittings(), noteRow = ([n, k]) => `<li data-id="${n.id}" class="${n.done ? 'done' : ''}"><span class="nbadge" data-len="${String(k + 1).length}">${k + 1}</span><span class="nb">${n.words ? `<span class="nq">${esc(n.words.text)}</span>` : ''}<span class="nt">${n.text ? esc(n.text) : '<i>Empty</i>'}</span>
+    <span class="nm nmrow"><span class="nmw">${n.side ? n.side + ' · ' : ''}${esc(noteWhere(n))}${n.area ? ' · Area' : ''}${n.cuts ? ` · ${n.cuts.length} elements` : ''}</span>${n.design !== 'url' && PROJECT ? `<button class="link open" data-open="${n.id}">Open</button>` : ''}</span>${said(n)}${n.cut && n.snap ? `<img class="snap" src="${snapURL(n)}" alt="" loading="lazy">` : ''}</span><button class="x" data-del="${n.id}" aria-label="Delete note">×</button></li>`;
   $('notelist').innerHTML = groups.length < 2 ? groups.flatMap(g => g.items).map(noteRow).join('') : groups.map((g, i) => {
     const open = g.items.filter(([n]) => !n.done).length, shown = sitOpen[g.start] ?? (i === 0 || open > 0);
     return `<li class="sit${shown ? '' : ' shut'}" data-sit="${g.start}"><span>${sitWhen(g.start)}</span><span class="ver">${open ? `${open} open` : 'Done'}</span></li>`
@@ -2210,7 +2474,7 @@ function renderNotes() {
   $('notecopy').disabled = !S.notes.length; // always in sight, so what notes are for is clear before the first one; off until there's something to copy
   $('notesync').textContent = notesServer ? '' : 'Saved in this browser only'; // on disk is the normal case: the path is on Copy brief
   $('notesync').hidden = !!notesServer || !S.notes.length; $('notecopy').title = notesServer ? `Also in ${SCENE_PATH}notes/brief.md` : '';
-  renderPins(); save(); queueSync();
+  renderPins(); save(); queueSync(); if (noting) annoCount();
 }
 
 /* ---------- notes on disk ----------
@@ -2281,8 +2545,11 @@ function openEditor(n, x, y, fresh, around) {
   editing = n; marksAtOpen = JSON.stringify(n.marks || []); markedLast = false; cssAtOpen = JSON.stringify(n.css || {});
   $('popcssbtn').hidden = !(n.cut && !n.cuts && n.cssRef); cssOpen(false);
   $('popdone').textContent = n.done ? 'Reopen' : 'Resolve'; $('popdone').hidden = !!fresh; renderPins();
-  $('popn').textContent = S.notes.indexOf(n) + 1;
+  $('popn').textContent = S.notes.indexOf(n) + 1; $('popn').dataset.len = String(S.notes.indexOf(n) + 1).length;
+  $('popwhat').textContent = n.cuts ? `${n.cuts.length} elements` : n.cut ? (n.cut.label || n.cut.path.split(' > ').pop().replace(/:nth-of-type\(\d+\)/, '')) : n.area ? 'Area' : n.words ? 'Words' : n.edit ? 'Words' : '';
   $('popmeta').textContent = (n.side ? n.side + ' · ' : '') + noteWhere(n);
+  $('popsave').textContent = fresh ? 'Add' : 'Save'; $('popcancel').hidden = !fresh; $('popdel').hidden = !!fresh;
+  if (fresh) newPin = n.id;
   $('poptext').value = n.text; showSnap(n);
   $('popwords').hidden = !n.words; $('popwords').textContent = n.words ? n.words.text : '';
   $('popedit').hidden = !n.edit; $('popedit').innerHTML = n.edit ? `<s>${esc(n.edit.old)}</s><b>${esc(n.edit.new)}</b>` : '';
@@ -2323,6 +2590,7 @@ function closeEditor(keep, done) {
     if (sc) { const r = sc.screen.getBoundingClientRect(), a = n.area; snapNote(n, L, r.left + (a ? a.x + a.w / 2 : n.x) * r.width, r.top + (a ? a.y + a.h / 2 : n.y) * r.height); } }
 }
 $('popsave').onclick = () => closeEditor(true);
+$('popcancel').onclick = () => closeEditor(false);
 $('popsnap').addEventListener('pointerdown', e => e.preventDefault()); // the caret stays in the note
 $('popsnap').onclick = () => $('popshot').classList.toggle('big');
 $('popdel').onclick = () => { $('poptext').value = ''; closeEditor(true); };
@@ -2374,8 +2642,8 @@ function cssOpen(on) {
   $('popcss').hidden = !el; $('popcssbtn').setAttribute('aria-pressed', !!el);
   if (!el) { if (on) UI.say($('popcssbtn'), 'Not on screen'); return; }
   $('popcss').innerHTML = CSS_PROPS.map(([p, name]) => { const v = n.css && n.css[p] ? n.css[p][1] : cssWas(n, el, p), on = n.css && n.css[p] ? ' on' : '';
-    return COLOURS.includes(p) ? `<div class="cssf${on}" data-p="${p}"><span>${name}</span><button class="swatch" type="button" style="--sw:${esc(v)}" aria-label="${name}"></button></div>`
-      : `<label class="cssf${on}${WIDE.includes(p) ? ' wide' : ''}" data-p="${p}"><span>${name}</span><input value="${esc(v)}" spellcheck="false" aria-label="${name}"></label>`; }).join('');
+    return COLOURS.includes(p) ? `<label class="cssf col${on}" data-p="${p}"><span title="Double-click to reset">${name}</span><input value="${esc(v)}" spellcheck="false" aria-label="${name}"><button class="swatch" type="button" style="--sw:${esc(v)}" aria-label="Pick ${name}"></button></label>`
+      : `<label class="cssf${/^-?[\d.]+[a-z%]*$/i.test(v) ? ' num' : ''}${on}${WIDE.includes(p) ? ' wide' : ''}" data-p="${p}"><span title="Drag to change · double-click to reset">${name}</span><input value="${esc(v)}" spellcheck="false" aria-label="${name}"></label>`; }).join('');
   const pop = $('notepop'); pop.style.top = clamp(parseFloat(pop.style.top), 16, Math.max(16, innerHeight - pop.offsetHeight - 16)) + 'px'; // taller now: still on screen
 }
 function cssSet(prop, v) {
@@ -2389,7 +2657,29 @@ function cssSet(prop, v) {
 }
 $('popcssbtn').addEventListener('pointerdown', e => e.preventDefault());
 $('popcssbtn').onclick = () => cssOpen($('popcss').hidden);
-$('popcss').addEventListener('input', e => { const f = e.target.closest('.cssf'); if (f && e.target.tagName === 'INPUT') cssSet(f.dataset.p, e.target.value); });
+$('popcss').addEventListener('input', e => { const f = e.target.closest('.cssf'); if (!f || e.target.tagName !== 'INPUT') return;
+  cssSet(f.dataset.p, e.target.value); f.classList.toggle('num', !f.classList.contains('col') && /^-?[\d.]+[a-z%]*$/i.test(e.target.value.trim()));
+  const sw = f.querySelector('.swatch'); if (sw && CSS.supports('color', e.target.value.trim())) sw.style.setProperty('--sw', e.target.value.trim()); });
+// scrub: drag a number's label sideways, 1 a step every 3px (⇧ 10, weight 100 every 12px), from where the drag began
+$('popcss').addEventListener('pointerdown', e => {
+  const lab = e.target.closest('.cssf.num span'); if (!lab || e.button) return;
+  const f = lab.parentElement, inp = f.querySelector('input'), m = inp.value.trim().match(/^(-?[\d.]+)([a-z%]*)$/i); if (!m) return;
+  e.preventDefault(); lab.setPointerCapture(e.pointerId);
+  const x0 = e.clientX, v0 = +m[1], unit = m[2], w = f.dataset.p === 'font-weight';
+  let moved = false;
+  const move = ev => { const dx = ev.clientX - x0; if (!moved && Math.abs(dx) < 2) return;
+    if (!moved) { moved = true; f.classList.add('scrub'); document.documentElement.classList.add('scrubbing'); }
+    const v = w ? Math.min(900, Math.max(100, Math.round((v0 + Math.round(dx / 12) * 100) / 100) * 100)) : Math.max(f.dataset.p === 'font-size' ? 1 : -9999, +(v0 + Math.round(dx / 3) * (ev.shiftKey ? 10 : 1)).toFixed(2));
+    inp.value = v + unit; cssSet(f.dataset.p, inp.value); };
+  const up = () => { lab.removeEventListener('pointermove', move); lab.removeEventListener('pointerup', up); lab.removeEventListener('pointercancel', up);
+    f.classList.remove('scrub'); document.documentElement.classList.remove('scrubbing'); if (!moved) inp.focus(); };
+  lab.addEventListener('pointermove', move); lab.addEventListener('pointerup', up); lab.addEventListener('pointercancel', up);
+});
+// double-click a label: back to what it was
+$('popcss').addEventListener('dblclick', e => { const lab = e.target.closest('.cssf span'); if (!lab) return; e.preventDefault();
+  const f = lab.parentElement, n = editing, el = cssEl(n); if (!n || !el) return; const p = f.dataset.p, was = cssWas(n, el, p); if (n.css) delete n.css[p];
+  const inp = f.querySelector('input'); inp.value = was; f.querySelector('.swatch')?.style.setProperty('--sw', was);
+  if (n.css && !Object.keys(n.css).length) delete n.css; f.classList.remove('on'); touch(n); applyPreviews(); });
 $('popcss').addEventListener('keydown', e => {
   e.stopPropagation();
   if (e.key === 'Enter') { e.preventDefault(); closeEditor(true); return; }
@@ -2400,7 +2690,7 @@ $('popcss').addEventListener('keydown', e => {
   t.value = Math.max(f.dataset.p === 'font-weight' ? 100 : -9999, +(+m[1] + step).toFixed(2)) + m[2]; cssSet(f.dataset.p, t.value);
 });
 $('popcss').addEventListener('click', e => { const sw = e.target.closest('.swatch'); if (!sw) return; const p = sw.closest('.cssf').dataset.p, n = editing;
-  ColorPick.open(sw, n.css && n.css[p] ? n.css[p][1] : cssWas(n, cssEl(n), p), v => { sw.style.setProperty('--sw', v); cssSet(p, v); }); });
+  ColorPick.open(sw, n.css && n.css[p] ? n.css[p][1] : cssWas(n, cssEl(n), p), v => { sw.style.setProperty('--sw', v); const i = sw.closest('.cssf').querySelector('input'); if (i) i.value = v; cssSet(p, v); }); });
 
 /* ---------- markup ----------
    While a note is open, Pen, Ellipse, Rectangle and Arrow draw on its screen in blue. The marks are kept with the note
@@ -2408,15 +2698,16 @@ $('popcss').addEventListener('click', e => { const sw = e.target.closest('.swatc
    ("Circled <p class="words">", "Arrow from A to B"), so the agent sees what was meant. They show only while the note
    is open or its pin is pointed at: nothing stays on the design. ⌘Z takes back the last one; Esc puts the tool down. */
 let marking = '', markedLast = false, marksAtOpen = '[]';
-const ACCENT = () => getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim() || '#4da6ff';
+const ACCENT = () => '#4da6ff'; // the marker blue: the same in both themes, as on screen (.ink path)
 const CUT_TIP = 'Point at an element. ↑ ↓ for its parent, click to cut it, shift-click for several';
 const toastBack = () => { const t = $('toast');
-  if (noting) { t.textContent = NOTE_TIP; t.hidden = false; } else if (cutting) { t.textContent = CUT_TIP; t.hidden = false; } else if (picking || focus) focusLabel(); else t.hidden = true; };
+  if (noting) { t.hidden = true; } /* the bar says it */ else if (cutting) { t.textContent = CUT_TIP; t.hidden = false; } else if (picking || focus) focusLabel(); else t.hidden = true; };
 function setMarking(tool) {
   marking = tool && editing ? tool : '';
   document.body.classList.toggle('marking', !!marking);
   document.querySelectorAll('#poptools [data-tool]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === marking));
-  if (marking) { $('cutbox').classList.remove('on'); $('toast').textContent = 'Draw on the screen · ⌘Z to undo'; $('toast').hidden = false; } else toastBack();
+  if (marking && noting) { $('cutbox').classList.remove('on'); annoSay('Draw on the screen · ⌘Z undoes'); }
+  else if (marking) { $('cutbox').classList.remove('on'); $('toast').textContent = 'Draw on the screen · ⌘Z to undo'; $('toast').hidden = false; } else { if (noting) annoSay(''); toastBack(); }
 }
 // a mark as one path: in screen pixels for the screen, in picture pixels for the snapshot
 const headOf = (a, b, s) => { const g = Math.atan2(b[1] - a[1], b[0] - a[0]); return [-.45, .45].map(d => [b[0] - s * Math.cos(g + d), b[1] - s * Math.sin(g + d)]); };
@@ -2616,17 +2907,24 @@ function renderDesigns() {
     return `<li class="${on.includes(id) ? 'on' : ''}" data-id="${id}" title="${esc(sc ? sc.note || '' : 'A running page, by its address')}">`
       + mk(id) + `<span>${esc(sc ? sc.title : 'URL')}</span><span class="ver">${esc(sc ? sc.version || '' : '')}</span></li>`;
   };
-  const vrow = id => {
-    const sc = sceneById(id), i = info(id), about = i.name || (sc.variant ? 'Variant' : sc.note || '');
-    return `<li class="sub${on.includes(id) ? ' on' : ''}${sc.variant ? ' variant' : ''}${i.lost ? ' lost' : ''}" data-id="${id}" title="${esc(sc.variant ? 'Double-click to rename' : about)}">`
-      + mk(id) + `<span class="vn">${esc(sc.version || '')}</span><span class="vd">${esc(about)}</span>`
-      + (i.picked ? '<span class="star" title="Picked">★</span>' : '')
-      + (sc.variant ? `<button class="x" data-del="${id}" aria-label="Remove variant">×</button>` : '') + '</li>';
+  /* A design with versions is one item (Eric, Nov 17: the list of truncated rows was unreadable): its name, the
+     count after it, its versions as the kit's chips (the one on screen in ink, each one compared lettered), and one
+     line under them saying what the one on screen is. A chip's own line shows on hover, in the kit's tooltip. */
+  const chip = id => {
+    const sc = sceneById(id), i = info(id), about = i.name || (sc.variant ? 'Variant · double-click to rename' : sc.note || ''), k = on.indexOf(id);
+    return `<button type="button" class="vchip${k >= 0 ? ' on' : ''}${sc.variant ? ' variant' : ''}${i.lost ? ' lost' : ''}" data-id="${id}"${about ? ` data-tip="${esc(about.length > 140 ? about.slice(0, 138) + '…' : about)}"` : ''}>`
+      + (k >= 0 && many ? `<i class="vl">${letter(k)}</i>` : '') + `<span>${esc(sc.version || 'v?')}</span>`
+      + (i.picked ? '<i class="vstar" aria-label="Picked"></i>' : '')
+      + (sc.variant ? `<span class="vx" data-del="${id}" role="button" aria-label="Remove variant">×</span>` : '') + '</button>';
   };
+  const aboutOf = f => { const id = f.ids.find(x => on.includes(x)), sc = id && sceneById(id); if (!sc) return '';
+    const i = info(id), t = i.name || sc.note || (sc.variant ? 'A variant: its own control values' : '');
+    return t ? `<p class="vabout"><b>${esc(sc.version || '')}</b> ${esc(t)}</p>` : ''; };
   $('dlist').innerHTML = families().map(f => {
     if (f.ids.length === 1) return row(f.ids[0]);
     const latest = f.ids.filter(id => !sceneById(id).variant).at(-1);
-    return `<li class="fh" data-id="${latest}" title="Click for the newest version"><span>${esc(f.title)}</span><span class="ver">${f.ids.length}</span></li>` + f.ids.map(vrow).join('');
+    return `<li class="fam${f.ids.some(x => on.includes(x)) ? ' on' : ''}"><button type="button" class="famh" data-id="${latest}" title="The newest version"><b>${esc(f.title)}</b><span>${f.ids.length} versions</span></button>`
+      + `<div class="vchips">${f.ids.map(chip).join('')}</div>${aboutOf(f)}</li>`;
   }).join('') + (S.shown.includes('url') ? row('url') : ''); // the URL row only while a URL is on screen (from before)
 }
 $('dlist').onclick = e => {
@@ -2642,7 +2940,7 @@ $('dlist').onclick = e => {
   if (id === 'url' && S.shown.includes('url')) $('url').focus();
 };
 $('dlist').ondblclick = e => {
-  const li = e.target.closest('li.variant'); if (!li) return;
+  const li = e.target.closest('.variant'); if (!li) return;
   const v = S.variants.find(x => x.id === li.dataset.id), name = prompt('Variant name', v.name);
   if (name && name.trim()) { v.name = name.trim(); ctlKey = ''; apply(); }
 };
@@ -2672,6 +2970,10 @@ addEventListener('drop', e => { e.preventDefault(); $('drop').classList.remove('
 $('dimr').oninput = e => { S.dim = +e.target.value; apply(); };
 $('blurr').oninput = e => { S.blur = +e.target.value; apply(); };
 $('tintr').oninput = e => { S.tint = +e.target.value; apply(); };
+/* Look: Theme sets light or dark for home and the stage (mode.js); Panels picks solid or the old frosted glass */
+$('modeseg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.mode = b.dataset.v; Mode.set(S.mode); apply(); };
+$('panesseg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.panes = b.dataset.v; apply(); Liquid.retune(); };
+addEventListener('modechange', () => { apply(); Liquid.retune(); }); // the lens's frost differs by theme
 $('baron').onchange = e => { S.bar = e.target.checked; apply(); };
 const restartLive = () => { screens.forEach(sc => sc.designs && fillScreen(sc, sc.designs)); renderPins(); };
 $('restart').onclick = restartLive;
@@ -2691,11 +2993,13 @@ function onKey(e) {
   const tgt = e.composedPath?.()[0] || e.target;
   if (tgt.matches?.('input:not([type=range]):not([type=checkbox]), textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey) return;
   if (e.key === 'Escape' && marking) { setMarking(''); return; }
+  if (e.key === 'Escape' && noting && cutPicks.length) { clearPicks(); annoSay(''); return; }
+  if (e.key === 'Enter' && noting && cutPicks.length) { e.preventDefault(); cutMake(cutPicks); return; }
   if (e.key === 'Escape' && noting) { setNoting(false); return; }
   if (e.key === 'Escape' && cutting && cutPicks.length) { clearPicks(); setCutting(true); return; }
   if (e.key === 'Escape' && cutting) { setCutting(false); return; }
   if (e.key === 'Enter' && cutting && cutPicks.length) { e.preventDefault(); cutMake(cutPicks); return; }
-  if (cutting && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+  if ((cutting || noting) && !editing && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault(); cutDepth = Math.max(0, cutDepth + (e.key === 'ArrowUp' ? 1 : -1)); if (cutAt) cutHover(cutAt.sc, cutAt.e); return;
   }
   if (e.key === 'x' || e.key === 'X') { setCutting(!cutting); return; }
@@ -2725,6 +3029,10 @@ function onKey(e) {
 
 /* one place that turns settings into the page */
 function apply() {
+  if (S.mode !== Mode.pref) S.mode = Mode.pref; // Theme may have been changed on home
+  if (S.panesV !== 2) { S.panes = 'frost'; S.panesV = 2; } // Frost is the look since Nov 17; Solid and Glass stay a click away
+  if (!['solid', 'frost', 'glass'].includes(S.panes)) S.panes = 'frost';
+  root.dataset.panes = S.panes;
   S.wall = Wall.apply($('wall'), S);
   root.style.setProperty('--dim', S.dim); root.style.setProperty('--blur', S.blur + 'px'); root.style.setProperty('--tint', S.tint);
   root.dataset.panel = S.panel && !uiHidden ? 'on' : 'off';
@@ -2755,6 +3063,7 @@ function apply() {
   $('tintr').value = S.tint; $('tinto').textContent = Math.round(S.tint * 100) + '%';
   $('baron').checked = S.bar; $('loop').checked = S.loop;
   $('exfmt').querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.exfmt));
+  mark('modeseg', S.mode); mark('panesseg', S.panes);
   if (!exporting) $('exhint').textContent = PROJECT ? EXPORTS[S.exfmt] : 'Export needs serve.py';
   document.querySelectorAll('.sect[data-k]').forEach(s => s.classList.toggle('folded', S.folded.includes(s.dataset.k)));
   buildTimeline();
@@ -2834,7 +3143,8 @@ if (S.place) {
 requestAnimationFrame(frame);
 /* liquid glass on the outermost glass: the panel and the bar bend at their rims and keep their frost.
    Buttons inside them stay clear glass: a lens inside another lens only sees the panel, never the wallpaper. */
-Liquid.watch('.side.glass, .transport.glass', g => ({ bezel: g.reach * 2, bend: g.bend * 1.6, split: g.split, frost: 'blur(var(--blur)) saturate(180%)' }));
+// the lens only when the panels are glass (Stage › Look › Panels); solid panels have nothing behind them to bend
+Liquid.watch('.side.glass, .transport.glass', g => root.dataset.panes !== 'solid' ? { bezel: g.reach * 2, bend: g.bend * 1.6, split: 0, frost: root.dataset.panes === 'frost' ? (root.dataset.mode === 'dark' ? 'blur(var(--blur)) saturate(160%) brightness(.82)' : 'blur(var(--blur)) saturate(25%) brightness(1.2)') : 'blur(var(--blur)) saturate(180%)' } : null); // no colour split on the panels: over the wallpaper it read as a yellow outline (Eric, Nov 17)
 Liquid.tuner($('tuner'));
 /* opened from a gallery thumbnail: the screen is the thumbnail, grown (see ui.css); the name is dropped once it lands */
 if (fromGallery && screens[0]) { screens[0].frame.style.viewTransitionName = 'screen'; addEventListener('pagereveal', e => e.viewTransition?.finished.finally(() => screens[0].frame.style.viewTransitionName = '')); setTimeout(() => screens[0].frame.style.viewTransitionName = '', 1500); }

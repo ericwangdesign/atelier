@@ -162,5 +162,5 @@ window.Liquid = (() => {
     });
     tuners.add(el);
   }
-  return { watch, tuner, supported: ok, values: () => ({ ...G }) };
+  return { watch, tuner, retune, supported: ok, values: () => ({ ...G }) };
 })();

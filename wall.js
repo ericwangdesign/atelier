@@ -6,9 +6,12 @@ window.Wall = (() => {
   let mem;
   const image = () => { if (mem === undefined) try { mem = localStorage.getItem(KEY); } catch { mem = null; } return mem; };
   /* paints el from a settings object, and returns the wallpaper actually shown (an image falls back to dark if none is kept) */
+  /* Dark and Light are one choice since Nov 17: Theme, the wallpaper that matches the page's light or dark mode
+     (mode.js). Returns 'auto' for it, so the menu shows Theme. */
   function apply(el, s) {
-    const img = image(), w = s.wall === 'image' && !img ? 'dark' : (s.wall || 'dark');
-    document.documentElement.dataset.wall = w;
+    const img = image(), themed = !s.wall || ['auto', 'dark', 'light'].includes(s.wall) || (s.wall === 'image' && !img);
+    const w = themed ? 'auto' : s.wall;
+    document.documentElement.dataset.wall = themed ? (window.Mode ? Mode.mode : 'dark') : w;
     el.style.backgroundImage = w === 'image' ? `url(${img})` : '';
     el.style.backgroundColor = w === 'color' ? s.color : '';
     document.documentElement.style.setProperty('--dim', s.dim || 0);
@@ -31,6 +34,6 @@ window.Wall = (() => {
     const k = list.join(' '); document.documentElement.dataset.photos = k;
     try { localStorage.setItem('workspace.photos', k); } catch {}
   }).catch(() => {});
-  const OPTIONS = [['dark', 'Dark'], ['light', 'Light'], ['gradient', 'Glow'], ['color', 'Colour'], ['image', 'Image…']];
+  const OPTIONS = [['auto', 'Theme'], ['gradient', 'Glow'], ['color', 'Colour'], ['image', 'Image…']];
   return { apply, save, OPTIONS };
 })();

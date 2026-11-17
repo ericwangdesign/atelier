@@ -240,7 +240,8 @@ console.log('Notes carry more than words');
     expect(await page.evaluate(() => [...document.querySelectorAll('.ink')].some(m => getComputedStyle(m).display !== 'none')), 'pointing at the pin does not show its markup');
     expect(snaps.length >= 2, `the snapshot was not taken again with the markup (${snaps.length})`);
     const [a, z] = [await blue(snaps[0]), await blue(snaps.at(-1))];
-    expect(z > a * 2 && z > 400, `the snapshot has no markup in it: ${a} blue pixels before, ${z} after`);
+    // a click in note mode notes the element under it (Annotate), and its picture already rings that element in blue, so count what the markup adds
+    expect(z - a > 400, `the snapshot has no markup in it: ${a} blue pixels before, ${z} after`);
     await page.mouse.move(5, 5);
   });
   await check('markup: Esc puts the tool down first, then cancels what was drawn', async () => {

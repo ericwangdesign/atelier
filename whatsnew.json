@@ -5,7 +5,18 @@
       "All five tabs fit the panel now: Stage is no longer cut off at the right.",
       "Copy brief is always in the Notes tab, greyed out until there's a note.",
       "Pausing right after a design loads no longer breaks the stage.",
-      "The first time a browser opens home, What's new starts as read, so a new install opens on the shelf."
+      "The first time a browser opens home, What's new starts as read, so a new install opens on the shelf.",
+      "Atelier is on the gen UI kit now: light and dark (Theme at the foot of home's sidebar, or Stage › Look), solid panels and controls, the kit's sizes and motion.",
+      "Glass panels are still there: Stage › Look › Panels › Glass.",
+      "Notes are Annotate now (N): point at the design and the element under the pointer is outlined and named; click it, drag an area, or shift-click several. A bar at the top shows the moves and Copy brief with the count.",
+      "Frost: the panel and the timeline are frosted glass over the wallpaper again, in light and dark. Stage › Look › Panels picks Solid, Frost or Glass.",
+      "Annotate names a button by its words (button “Start”), skips a design's glow layers to the element under them, and outlines nothing over plain background.",
+      "While annotating, hints (picked, drawing, editing words) show in the bar at the top, and the stage keeps that strip clear so the bar never covers a design.",
+      "A line added to Taste scrolls into view where it landed.",
+      "Note pins are a raised blue disc in a dark comment shape, its corner on the spot noted; ⇧ picks look the same.",
+      "Edit CSS: every value is a field. Drag a name sideways to scrub it (⇧ for tens), double-click it to put the value back; colours take a hex too.",
+      "Home's pane: a design stands on its earlier iterations, and a phone keeps a phone's corners.",
+      "A note's picture on a phone design shows what you picked again: it was drawn about 50px too high, without the status bar's room."
     ]
   },
   {

@@ -60,14 +60,19 @@ window.Taste = (() => {
         <button class="x" aria-label="Forget" title="Forget">×</button></li>`;
     }).join('');
     $('tasteempty').hidden = !!data.lines.length;
+    // the line just added: brought into view where it landed, rising in the kit's way, so you see it arrive
+    if (added) { const li = [...$('tastelist').querySelectorAll('.tl')].find(l => (l.querySelector('.tt')?.textContent || '').trim() === added); added = '';
+      if (li) { li.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        li.animate([{ opacity: 0, transform: 'translateY(6px)', filter: 'blur(3px)', background: 'var(--c-fill)' }, { opacity: 1, transform: 'none', filter: 'none', background: 'var(--c-fill)' }, { background: 'transparent' }], { duration: 1400, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }); } }
   }
 
+  var added = ''; // the line just typed, until it shows in the list
   /* ---------- editing ---------- */
   const act = body => API(body).then(refresh).catch(err => say(err.message));
   $('tasteon').onchange = e => { act({ act: 'on', on: e.target.checked }); say(e.target.checked ? 'Runs read your taste again' : 'Runs ignore your taste for now'); };
   $('tasteadd').onkeydown = e => {
     if (e.key !== 'Enter' || !e.target.value.trim()) return;
-    act({ act: 'add', text: e.target.value }); e.target.value = '';
+    added = e.target.value.trim(); act({ act: 'add', text: e.target.value }); e.target.value = '';
   };
   $('tastelist').addEventListener('click', e => {
     const j = e.target.closest('.jlink');
