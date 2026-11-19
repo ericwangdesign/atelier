@@ -4,14 +4,16 @@ Everything Atelier does, by where it lives. Type `atelier` in any terminal: it o
 
 ## Home
 
-![Home: a client and its projects](img/home.jpg)
+![Home in Columns: a folder, a project and its newest design](img/home.jpg)
 
-1. **The client.** One row per folder next to `atelier/`, with how many projects it has.
-2. **A project.** One card per project, with how many designs it has. Move the pointer across the card to skim its designs, each at its newest version; a click opens the one under the pointer. Versions show on the stage, not here.
-3. **Wallpaper** for every page.
-4. **New project.**
+1. **A folder.** One per folder next to `atelier/`. Click it to see its projects in the next column. The sidebar lists the same folders, under All projects, Recent and Mine.
+2. **A project.** Click it and its newest design is chosen.
+3. **The design**, running live. Click it to open it on the stage.
+4. **Its iterations**, as chips, the one shown in ink. Pick one to see it here. Under the facts, **Open** puts it on the stage and **Remix** copies a brief for your own agent session.
+5. **Grid or Columns.** Grid shows a card per project; Columns keeps the path you took on screen.
+6. **Theme:** Auto, Light or Dark, one setting for home and the stage.
 
-Filter with /, and sort by Recent or Name, once there's more than one project. When Atelier has changed since you last looked, a card at the top says what's new, once; **Got it** puts it away.
+**New project** and **New folder** sit at the top right. Search is at the top of the sidebar. When Atelier has changed since you last looked, a card at the top says what's new, once; **Got it** puts it away.
 
 ## The stage
 
@@ -33,8 +35,8 @@ Drag any edge of a desktop screen to resize it. Scroll on empty canvas to pan.
 
 ![Two versions side by side](img/compare.jpg)
 
-1. **The layer list.** One row per version: the version, then what it is. Click shows one; shift-click (or ⌘-click) adds it beside, up to five. A small dot marks the one on screen. With several on screen, each gets its letter instead, A to E.
-2. **The letter** above each screen matches the circle in the list.
+1. **The designs list.** One item per design: its name, how many versions, the versions as chips, and a line on the one shown. Click a chip to show it; shift-click (or ⌘-click) adds it beside, up to five. With several on screen, each chip gets its letter, A to E.
+2. **The letter** above each screen matches its chip.
 3. **Rows and Columns.** Any two axes as a grid: Versions down × Screen across shows v1 and v2 at desktop and phone at once.
 4. **View**, with exactly two: Side by side, **Swipe** (drag the divider), **Onion** (opacity slider), **Difference** (only changed pixels show).
 
@@ -69,13 +71,12 @@ Press F, then click an element: every screen crops to that part, enlarged, on th
 
 ![Two notes: a pin and an area](img/notes.jpg)
 
-On the screen, a grey numbered dot is a pinned note and a box is an area note. They only show on the step they were left on.
+On the screen, a blue numbered marker is a note, its sharp corner on the spot noted, and a dashed box is an area note. They only show on the step they were left on.
 
-1. **Note** (N): click a screen to pin one, or drag a box to note an area. An area records every element inside and their text. Select words on a screen and press N to note those exact words. The wheel still scrolls the design; hold ⌥ to click or use it without leaving note mode. On a design that frames a live page, the note is on the element in the page.
-2. **Cut** (X): point at an element and click. ↑ ↓ walk to its parent and back. Shift-click several, then Return, to cut them into one note.
-3. **The note.** Click to find its pin. **Open** opens the file at that spot.
-4. **Copy brief** copies every open note as a brief for your own agent session. See No agent inside, below.
-5. **Clear all** deletes every note, after asking.
+1. **Annotate** (N): point at the screen and the element under the pointer is outlined and named. Click to note that element, or drag a box to note an area; an area records every element inside and their text. ↑ ↓ walk to its parent and back. Shift-click several, then Return, for one note. Hold ⌥ to click the design itself. On a design that frames a live page, the note is on the element in the page. Esc or **Done** in the bar at the top ends it.
+2. **The note**, with a picture of what it's on. Click to find its marker. **Open** opens the file at that spot.
+3. **Copy brief** copies every open note as a brief for your own agent session. The bar at the top while annotating has it too, with the count. See No agent inside, below.
+4. **Clear all** deletes every note, after asking.
 
 Click a pin to edit, resolve or delete it; drag a pin to move it and it re-reads what's under it. Notes group into sittings: a gap over half an hour starts a new one. Everything is saved to `<project>/scenes/notes/`.
 
